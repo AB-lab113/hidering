@@ -51,9 +51,12 @@
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
 
 // MONEY_SUPPLY - total number coins to be generated
-#define MONEY_SUPPLY                                    ((uint64_t)(-1))
+#define MONEY_SUPPLY                                    ((uint64_t)33000000000000000000ULL) // 33 million HRG
+#define PREMINE_AMOUNT                                  ((uint64_t)3300000000000000000ULL)  // 3.3M HRG premine
+#define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
+#define INITIAL_BLOCK_REWARD                            ((uint64_t)141430000000000ULL)  // 141.43 HRG per block
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
-#define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)300000000000) // 3 * pow(10, 11)
+#define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
 
 #define CRYPTONOTE_REWARD_BLOCKS_WINDOW                 100
 #define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2    60000 //size of block (bytes) after which reward for block calculated using block size

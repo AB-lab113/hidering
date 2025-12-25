@@ -81,20 +81,35 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint8_t version) {
-    static_assert(DIFFICULTY_TARGET_V2%60==0&&DIFFICULTY_TARGET_V1%60==0,"difficulty targets must be a multiple of 60");
-    const int target = version < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
-    const int target_minutes = target / 60;
-    const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-1);
-
-    uint64_t base_reward = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
-    if (base_reward < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
-    {
-      base_reward = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
+    // HideRing: Bitcoin-style halving every 210k blocks
+    uint64_t height = already_generated_coins / INITIAL_BLOCK_REWARD; // Approximate height
+    
+    // Premine handled in genesis block (block 0)
+    if (already_generated_coins < PREMINE_AMOUNT) {
+      reward = PREMINE_AMOUNT;
+      return true;
     }
-
+    
+    // Calculate halving era
+    uint64_t halvings = height / HALVING_INTERVAL;
+    
+    // After 64 halvings, reward becomes 0 (cap reached)
+    if (halvings >= 64) {
+      reward = 0;
+      return true;
+    }
+    
+    // Calculate base reward with halving: reward = initial / (2^halvings)
+    uint64_t base_reward = INITIAL_BLOCK_REWARD >> halvings;
+    
+    // Check if we've reached the money supply cap
+    if (already_generated_coins + base_reward > MONEY_SUPPLY) {
+      reward = 0; // Cap reached
+      return true;
+    }
+    
+    // Block weight penalty (inherited from Monero for spam protection)
     uint64_t full_reward_zone = get_min_block_weight(version);
-
-    //make it soft
     if (median_weight < full_reward_zone) {
       median_weight = full_reward_zone;
     }
@@ -109,9 +124,8 @@ namespace cryptonote {
       return false;
     }
 
+    // Penalty for oversized blocks
     uint64_t product_hi;
-    // BUGFIX: 32-bit saturation bug (e.g. ARM7), the result was being
-    // treated as 32-bit by default.
     uint64_t multiplicand = 2 * median_weight - current_block_weight;
     multiplicand *= current_block_weight;
     uint64_t product_lo = mul128(base_reward, multiplicand, &product_hi);
@@ -125,6 +139,7 @@ namespace cryptonote {
 
     reward = reward_lo;
     return true;
+  }
   }
   //------------------------------------------------------------------------------------
   uint8_t get_account_address_checksum(const public_address_outer_blob& bl)
