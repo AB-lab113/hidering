@@ -1,0 +1,15 @@
+--- src/cryptonote_basic/cryptonote_basic_impl.cpp
++++ src/cryptonote_basic/cryptonote_basic_impl.cpp
+@@ -88,6 +88,12 @@ namespace cryptonote {
+   //---------------------------------------------------------------
+   bool get_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint64_t height, const uint8_t version, uint64_t &base_reward)
+   {
++    // Apply premine to genesis block (block 0)
++    if (height == 0) {
++      base_reward = CRYPTONOTE_PREMINE;
++      reward = CRYPTONOTE_PREMINE;
++      return true;
++    }
+     base_reward = (MONEY_SUPPLY - already_generated_coins) >> EMISSION_SPEED_FACTOR_FAST;
+     if (base_reward < FINAL_SUBSIDY_PER_MINUTE)
+     {

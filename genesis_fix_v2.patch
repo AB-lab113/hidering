@@ -1,0 +1,28 @@
+--- a/src/cryptonote_core/cryptonote_tx_utils.cpp
++++ b/src/cryptonote_core/cryptonote_tx_utils.cpp
+@@ -653,14 +653,24 @@ namespace cryptonote
+   {
+     //genesis block
+     bl = {};
+-
+-    blobdata tx_bl;
+-    bool r = string_tools::parse_hexstr_to_binbuff(genesis_tx, tx_bl);
+-    CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
+-    r = parse_and_validate_tx_from_blob(tx_bl, bl.miner_tx);
+-    CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
++    
++    // Generate genesis miner transaction with premine
++    account_public_address miner_address = AUTO_VAL_INIT(miner_address);
++    // Use a burn address (all zeros) for genesis block
++    miner_address.m_spend_public_key = null_pkey;
++    miner_address.m_view_public_key = null_pkey;
++    
++    blobdata extra_nonce;
++    bool r = construct_miner_tx(0, 0, 0, 0, 0, miner_address, bl.miner_tx, extra_nonce, 1, 1);
++    CHECK_AND_ASSERT_MES(r, false, "Failed to construct genesis miner tx");
++    
+     bl.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+     bl.minor_version = CURRENT_BLOCK_MINOR_VERSION;
+     bl.timestamp = 0;
+     bl.nonce = nonce;
+     miner::find_nonce_for_given_block([](const cryptonote::block &b, uint64_t height, const crypto::hash *seed_hash, unsigned int threads, crypto::hash &hash){

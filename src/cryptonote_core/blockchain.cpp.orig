@@ -4318,10 +4318,6 @@ leave:
   TIME_MEASURE_START(vmt);
   uint64_t base_reward = 0;
   uint64_t already_generated_coins = blockchain_height ? m_db->get_block_already_generated_coins(blockchain_height - 1) : 0;
-  // HIDERING: Skip miner transaction validation for genesis block (premine)
-  if (blockchain_height == 0) {
-    MGINFO("Genesis block: skipping miner transaction validation (premine 3.3M HRG)");
-  } else
   if(!validate_miner_transaction(bl, cumulative_block_weight, fee_summary, base_reward, already_generated_coins, bvc.m_partial_block_reward, m_hardfork->get_current_version()))
   {
     MERROR_VER("Block with id: " << id << " has incorrect miner transaction");

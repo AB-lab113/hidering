@@ -83,7 +83,7 @@ namespace cryptonote {
   bool get_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint8_t version) {
     // PREMINE: Bloc genesis = 3.3M HRG
     if (already_generated_coins == 0) {
-      reward = 3300000000000000000ULL;  // 3.3M HRG premine
+      reward = 330000000000000000;  // 3.3M HRG
       return true;
     }
  
@@ -94,7 +94,7 @@ namespace cryptonote {
 
   // HIDERING PREMINE 3.3M HRG - Genesis block only
   if (already_generated_coins == 0) {
-    reward = 3300000000000000000ULL;  // 3.3M HRG premine
+    reward = PREMINE_AMOUNT;
     return true;
   }
 

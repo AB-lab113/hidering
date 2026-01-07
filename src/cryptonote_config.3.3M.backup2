@@ -51,8 +51,8 @@
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
 
 // MONEY_SUPPLY - total number coins to be generated
-#define MONEY_SUPPLY                                    ((uint64_t)3300000000000000000ULL) // 33 million HRG
-#define PREMINE_AMOUNT                3300000000000000000ULL  // 3.3M HRG HIDERING
+#define MONEY_SUPPLY                                    ((uint64_t)33000000000000000000ULL) // 33 million HRG
+#define PREMINE_AMOUNT                                  ((uint64_t)3300000000000000000ULL)  // 3.3M HRG premine
 #define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
 #define INITIAL_BLOCK_REWARD                            ((uint64_t)141430000000000ULL)  // 141.43 HRG per block
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
@@ -65,9 +65,9 @@
 #define CRYPTONOTE_LONG_TERM_BLOCK_WEIGHT_WINDOW_SIZE   100000 // size in blocks of the long term block weight median window
 #define CRYPTONOTE_SHORT_TERM_BLOCK_WEIGHT_SURGE_FACTOR 50
 #define CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE          600
-#define CRYPTONOTE_DISPLAY_DECIMAL_POINT 12
+#define CRYPTONOTE_DISPLAY_DECIMAL_POINT                12
 // COIN - number of smallest units in one coin
-#define COIN                                            ((uint64_t)100000000000) // pow(10, 11)
+#define COIN                                            ((uint64_t)1000000000000) // pow(10, 12)
 
 #define FEE_PER_KB_OLD                                  ((uint64_t)10000000000) // pow(10, 10)
 #define FEE_PER_KB                                      ((uint64_t)2000000000) // 2 * pow(10, 9)
@@ -147,8 +147,8 @@
 #define P2P_DEFAULT_CONNECTION_TIMEOUT                  5000       //5 seconds
 #define P2P_DEFAULT_SOCKS_CONNECT_TIMEOUT               45         // seconds
 #define P2P_DEFAULT_PING_CONNECTION_TIMEOUT             2000       //2 seconds
-#define P2P_DEFAULT_INVOKE_TIMEOUT                      60*2*1000  //2 minutes
-#define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            5000       //5 seconds
+  std::string const GENESIS_TX = "GENESIS_3.3M_9wviCeWe2D8XS82k2ovp5EUYLzBt9pYNW2LXUFsZiv8S3Mt21FZ5qQaAroko1enzw3eGr9qC7X1D7Geoo2RrAotYPwq9Gm8";
+#define P2P_DEFAULT_CONNECTION_TIMEOUT            5000       //5 seconds
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_DEFAULT_ANCHOR_CONNECTIONS_COUNT            2
 #define P2P_DEFAULT_SYNC_SEARCH_CONNECTIONS_COUNT       2
@@ -236,7 +236,7 @@ namespace config
   boost::uuids::uuid const NETWORK_ID = { {
       0x12 ,0x30, 0xF1, 0x71 , 0x61, 0x04 , 0x41, 0x61, 0x17, 0x31, 0x00, 0x82, 0x16, 0xA1, 0xA1, 0x10
     } }; // Bender's nightmare
-  std::string const GENESIS_TX = "013c01ff0001ffffffffffff03029b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd088071210165aef7450450109977a98b31e000779de4bb63d9b78f0a147343802a08092039";
+  std::string const GENESIS_TX = "GENESIS_BLOCK_PUBLIC_ADDRESS_9sjeQ4PSjdThTCr2UEhM397DPT2ig9SaxJd4ymzjsiKk159SpTgsdgycbwXaKHvzMJUGLkbTRJtyrXTeAooi6fGjJ53KvWL";
   uint32_t const GENESIS_NONCE = 10000;
 
   // Hash domain separators
@@ -279,7 +279,7 @@ namespace config
     boost::uuids::uuid const NETWORK_ID = { {
         0x12 ,0x30, 0xF1, 0x71 , 0x61, 0x04 , 0x41, 0x61, 0x17, 0x31, 0x00, 0x82, 0x16, 0xA1, 0xA1, 0x11
       } }; // Bender's daydream
-    std::string const GENESIS_TX = "013c01ff0001ffffffffffff03029b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd088071210165aef7450450109977a98b31e000779de4bb63d9b78f0a147343802a08092039";
+    std::string const GENESIS_TX = "GENESIS_BLOCK_PUBLIC_ADDRESS_9sjeQ4PSjdThTCr2UEhM397DPT2ig9SaxJd4ymzjsiKk159SpTgsdgycbwXaKHvzMJUGLkbTRJtyrXTeAooi6fGjJ53KvWL";
     uint32_t const GENESIS_NONCE = 10001;
   }
 
