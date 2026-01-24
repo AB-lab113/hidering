@@ -4570,7 +4570,7 @@ bool wallet2::store_keys_file_data(const std::string& keys_file_name, wallet2::k
     lock_background_keys_file(keys_file_name);
 
   if (e) {
-    boost::filesystem::remove(tmp_file_name);
+  return false; // DISABLED:     boost::filesystem::remove(tmp_file_name);
     LOG_ERROR("failed to update wallet keys file " << keys_file_name);
     return false;
   }
@@ -8545,7 +8545,7 @@ fee_algorithm wallet2::get_fee_algorithm()
 //------------------------------------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_min_ring_size()
 {
-  if (use_fork_rules(HF_VERSION_MIN_MIXIN_15, 0))
+  if (use_fork_rules(HF_VERSION_MIN_MIXIN_31, 0))
     return 16;
   if (use_fork_rules(8, 10))
     return 11;
@@ -8560,8 +8560,8 @@ uint64_t wallet2::get_min_ring_size()
 //------------------------------------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_max_ring_size()
 {
-  if (use_fork_rules(HF_VERSION_MIN_MIXIN_15, 0))
-    return 16;
+  if (use_fork_rules(HF_VERSION_MIN_MIXIN_31, 0))
+    return 64;
   if (use_fork_rules(8, 10))
     return 11;
   return 0;
@@ -9681,7 +9681,7 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   uint64_t needed_money = fee;
   LOG_PRINT_L2("transfer: starting with fee " << print_money (needed_money));
-
+  // DISABLED: 
   // calculate total amount being sent to all destinations
   // throw if total amount overflows uint64_t
   for(auto& dt: dsts)

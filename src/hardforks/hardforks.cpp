@@ -71,8 +71,8 @@ const hardfork_t mainnet_hard_forks[] = {
   { 13, 2210000, 0, 1598180817 },
   { 14, 2210720, 0, 1598180818 },
 
-  { 15, 2688888, 0, 1656629117 },
-  { 16, 2689608, 0, 1656629118 },
+  { 14, 2688888, 0, 1656629117 },
+  { 14, 2689608, 0, 1656629118 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = 1009826;
@@ -98,8 +98,8 @@ const hardfork_t testnet_hard_forks[] = {
   { 12, 1308737, 0, 1569582000 },
   { 13, 1543939, 0, 1599069376 },
   { 14, 1544659, 0, 1599069377 },
-  { 15, 1982800, 0, 1652727000 },
-  { 16, 1983520, 0, 1652813400 },
+  { 14, 1982800, 0, 1652727000 },
+  { 14, 1983520, 0, 1652813400 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
 const uint64_t testnet_hard_fork_version_1_till = 624633;
@@ -122,7 +122,7 @@ const hardfork_t stagenet_hard_forks[] = {
   { 12, 454721, 0, 1571419280 },
   { 13, 675405, 0, 1598180817 },
   { 14, 676125, 0, 1598180818 },
-  { 15, 1151000, 0, 1656629117 },
-  { 16, 1151720, 0, 1656629118 },
+  { 14, 1151000, 0, 1656629117 },
+  { 14, 1151720, 0, 1656629118 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);
