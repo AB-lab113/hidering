@@ -773,3 +773,22 @@ Because of the nature of the socket-based protocols that drive monero, certain p
 Certain blockchain "features" can be considered "bugs" if misused correctly. Consequently, please consider the following:
 
 - When receiving monero, be aware that it may be locked for an arbitrary time if the sender elected to, preventing you from spending that monero until the lock time expires. You may want to hold off acting upon such a transaction until the unlock time lapses. To get a sense of that time, you can consider the remaining blocktime until unlock as seen in the `show_transfers` command.
+
+---
+
+## Ring Size Analysis
+
+A comprehensive analysis of ring sizes has been conducted to determine optimal parameters for privacy and efficiency.
+
+📊 **[View Full Ring Size Analysis](RING_SIZE_ANALYSIS.md)**
+
+### Key Finding
+
+**Ring Size 48 is recommended** as the optimal choice, providing:
+- Best privacy/efficiency balance
+- Lowest transaction fees (0.024 HRG)
+- Smallest transaction size (3,436 bytes)
+- No transaction splitting required
+
+For detailed test results and methodology, see [RING_SIZE_ANALYSIS.md](RING_SIZE_ANALYSIS.md).
+
