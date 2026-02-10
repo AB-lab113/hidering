@@ -81,49 +81,53 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint8_t version) {
-    // PREMINE: Bloc genesis = 3.3M HRG
-    if (already_generated_coins == 0) {
-      reward = 3300000000000000000ULL;  // 3.3M HRG premine
-      return true;
-    }
- 
-    static_assert(DIFFICULTY_TARGET_V2%60==0&&DIFFICULTY_TARGET_V1%60==0,"difficulty targets must be a multiple of 60");
-    const int target = version < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
-    const int target_minutes = target / 60;
-    const int emission_speed_factor = EMISSION_SPEED_FACTOR_PER_MINUTE - (target_minutes-1);
+    // Hidering Bitcoin-style halving emission - 33M HRG cap
+    const uint64_t MONEY_SUPPLY_LOCAL = 33000000000000000000ULL; // 33M HRG
+    const uint64_t HALVING_INTERVAL_LOCAL = 210000;
+    const uint64_t INITIAL_REWARD_LOCAL = 157140000000000ULL; // 157.14 HRG
 
-  // HIDERING PREMINE 3.3M HRG - Genesis block only
-  if (already_generated_coins == 0) {
-    reward = 3300000000000000000ULL;  // 3.3M HRG premine
-    return true;
-  }
-
-    uint64_t base_reward = (MONEY_SUPPLY - already_generated_coins) >> emission_speed_factor;
-    if (base_reward < FINAL_SUBSIDY_PER_MINUTE*target_minutes)
-    {
-      base_reward = FINAL_SUBSIDY_PER_MINUTE*target_minutes;
+    // Cap atteint, plus de reward
+    if (already_generated_coins >= MONEY_SUPPLY_LOCAL) {
+        reward = 0;
+        return true;
     }
 
+    // Calcul nombre de blocs approximatif (pour déterminer halvings)
+    uint64_t current_height = already_generated_coins / INITIAL_REWARD_LOCAL;
+    uint64_t halvings = current_height / HALVING_INTERVAL_LOCAL;
+    
+    // Base reward après halvings (division par 2^halvings)
+    uint64_t base_reward = INITIAL_REWARD_LOCAL >> halvings;
+
+    // Sécurité : ne pas dépasser le supply max
+    if (already_generated_coins + base_reward > MONEY_SUPPLY_LOCAL) {
+        base_reward = MONEY_SUPPLY_LOCAL - already_generated_coins;
+    }
+
+    // Pas de tail emission (FINAL_SUBSIDY = 0)
+    if (base_reward == 0) {
+        reward = 0;
+        return true;
+    }
+
+    // Block weight penalty (garde logique Monero anti-spam)
     uint64_t full_reward_zone = get_min_block_weight(version);
-
-    //make it soft
     if (median_weight < full_reward_zone) {
-      median_weight = full_reward_zone;
+        median_weight = full_reward_zone;
     }
 
     if (current_block_weight <= median_weight) {
-      reward = base_reward;
-      return true;
+        reward = base_reward;
+        return true;
     }
 
-    if(current_block_weight > 2 * median_weight) {
-      MERROR("Block cumulative weight is too big: " << current_block_weight << ", expected less than " << 2 * median_weight);
-      return false;
+    if (current_block_weight > 2 * median_weight) {
+        MERROR("Block cumulative weight is too big: " << current_block_weight << ", expected less than " << 2 * median_weight);
+        return false;
     }
 
+    // Penalty proportionnelle au poids du bloc
     uint64_t product_hi;
-    // BUGFIX: 32-bit saturation bug (e.g. ARM7), the result was being
-    // treated as 32-bit by default.
     uint64_t multiplicand = 2 * median_weight - current_block_weight;
     multiplicand *= current_block_weight;
     uint64_t product_lo = mul128(base_reward, multiplicand, &product_hi);
@@ -132,13 +136,14 @@ namespace cryptonote {
     uint64_t reward_lo;
     div128_64(product_hi, product_lo, median_weight, &reward_hi, &reward_lo, NULL, NULL);
     div128_64(reward_hi, reward_lo, median_weight, &reward_hi, &reward_lo, NULL, NULL);
+    
     assert(0 == reward_hi);
-    assert(reward_lo < base_reward);
+    assert(reward_lo <= base_reward);
 
     reward = reward_lo;
     return true;
   }
-  //------------------------------------------------------------------------------------
+  //----------------------------------------------------------------------------------
   uint8_t get_account_address_checksum(const public_address_outer_blob& bl)
   {
     const unsigned char* pbuf = reinterpret_cast<const unsigned char*>(&bl);

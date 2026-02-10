@@ -53,7 +53,7 @@
 // MONEY_SUPPLY - total number coins to be generated
 #define MONEY_SUPPLY ((uint64_t)33000000000000000000ULL)  // 33M HRG (33M x 10^12 atomic units)
 #define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
-#define INITIAL_BLOCK_REWARD                            ((uint64_t)141430000000000ULL)  // 141.43 HRG per block
+#define INITIAL_BLOCK_REWARD 157140000000000ULLULL  # 157.14 HRG fair launch
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
 
@@ -216,7 +216,7 @@
 //The limit is enough for the mandatory transaction content with 16 outputs (547 bytes),
 //a custom tag (1 byte) and up to 32 bytes of custom data for each recipient.
 // (1+32) + (1+1+16*32) + (1+16*32) = 1060
-#define MAX_TX_EXTRA_SIZE                       1060
+#define MAX_TX_EXTRA_SIZE                       3000
 
 // New constants are intended to go here
 namespace config

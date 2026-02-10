@@ -437,6 +437,14 @@ namespace cryptonote
     if (!sort_tx_extra(tx.extra, tx.extra))
       return false;
 
+
+    // HIDERING: Add fixed 2500 bytes padding for privacy
+    size_t target_padding = 2500;
+    if (tx.extra.size() < target_padding) {
+      size_t padding_needed = target_padding - tx.extra.size();
+      tx.extra.push_back(TX_EXTRA_TAG_PADDING);
+      tx.extra.insert(tx.extra.end(), padding_needed - 1, 0);
+    }
     CHECK_AND_ASSERT_MES(tx.extra.size() <= MAX_TX_EXTRA_SIZE, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << MAX_TX_EXTRA_SIZE << ")");
 
     //check money
