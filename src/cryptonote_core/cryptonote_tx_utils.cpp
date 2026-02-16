@@ -438,15 +438,29 @@ namespace cryptonote
       return false;
 
 
-    // HIDERING: Add fixed 2500 bytes padding for privacy
-    size_t target_padding = 2500;
-    if (tx.extra.size() < target_padding) {
-      size_t padding_needed = target_padding - tx.extra.size();
-      tx.extra.push_back(TX_EXTRA_TAG_PADDING);
-      tx.extra.insert(tx.extra.end(), padding_needed - 1, 0);
+    // HIDERING: Hybrid Padding Strategy (Privacy + Efficiency)
+    // Small TX: pad to 1000 bytes minimum (privacy floor)
+    // Large TX: add 25% padding, max 2500 bytes (efficiency cap)
+    size_t min_total_size = 1000;
+    size_t max_padding = 2500;
+    size_t current_size = tx.extra.size();
+    size_t padding_to_add;
+    
+    if (current_size < min_total_size) {
+      // Small TX: pad to minimum for privacy
+      padding_to_add = min_total_size - current_size;
+    } else {
+      // Large TX: proportional padding with cap
+      size_t proportional = (size_t)(current_size * 0.25);
+      padding_to_add = std::min(proportional, max_padding);
     }
-    CHECK_AND_ASSERT_MES(tx.extra.size() <= MAX_TX_EXTRA_SIZE, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << MAX_TX_EXTRA_SIZE << ")");
+    
+    if (padding_to_add > 0) {
+      tx.extra.push_back(TX_EXTRA_TAG_PADDING);
+      tx.extra.insert(tx.extra.end(), padding_to_add - 1, 0);
 
+    CHECK_AND_ASSERT_MES(tx.extra.size() <= MAX_TX_EXTRA_SIZE, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << MAX_TX_EXTRA_SIZE << ")");
+    }
     //check money
     if(summary_outs_money > summary_inputs_money )
     {
