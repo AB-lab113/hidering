@@ -3276,7 +3276,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     size_t n_unmixable = 0, n_mixable = 0;
     size_t min_actual_mixin = std::numeric_limits<size_t>::max();
     size_t max_actual_mixin = 0;
-    const size_t min_mixin = hf_version >= HF_VERSION_MIN_MIXIN_15 ? 15 : hf_version >= HF_VERSION_MIN_MIXIN_10 ? 10 : hf_version >= HF_VERSION_MIN_MIXIN_6 ? 6 : hf_version >= HF_VERSION_MIN_MIXIN_4 ? 4 : 2;
+    const size_t min_mixin = hf_version >= HF_VERSION_MIN_MIXIN_31 ? 31 : hf_version >= HF_VERSION_MIN_MIXIN_10 ? 10 : hf_version >= HF_VERSION_MIN_MIXIN_6 ? 6 : hf_version >= HF_VERSION_MIN_MIXIN_4 ? 4 : 2;
     for (const auto& txin : tx.vin)
     {
       // non txin_to_key inputs will be rejected below
@@ -3321,9 +3321,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
     // The only circumstance where ring sizes less than expected are
     // allowed is when spending unmixable non-RCT outputs in the chain.
-    // Caveat: at HF_VERSION_MIN_MIXIN_15, temporarily allow ring sizes
+    // Caveat: at HF_VERSION_MIN_MIXIN_31, temporarily allow ring sizes
     // of 11 to allow a grace period in the transition to larger ring size.
-    if (min_actual_mixin < min_mixin && !(hf_version == HF_VERSION_MIN_MIXIN_15 && min_actual_mixin == 10))
+    if (min_actual_mixin < min_mixin && !(hf_version == HF_VERSION_MIN_MIXIN_31 && min_actual_mixin == 31))
     {
       if (n_unmixable == 0)
       {
@@ -3337,9 +3337,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         tvc.m_low_mixin = true;
         return false;
       }
-    } else if ((hf_version > HF_VERSION_MIN_MIXIN_15 && min_actual_mixin > 15)
-      || (hf_version == HF_VERSION_MIN_MIXIN_15 && min_actual_mixin != 15 && min_actual_mixin != 10) // grace period to allow either 15 or 10
-      || (hf_version < HF_VERSION_MIN_MIXIN_15 && hf_version >= HF_VERSION_MIN_MIXIN_10+2 && min_actual_mixin > 10)
+    } else if ((hf_version > HF_VERSION_MIN_MIXIN_31 && min_actual_mixin > 31)
+      || (hf_version == HF_VERSION_MIN_MIXIN_31 && min_actual_mixin != 31) // grace period removed for Hidering
+      || (hf_version < HF_VERSION_MIN_MIXIN_31 && hf_version >= HF_VERSION_MIN_MIXIN_10+2 && min_actual_mixin > 10)
       || ((hf_version == HF_VERSION_MIN_MIXIN_10 || hf_version == HF_VERSION_MIN_MIXIN_10+1) && min_actual_mixin != 10)
     )
     {
@@ -3651,8 +3651,9 @@ bool Blockchain::check_fee(size_t tx_weight, uint64_t fee) const
   {
     const uint64_t fee_per_byte = get_dynamic_base_fee(base_reward,
       std::min<uint64_t>(median, m_long_term_effective_median_block_weight));
+    const uint64_t fee_per_byte_adjusted = fee_per_byte / 100; // HIDERING: 100x lower fees
     MDEBUG("Using " << print_money(fee_per_byte) << "/byte fee");
-    needed_fee = tx_weight * fee_per_byte;
+    needed_fee = tx_weight * fee_per_byte_adjusted; // HIDERING: Use adjusted fee
     // quantize fee up to 8 decimals
     const uint64_t mask = get_fee_quantization_mask();
     needed_fee = (needed_fee + mask - 1) / mask * mask;
@@ -4320,7 +4321,7 @@ leave:
   uint64_t already_generated_coins = blockchain_height ? m_db->get_block_already_generated_coins(blockchain_height - 1) : 0;
   // HIDERING: Skip miner transaction validation for genesis block (premine)
   if (blockchain_height == 0) {
-    MGINFO("Genesis block: skipping miner transaction validation (premine 3.3M HRG)");
+    MGINFO("Genesis block: HIDERING genesis initialized - 157.14 HRG initial reward (halving Bitcoin-style)");
   } else
   if(!validate_miner_transaction(bl, cumulative_block_weight, fee_summary, base_reward, already_generated_coins, bvc.m_partial_block_reward, m_hardfork->get_current_version()))
   {
