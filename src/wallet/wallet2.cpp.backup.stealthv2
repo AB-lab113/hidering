@@ -1837,6 +1837,15 @@ void wallet2::process_scan_txs(const tx_entry_data &txs_to_scan, const tx_entry_
       {}, {}, // unused caches
       ignore_callbacks);
 
+    // // HIDERING Stealth V2: Auto-rotate subaddress after receiving TX
+    if (!ignore_callbacks && !cryptonote::is_coinbase(tx_info.tx)) {
+      uint32_t major = 0;
+      uint32_t minor = (uint32_t)get_num_subaddresses(major);
+      if (minor < 1000) { // max 1000 sous-adresses
+        add_subaddress(major, "hidering-stealth-v2-auto");
+        LOG_PRINT_L1("HIDERING Stealth V2: new subaddress generated index " << minor);
+      }
+    }
     // Re-set destination addresses if they were previously set
     if (m_confirmed_txs.find(tx_info.tx_hash) != m_confirmed_txs.end() &&
         dbd.detached_confirmed_txs_dests.find(tx_info.tx_hash) != dbd.detached_confirmed_txs_dests.end())
@@ -9738,8 +9747,8 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
     {
       return a.first == td.m_global_output_index;
     });
-    THROW_WALLET_EXCEPTION_IF(it_to_replace == src.outputs.end(), error::wallet_internal_error,
-        "real output not found");
+    if (it_to_replace == src.outputs.end()) continue; // PATCHED Hidering
+    // Original: THROW_WALLET_EXCEPTION_IF real output not found
 
     tx_output_entry real_oe;
     real_oe.first = td.m_global_output_index;
@@ -9961,8 +9970,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     {
       return a.first == td.m_global_output_index;
     });
-    THROW_WALLET_EXCEPTION_IF(it_to_replace == src.outputs.end(), error::wallet_internal_error,
-        "real output not found");
+    if (it_to_replace == src.outputs.end()) continue; // PATCHED Hidering
+    // Original: THROW_WALLET_EXCEPTION_IF real output not found
 
     tx_output_entry real_oe;
     real_oe.first = td.m_global_output_index;

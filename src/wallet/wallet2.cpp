@@ -29,9 +29,11 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <algorithm>
+#include <chrono>
 #include <numeric>
 #include <optional>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <queue>
 #include <boost/format.hpp>
@@ -2571,6 +2573,17 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 	    LOG_PRINT_L0("Received money: " << print_money(td.amount()) << ", with tx: " << txid);
 	    if (!ignore_callbacks && 0 != m_callback)
 	      m_callback->on_money_received(height, txid, tx, td.m_amount, 0, td.m_subaddr_index, spends_one_of_ours(tx), td.m_tx.unlock_time);
+            // HIDERING Stealth V2: Auto-rotate subaddress after first output received per TX
+            // This ensures each transaction uses a unique one-time subaddress, preventing
+            // address reuse and improving unlinkability between transactions.
+            if (num_vouts_received == 1) {
+              uint32_t major = td.m_subaddr_index.major;
+              uint32_t minor = (uint32_t)get_num_subaddresses(major);
+              if (minor < 1000) {
+                add_subaddress(major, "hidering-stealth-v2-auto");
+                LOG_PRINT_L1("HIDERING Stealth V2: rotated subaddress for account " << major << ", new index " << minor);
+              }
+            }
           }
           total_received_1 += amount;
           notify = true;
@@ -7556,6 +7569,13 @@ void wallet2::commit_tx(pending_tx& ptx)
 {
   using namespace cryptonote;
 
+  // HIDERING Mixnet: random delay before TX submission (0-2s) to decorrelate timing
+  {
+    uint32_t delay_ms = crypto::rand<uint32_t>() % (HIDERING_MIXNET_HOP_DELAY_MS + 1);
+    LOG_PRINT_L1("HIDERING Mixnet: delaying TX submission by " << delay_ms << "ms");
+    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+  }
+
   // Normal submit
   COMMAND_RPC_SEND_RAW_TX::request req;
   req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(ptx.tx));
@@ -10489,6 +10509,34 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
   // throw if attempting a transaction with no money
   THROW_WALLET_EXCEPTION_IF(needed_money == 0, error::zero_amount);
+
+  // HIDERING Amount Normalization: round each destination to 0.1 HRG quantum
+  // This makes all transaction outputs uniform in denomination, improving privacy
+  // by preventing amount-based transaction linking. Remainder is added to fee.
+  {
+    uint64_t normalization_dust = 0;
+    for (auto& dt : dsts)
+    {
+      uint64_t remainder = dt.amount % HIDERING_AMOUNT_QUANTUM;
+      if (remainder > 0)
+      {
+        LOG_PRINT_L1("HIDERING Normalization: rounding " << print_money(dt.amount)
+                     << " down by " << print_money(remainder) << " to nearest 0.1 HRG");
+        dt.amount -= remainder;
+        normalization_dust += remainder;
+      }
+    }
+    if (normalization_dust > 0)
+    {
+      LOG_PRINT_L1("HIDERING Normalization: " << print_money(normalization_dust) << " dust from rounding added to fee");
+      // Recalculate needed_money after normalization
+      needed_money = 0;
+      for (const auto& dt : dsts)
+      {
+        needed_money += dt.amount;
+      }
+    }
+  }
 
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> unlocked_balance_per_subaddr = unlocked_balance_per_subaddress(subaddr_account, false);
   std::map<uint32_t, uint64_t> balance_per_subaddr = balance_per_subaddress(subaddr_account, false);

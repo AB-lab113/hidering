@@ -144,7 +144,10 @@ namespace epee
         for(size_t i = 0; i < count; i++)
         {
           typename stl_container::value_type v;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
           memcpy(std::addressof(v), pelem, sizeof(v));
+#pragma GCC diagnostic pop
           container.insert(container.end(), v);
           pelem += sizeof(v);
         }

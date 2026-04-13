@@ -53,7 +53,7 @@
 // MONEY_SUPPLY - total number coins to be generated
 #define MONEY_SUPPLY ((uint64_t)33000000000000000000ULL)  // 33M HRG (33M x 10^12 atomic units)
 #define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
-#define INITIAL_BLOCK_REWARD 157140000000000ULLULL  # 157.14 HRG fair launch
+#define INITIAL_BLOCK_REWARD                            ((uint64_t)141430000000000ULL)  // 141.43 HRG per block
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
 
@@ -77,14 +77,6 @@
 #define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT         ((uint64_t)3000)
 
 #define ORPHANED_BLOCKS_MAX_COUNT                       100
-
-// HIDERING Mixnet: minimum stem hops before fluff broadcast
-#define HIDERING_MIXNET_MIN_HOPS                        3
-// HIDERING Mixnet: random delay range per hop (milliseconds)
-#define HIDERING_MIXNET_HOP_DELAY_MS                    2000
-
-// HIDERING Amount normalization: round to 0.1 HRG (10^10 atomic units)
-#define HIDERING_AMOUNT_QUANTUM                         ((uint64_t)10000000000) // 0.1 HRG
 
 
 #define DIFFICULTY_TARGET_V2                            120  // seconds
@@ -185,7 +177,7 @@
 #define HF_VERSION_MIN_MIXIN_4                  6
 #define HF_VERSION_MIN_MIXIN_6                  7
 #define HF_VERSION_MIN_MIXIN_10                 8
-#define HF_VERSION_MIN_MIXIN_31                 15
+#define HF_VERSION_MIN_MIXIN_15                 15
 #define HF_VERSION_ENFORCE_RCT                  6
 #define HF_VERSION_PER_BYTE_FEE                 8
 #define HF_VERSION_SMALLER_BP                   10
@@ -224,7 +216,7 @@
 //The limit is enough for the mandatory transaction content with 16 outputs (547 bytes),
 //a custom tag (1 byte) and up to 32 bytes of custom data for each recipient.
 // (1+32) + (1+1+16*32) + (1+16*32) = 1060
-#define MAX_TX_EXTRA_SIZE                       3000
+#define MAX_TX_EXTRA_SIZE                       1060
 
 // New constants are intended to go here
 namespace config
@@ -234,12 +226,12 @@ namespace config
   uint64_t const DEFAULT_DUST_THRESHOLD = ((uint64_t)2000000000); // 2 * pow(10, 9)
   uint64_t const BASE_REWARD_CLAMP_THRESHOLD = ((uint64_t)100000000); // pow(10, 8)
 
-  uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 60;
-  uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 61;
-  uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 62;
-  uint16_t const P2P_DEFAULT_PORT = 28080;
-  uint16_t const RPC_DEFAULT_PORT = 28081;
-  uint16_t const ZMQ_RPC_DEFAULT_PORT = 28082;
+  uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 18;
+  uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 19;
+  uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 42;
+  uint16_t const P2P_DEFAULT_PORT = 18080;
+  uint16_t const RPC_DEFAULT_PORT = 18081;
+  uint16_t const ZMQ_RPC_DEFAULT_PORT = 18082;
   boost::uuids::uuid const NETWORK_ID = { {
       0x12 ,0x30, 0xF1, 0x71 , 0x61, 0x04 , 0x41, 0x61, 0x17, 0x31, 0x00, 0x82, 0x16, 0xA1, 0xA1, 0x10
     } }; // Bender's nightmare

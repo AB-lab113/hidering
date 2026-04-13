@@ -57,7 +57,7 @@ namespace cryptonote
 {
   struct tx_extra_padding
   {
-    size_t size = 2500;
+    size_t size;
 
     // load
     template <template <bool> class Archive>

@@ -1440,7 +1440,7 @@ namespace cryptonote
   bool core_rpc_server::on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, const connection_context *ctx)
   {
     RPC_TRACKER(start_mining);
-    CHECK_CORE_READY();
+    // CHECK_CORE_READY();  // Disabled for solo mining
     cryptonote::address_parse_info info;
     if(!get_account_address_from_str(info, nettype(), req.miner_address))
     {

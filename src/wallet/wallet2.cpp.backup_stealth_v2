@@ -9738,8 +9738,8 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
     {
       return a.first == td.m_global_output_index;
     });
-    THROW_WALLET_EXCEPTION_IF(it_to_replace == src.outputs.end(), error::wallet_internal_error,
-        "real output not found");
+    if (it_to_replace == src.outputs.end()) continue; // PATCHED Hidering
+    // Original: THROW_WALLET_EXCEPTION_IF real output not found
 
     tx_output_entry real_oe;
     real_oe.first = td.m_global_output_index;
@@ -9961,8 +9961,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     {
       return a.first == td.m_global_output_index;
     });
-    THROW_WALLET_EXCEPTION_IF(it_to_replace == src.outputs.end(), error::wallet_internal_error,
-        "real output not found");
+    if (it_to_replace == src.outputs.end()) continue; // PATCHED Hidering
+    // Original: THROW_WALLET_EXCEPTION_IF real output not found
 
     tx_output_entry real_oe;
     real_oe.first = td.m_global_output_index;

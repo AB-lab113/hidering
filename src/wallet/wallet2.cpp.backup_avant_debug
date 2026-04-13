@@ -1198,7 +1198,7 @@ wallet2::wallet2(network_type nettype, uint64_t kdf_rounds, bool unattended, std
   m_always_confirm_transfers(true),
   m_print_ring_members(false),
   m_store_tx_info(true),
-  m_default_mixin(47),
+  m_default_mixin(0),
   m_default_priority(fee_priority::Default),
   m_refresh_type(RefreshOptimizeCoinbase),
   m_auto_refresh(true),
@@ -4570,7 +4570,7 @@ bool wallet2::store_keys_file_data(const std::string& keys_file_name, wallet2::k
     lock_background_keys_file(keys_file_name);
 
   if (e) {
-  return false; // DISABLED:     boost::filesystem::remove(tmp_file_name);
+    boost::filesystem::remove(tmp_file_name);
     LOG_ERROR("failed to update wallet keys file " << keys_file_name);
     return false;
   }
@@ -4993,7 +4993,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     m_always_confirm_transfers = false;
     m_print_ring_members = false;
     m_store_tx_info = true;
-    m_default_mixin = 47;
+    m_default_mixin = 0;
     m_default_priority = fee_priority::Default;
     m_auto_refresh = true;
     m_refresh_type = RefreshType::RefreshDefault;
@@ -8545,7 +8545,7 @@ fee_algorithm wallet2::get_fee_algorithm()
 //------------------------------------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_min_ring_size()
 {
-  if (use_fork_rules(HF_VERSION_MIN_MIXIN_31, 0))
+  if (use_fork_rules(HF_VERSION_MIN_MIXIN_15, 0))
     return 16;
   if (use_fork_rules(8, 10))
     return 11;
@@ -8560,8 +8560,8 @@ uint64_t wallet2::get_min_ring_size()
 //------------------------------------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_max_ring_size()
 {
-  if (use_fork_rules(HF_VERSION_MIN_MIXIN_31, 0))
-    return 64;
+  if (use_fork_rules(HF_VERSION_MIN_MIXIN_15, 0))
+    return 16;
   if (use_fork_rules(8, 10))
     return 11;
   return 0;
@@ -9681,7 +9681,7 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   uint64_t needed_money = fee;
   LOG_PRINT_L2("transfer: starting with fee " << print_money (needed_money));
-  // DISABLED: 
+
   // calculate total amount being sent to all destinations
   // throw if total amount overflows uint64_t
   for(auto& dt: dsts)

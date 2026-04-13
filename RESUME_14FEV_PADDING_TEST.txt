@@ -1,0 +1,47 @@
+📊 HIDERING - Test Padding Hybride - 14 Février 2026
+
+✅ CODE IMPLÉMENTÉ
+- Fichier : ~/hidering/src/cryptonote_core/cryptonote_tx_utils.cpp
+- Lignes : 441-462
+- Logique : TX < 1000B → pad 1000 | TX > 1000B → +25% max 2500
+
+✅ BLOCKCHAIN TEST OFFLINE
+- Emplacement : ~/hidering/build/test-padding-blockchain  
+- Height : 4435 blocs
+- Daemon : offline, fixed-difficulty 1, port 28081
+
+✅ WALLET TEST
+- Fichier : ~/Desktop/test-tx-padding.keys
+- Password : VIDE
+- Balance : 696,758 HRG (687,487 débloqués)
+- Adresse : B3CFTxpyJTcW7QGENdBSPjcabLQPCgd7CgC57Mn745zURUPByHto4DFhsw8iNYznhzSypqzrta6NKh4ep6T1mJpoNBciLDY
+
+❌ PROBLÈME RENCONTRÉ
+- Error: "real output not found"
+- Cause : 100% outputs coinbase (mining) → pas d'outputs normaux
+- Ring signatures impossibles
+
+🔧 SOLUTION POUR PROCHAINE SESSION
+Commandes à exécuter :
+
+1. Démarrer daemon :
+cd ~/hidering/build
+./bin/hideringd --offline --fixed-difficulty 1 --data-dir ./test-padding-blockchain --detach --rpc-bind-ip=127.0.0.1 --rpc-bind-port=28081
+
+2. Ouvrir wallet :
+./bin/hidering-wallet-cli --wallet-file ~/Desktop/test-tx-padding.keys --password ""
+
+3. Dans wallet :
+set_daemon 127.0.0.1:28081
+set max-reorg-depth 10000
+refresh
+
+4. Créer outputs normaux avec ring-size 1 :
+transfer B3CFTxpyJTcW7QGENdBSPjcabLQPCgd7CgC57Mn745zURUPByHto4DFhsw8iNYznhzSypqzrta6NKh4ep6T1mJpoNBciLDY 1 ring-size 1
+
+5. Ensuite tester padding hybride !
+
+🎯 OBJECTIF FINAL
+- 3 TX : petite (0.1), moyenne (5), grande (sweep_all)
+- Analyser tx.extra size
+- Valider gains padding vs ancien système

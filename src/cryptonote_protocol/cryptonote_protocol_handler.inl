@@ -927,9 +927,16 @@ namespace cryptonote
     relay_method tx_relay = zone == epee::net_utils::zone::public_ ?
       relay_method::stem : relay_method::forward;
 
+    // HIDERING Mixnet 3-hops: force stem mode until minimum hops reached
+    const bool mixnet_force_stem = (arg.hidering_hop_count < HIDERING_MIXNET_MIN_HOPS);
+    if (mixnet_force_stem)
+    {
+      MDEBUG("HIDERING Mixnet: hop " << (int)arg.hidering_hop_count << "/" << HIDERING_MIXNET_MIN_HOPS << ", forcing stem relay");
+    }
+
     std::vector<blobdata> stem_txs{};
     std::vector<blobdata> fluff_txs{};
-    if (arg.dandelionpp_fluff)
+    if (arg.dandelionpp_fluff && !mixnet_force_stem)
     {
       tx_relay = relay_method::fluff;
       fluff_txs.reserve(arg.txs.size());
@@ -968,7 +975,10 @@ namespace cryptonote
     {
       //TODO: add announce usage here
       arg.dandelionpp_fluff = false;
+      // HIDERING Mixnet: increment hop count for the next relay
+      arg.hidering_hop_count = std::min((uint8_t)(arg.hidering_hop_count + 1), (uint8_t)255);
       arg.txs = std::move(stem_txs);
+      MDEBUG("HIDERING Mixnet: relaying " << arg.txs.size() << " TX(s) as stem, hop " << (int)arg.hidering_hop_count);
       relay_transactions(arg, context.m_connection_id, context.m_remote_address.get_zone(), relay_method::stem);
     }
     if (!fluff_txs.empty())
@@ -976,6 +986,7 @@ namespace cryptonote
       //TODO: add announce usage here
       arg.dandelionpp_fluff = true;
       arg.txs = std::move(fluff_txs);
+      MDEBUG("HIDERING Mixnet: fluffing " << arg.txs.size() << " TX(s) after " << (int)arg.hidering_hop_count << " hops");
       relay_transactions(arg, context.m_connection_id, context.m_remote_address.get_zone(), relay_method::fluff);
     }
     return 1;
