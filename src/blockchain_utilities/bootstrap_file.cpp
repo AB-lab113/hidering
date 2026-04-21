@@ -42,8 +42,8 @@ using namespace epee;
 namespace
 {
   // This number was picked by taking the leading 4 bytes from this output:
-  // echo Monero bootstrap file | sha1sum
-  const uint32_t blockchain_raw_magic = 0x28721586;
+  // echo Hidering bootstrap file | sha1sum
+  const uint32_t blockchain_raw_magic = 0x48524700;
   const uint32_t header_size = 1024;
 
   std::string refresh_string = "\r                                    \r";
