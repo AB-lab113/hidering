@@ -2126,14 +2126,10 @@ namespace nodetool
     if (m_nettype != cryptonote::MAINNET)
       return true;
 
+    // Hidering: placeholder DNS blocklist host. Not registered yet;
+    // lookups will fail cleanly and update_dns_blocklist returns true.
     static const std::vector<std::string> dns_urls = {
-      "blocklist.moneropulse.se"
-    , "blocklist.moneropulse.org"
-    , "blocklist.moneropulse.net"
-    , "blocklist.moneropulse.no"
-    , "blocklist.moneropulse.fr"
-    , "blocklist.moneropulse.de"
-    , "blocklist.moneropulse.ch"
+      "blocklist.hidering.invalid"
     };
 
     std::vector<std::string> records;

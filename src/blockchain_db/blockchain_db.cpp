@@ -446,35 +446,9 @@ void BlockchainDB::fixup()
     return;
   }
 
-  // There was a bug that would cause key images for transactions without
-  // any outputs to not be added to the spent key image set. There are two
-  // instances of such transactions on mainnet, in blocks 202612 and 685498.
-  // On testnet, there are no such transactions
-  // See commit 533acc30eda7792c802ea8b6417917fa99b8bc2b for the fix
-  // Since its been 8 years since the fix was implemented, we can safely force
-  // nodes to re-sync if the bug is present in their chain.
-  static const char * const mainnet_genesis_hex = "418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3";
-  crypto::hash mainnet_genesis_hash;
-  epee::string_tools::hex_to_pod(mainnet_genesis_hex, mainnet_genesis_hash );
-
-  if (get_block_hash_from_height(0) == mainnet_genesis_hash)
-  {
-    // From tx 17ce4c8feeb82a6d6adaa8a89724b32bf4456f6909c7f84c8ce3ee9ebba19163
-    static const char * const first_missing_key_image_202612 =
-      "121bf6ae1596983b703d62fecf60ea7dd3c3909acf1e0911652e7dadb420ed12";
-
-    if (height() > 202612)
-    {
-      crypto::key_image ki;
-      epee::string_tools::hex_to_pod(first_missing_key_image_202612, ki);
-      if (!has_key_image(ki))
-      {
-        LOG_PRINT_L1("Fixup: detected missing key images from block 202612! Popping blocks...");
-        while (height() > 202612)
-          pop_block();
-      }
-    }
-  }
+  // Hidering: the Monero-specific block 202612 / 685498 key-image fixup has
+  // been removed. It was gated on the Monero mainnet genesis hash, so it was
+  // already unreachable on a Hidering chain — drop it to avoid confusion.
 }
 
 bool BlockchainDB::txpool_tx_matches_category(const crypto::hash& tx_hash, relay_category category)
