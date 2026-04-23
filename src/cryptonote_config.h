@@ -53,7 +53,7 @@
 // MONEY_SUPPLY - total number coins to be generated
 #define MONEY_SUPPLY ((uint64_t)33000000000000000000ULL)  // 33M HRG (33M x 10^12 atomic units)
 #define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
-#define INITIAL_BLOCK_REWARD                            ((uint64_t)157140000000000ULL) // 157.14 HRG fair launch (assuming COIN = 10^12)
+#define INITIAL_BLOCK_REWARD                            ((uint64_t)157140000000000ULL) // 157.14 HRG fair launch (= 157.14 * COIN with COIN = 10^12)
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
 
@@ -65,15 +65,16 @@
 #define CRYPTONOTE_SHORT_TERM_BLOCK_WEIGHT_SURGE_FACTOR 50
 #define CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE          600
 #define CRYPTONOTE_DISPLAY_DECIMAL_POINT 12
-// COIN - number of smallest units in one coin
-#define COIN                                            ((uint64_t)100000000000) // pow(10, 11)
+// COIN — atomic units per 1 HRG. Must equal 10^CRYPTONOTE_DISPLAY_DECIMAL_POINT so that
+// amount parsing, display formatting, and wallet-side thresholds (e.g. DEFAULT_MIN_OUTPUT_VALUE)
+// agree on the same denomination. Hidering uses 10^12 to match the decimal point, which also
+// aligns with Monero's atomic-unit granularity (1 HRG = 10^12 piconero-equivalent).
+#define COIN                                            ((uint64_t)1000000000000) // 10^12
 
-// Hidering fee constants — PLACEHOLDER values inherited from Monero.
-// These were calibrated for XMR (COIN = 10^12). Hidering uses COIN = 10^11,
-// so the effective HRG-denominated fee is 10x higher than Monero's at the
-// same atomic-unit number. A proper economic retuning is a Phase 3B task;
-// the values below are kept only to compile and run pre-mainnet.
-// TODO(phase3b): retune FEE_PER_* and DYNAMIC_FEE_* for Hidering economics.
+// Hidering fee constants — PLACEHOLDER values inherited from Monero (which also uses COIN = 10^12),
+// so the atomic-unit numbers map 1:1 to the original XMR calibration. A proper economic retuning
+// for Hidering block times / supply / target users is still pending.
+// TODO(phase3c): retune FEE_PER_* and DYNAMIC_FEE_* for Hidering economics.
 #define FEE_PER_KB_OLD                                  ((uint64_t)10000000000) // placeholder
 #define FEE_PER_KB                                      ((uint64_t)2000000000)  // placeholder
 #define FEE_PER_BYTE                                    ((uint64_t)300000)       // placeholder
