@@ -32,48 +32,50 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
 
 const hardfork_t mainnet_hard_forks[] = {
-  // HIDERING mainnet: all features enabled from genesis (v15 = BP+, CLSAG, view tags, 2021 scaling)
-  { 1, 1, 0, 1713700000 },
-  { 7, 1, 0, 1713700000 },
-  { 8, 1, 0, 1713700000 },
-  { 9, 1, 0, 1713700000 },
-  { 10, 1, 0, 1713700000 },
-  { 11, 1, 0, 1713700000 },
-  { 12, 1, 0, 1713700000 },
-  { 13, 1, 0, 1713700000 },
-  { 14, 1, 0, 1713700000 },
-  { 15, 1, 0, 1713700000 },
+  // HIDERING mainnet: all features active by block 10 (v15 = BP+, CLSAG, view tags, 2021 scaling).
+  // HardFork::add_fork requires strictly-increasing (height, time) tuples, so we space entries one
+  // block/second apart instead of stacking them all on height 1.
+  { 1,  1,  0, 1713700000 },
+  { 7,  2,  0, 1713700001 },
+  { 8,  3,  0, 1713700002 },
+  { 9,  4,  0, 1713700003 },
+  { 10, 5,  0, 1713700004 },
+  { 11, 6,  0, 1713700005 },
+  { 12, 7,  0, 1713700006 },
+  { 13, 8,  0, 1713700007 },
+  { 14, 9,  0, 1713700008 },
+  { 15, 10, 0, 1713700009 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = 0;
 
 const hardfork_t testnet_hard_forks[] = {
-  // HIDERING testnet: all features enabled from genesis
-  { 1, 1, 0, 1713700000 },
-  { 7, 1, 0, 1713700000 },
-  { 8, 1, 0, 1713700000 },
-  { 9, 1, 0, 1713700000 },
-  { 10, 1, 0, 1713700000 },
-  { 11, 1, 0, 1713700000 },
-  { 12, 1, 0, 1713700000 },
-  { 13, 1, 0, 1713700000 },
-  { 14, 1, 0, 1713700000 },
-  { 15, 1, 0, 1713700000 },
+  // HIDERING testnet: all features active by block 10 (same rationale as mainnet)
+  { 1,  1,  0, 1713700000 },
+  { 7,  2,  0, 1713700001 },
+  { 8,  3,  0, 1713700002 },
+  { 9,  4,  0, 1713700003 },
+  { 10, 5,  0, 1713700004 },
+  { 11, 6,  0, 1713700005 },
+  { 12, 7,  0, 1713700006 },
+  { 13, 8,  0, 1713700007 },
+  { 14, 9,  0, 1713700008 },
+  { 15, 10, 0, 1713700009 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
 const uint64_t testnet_hard_fork_version_1_till = 0;
 
 const hardfork_t stagenet_hard_forks[] = {
-  // HIDERING stagenet: all features enabled from genesis
-  { 1, 1, 0, 1713700000 },
-  { 7, 1, 0, 1713700000 },
-  { 8, 1, 0, 1713700000 },
-  { 9, 1, 0, 1713700000 },
-  { 10, 1, 0, 1713700000 },
-  { 11, 1, 0, 1713700000 },
-  { 12, 1, 0, 1713700000 },
-  { 13, 1, 0, 1713700000 },
-  { 14, 1, 0, 1713700000 },
-  { 15, 1, 0, 1713700000 },
+  // HIDERING stagenet: all features active by block 10 (same rationale as mainnet)
+  { 1,  1,  0, 1713700000 },
+  { 7,  2,  0, 1713700001 },
+  { 8,  3,  0, 1713700002 },
+  { 9,  4,  0, 1713700003 },
+  { 10, 5,  0, 1713700004 },
+  { 11, 6,  0, 1713700005 },
+  { 12, 7,  0, 1713700006 },
+  { 13, 8,  0, 1713700007 },
+  { 14, 9,  0, 1713700008 },
+  { 15, 10, 0, 1713700009 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);

@@ -53,7 +53,7 @@
 // MONEY_SUPPLY - total number coins to be generated
 #define MONEY_SUPPLY ((uint64_t)33000000000000000000ULL)  // 33M HRG (33M x 10^12 atomic units)
 #define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
-#define INITIAL_BLOCK_REWARD 157140000000000ULLULL  # 157.14 HRG fair launch
+#define INITIAL_BLOCK_REWARD                            ((uint64_t)157140000000000ULL) // 157.14 HRG fair launch (assuming COIN = 10^12)
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
 
