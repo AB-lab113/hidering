@@ -741,7 +741,7 @@ namespace nodetool
     }
     else
     {
-      // HIDERING mainnet: add seed IPs when available
+      full_addrs.insert("149.154.177.90:19740");
     }
     return full_addrs;
   }
