@@ -52,8 +52,6 @@
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
-// Hardcode Monero's donation address (see #1447)
-constexpr const char MONERO_DONATION_ADDR[] = "888tNkZrPN6JsEgekjMnABU4TBzc2Dt29EPAvkRxbANsAnjyPbb3iQ1YBRk1UXcdRsiKc9dhwMVgN5S9cQUiyoogDavup3H";
 
 /*!
  * \namespace cryptonote
@@ -176,7 +174,6 @@ namespace cryptonote
     bool sweep_below(const std::vector<std::string> &args);
     bool sweep_single(const std::vector<std::string> &args);
     bool sweep_unmixable(const std::vector<std::string> &args);
-    bool donate(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
     std::vector<std::vector<cryptonote::tx_destination_entry>> split_amounts(

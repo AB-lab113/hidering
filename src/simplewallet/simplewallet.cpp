@@ -202,7 +202,6 @@ namespace
   const char* USAGE_SWEEP_ACCOUNT("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
   const char* USAGE_SWEEP_BELOW("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <address> [<payment_id (obsolete)>]");
   const char* USAGE_SWEEP_SINGLE("sweep_single [<priority>] [<ring_size>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
-  const char* USAGE_DONATE("donate [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <amount> [<payment_id (obsolete)>]");
   const char* USAGE_SIGN_TRANSFER("sign_transfer [export_raw] [<filename>]");
   const char* USAGE_SET_LOG("set_log <level>|{+,-,}<categories>");
   const char* USAGE_ACCOUNT("account\n"
@@ -3076,8 +3075,6 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
     message_writer() << tr("\"version\" - Check software version.");
     message_writer() << tr("\"exit\" - Exit wallet.");
     message_writer() << "";
-    message_writer() << tr("\"donate <amount>\" - Donate XMR to the development team.");
-    message_writer() << "";
   }
   else if ((args.size() == 1) && (args.front() == "all"))
   {
@@ -3229,10 +3226,6 @@ simple_wallet::simple_wallet()
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sweep_single, _1),
                            tr(USAGE_SWEEP_SINGLE),
                            tr("Send a single output of the given key image to an address without change."));
-  m_cmd_binder.set_handler("donate",
-                           boost::bind(&simple_wallet::on_command, this, &simple_wallet::donate, _1),
-                           tr(USAGE_DONATE),
-                           tr("Donate <amount> to the development team (donate.getmonero.org)."));
   m_cmd_binder.set_handler("sign_transfer",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sign_transfer, _1),
                            tr(USAGE_SIGN_TRANSFER),
@@ -7512,68 +7505,6 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args_)
     return true;
   }
   sweep_main(m_current_subaddress_account, below, std::vector<std::string>(++args_.begin(), args_.end()));
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
-bool simple_wallet::donate(const std::vector<std::string> &args_)
-{
-  CHECK_IF_BACKGROUND_SYNCING("cannot donate");
-  std::vector<std::string> local_args = args_;
-  if(local_args.empty() || local_args.size() > 5)
-  {
-     PRINT_USAGE(USAGE_DONATE);
-     return true;
-  }
-  std::string amount_str;
-  std::string payment_id_str;
-  // get payment id and pop
-  crypto::hash payment_id;
-  crypto::hash8 payment_id8;
-  if (tools::wallet2::parse_long_payment_id (local_args.back(), payment_id ) ||
-      tools::wallet2::parse_short_payment_id(local_args.back(), payment_id8))
-  {
-    payment_id_str = local_args.back();
-    local_args.pop_back();
-  }
-  // get amount and pop
-  uint64_t amount;
-  bool ok = cryptonote::parse_amount(amount, local_args.back());
-  if (ok && amount != 0)
-  {
-    amount_str = local_args.back();
-    local_args.pop_back();
-  }
-  else
-  { 
-    fail_msg_writer() << tr("amount is wrong: ") << local_args.back() << ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
-    return true;
-  }
-  // push back address, amount, payment id
-  std::string address_str;
-  if (m_wallet->nettype() != cryptonote::MAINNET)
-  {
-    // if not mainnet, convert donation address string to the relevant network type
-    address_parse_info info;
-    if (!cryptonote::get_account_address_from_str(info, cryptonote::MAINNET, MONERO_DONATION_ADDR))
-    {
-      fail_msg_writer() << tr("Failed to parse donation address: ") << MONERO_DONATION_ADDR;
-      return true;
-    }
-    address_str = cryptonote::get_account_address_as_str(m_wallet->nettype(), info.is_subaddress, info.address);
-  }
-  else
-  {
-    address_str = MONERO_DONATION_ADDR;
-  }
-  local_args.push_back(address_str);
-  local_args.push_back(amount_str);
-  if (!payment_id_str.empty())
-    local_args.push_back(payment_id_str);
-  if (m_wallet->nettype() == cryptonote::MAINNET)
-    message_writer() << (boost::format(tr("Donating %s %s to The Monero Project (donate.getmonero.org or %s).")) % amount_str % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % MONERO_DONATION_ADDR).str();
-  else
-    message_writer() << (boost::format(tr("Donating %s %s to %s.")) % amount_str % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % address_str).str();
-  transfer(local_args);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
