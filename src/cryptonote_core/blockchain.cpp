@@ -3321,9 +3321,12 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
     // The only circumstance where ring sizes less than expected are
     // allowed is when spending unmixable non-RCT outputs in the chain.
-    // Caveat: at HF_VERSION_MIN_MIXIN_31, temporarily allow ring sizes
-    // of 11 to allow a grace period in the transition to larger ring size.
-    if (min_actual_mixin < min_mixin && !(hf_version == HF_VERSION_MIN_MIXIN_31 && min_actual_mixin == 31))
+    // Hidering: from HF_VERSION_MIN_MIXIN_31 onwards, the consensus
+    // floor is mixin >= 31 (ring_size >= 32) and the ceiling is
+    // mixin <= 63 (ring_size <= 64). Within that window, any ring size
+    // is valid as long as all inputs of the tx use the same one (the
+    // SAME_MIXIN check above already enforces uniformity).
+    if (min_actual_mixin < min_mixin)
     {
       if (n_unmixable == 0)
       {
@@ -3337,13 +3340,15 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         tvc.m_low_mixin = true;
         return false;
       }
-    } else if ((hf_version > HF_VERSION_MIN_MIXIN_31 && min_actual_mixin > 31)
-      || (hf_version == HF_VERSION_MIN_MIXIN_31 && min_actual_mixin != 31) // grace period removed for Hidering
+    } else if ((hf_version >= HF_VERSION_MIN_MIXIN_31 && min_actual_mixin > 63)
       || (hf_version < HF_VERSION_MIN_MIXIN_31 && hf_version >= HF_VERSION_MIN_MIXIN_10+2 && min_actual_mixin > 10)
       || ((hf_version == HF_VERSION_MIN_MIXIN_10 || hf_version == HF_VERSION_MIN_MIXIN_10+1) && min_actual_mixin != 10)
     )
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " has invalid ring size (" << (min_actual_mixin + 1) << "), it should be " << (min_mixin + 1));
+      if (hf_version >= HF_VERSION_MIN_MIXIN_31)
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " has invalid ring size (" << (min_actual_mixin + 1) << "), it should be in [32, 64]");
+      else
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " has invalid ring size (" << (min_actual_mixin + 1) << "), it should be " << (min_mixin + 1));
       tvc.m_low_mixin = true;
       return false;
     }
