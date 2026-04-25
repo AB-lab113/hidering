@@ -33,6 +33,7 @@ CMD ["--non-interactive", \
      "--confirm-external-bind", \
      "--no-igd", \
      "--public-node", \
+     "--restricted-rpc", \
      "--p2p-bind-ip=0.0.0.0", \
      "--p2p-bind-port=19740", \
      "--rpc-bind-ip=0.0.0.0", \
