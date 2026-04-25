@@ -118,3 +118,16 @@ nbproject
 __pycache__/
 *.pyc
 *.log
+
+# wallet keystores must never be committed
+*.keys
+premine
+premine/
+test_wallet*
+
+# one-shot dev scripts kept local only
+fix_premine*.py
+fix_genesis*.py
+fix_clean_genesis.py
+genesis_fix*.patch
+fix_supply.patch
