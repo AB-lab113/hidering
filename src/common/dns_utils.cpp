@@ -263,23 +263,24 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
 
   if (!DNS_PUBLIC)
   {
-    // if no DNS_PUBLIC specified, we try a lookup to what we know
-    // should be a valid DNSSEC record, and switch to known good
-    // DNSSEC resolvers if verification fails
-    bool available, valid;
-    static const char *probe_hostname = "updates.moneropulse.org";
-    auto records = get_txt_record(probe_hostname, available, valid);
-    if (!valid)
-    {
-      MINFO("Failed to verify DNSSEC record from " << probe_hostname << ", falling back to TCP with well known DNSSEC resolvers");
-      ub_ctx_delete(m_data->m_ub_context);
-      m_data->m_ub_context = ub_ctx_create();
-      add_anchors(m_data->m_ub_context);
-      for (const auto &ip: DEFAULT_DNS_PUBLIC_ADDR)
-        ub_ctx_set_fwd(m_data->m_ub_context, string_copy(ip));
-      ub_ctx_set_option(m_data->m_ub_context, string_copy("do-udp:"), string_copy("no"));
-      ub_ctx_set_option(m_data->m_ub_context, string_copy("do-tcp:"), string_copy("yes"));
-    }
+    // Hidering: privacy default. Always route DNSSEC lookups through the
+    // built-in public DNSSEC resolvers (DEFAULT_DNS_PUBLIC_ADDR) instead
+    // of the system resolver. The system resolver may be local-network
+    // controlled, ISP-controlled, or otherwise observable; for a privacy
+    // coin we prefer a deterministic, audited resolver path.
+    //
+    // The upstream code probed a DNSSEC-signed hostname here to decide
+    // whether the system resolver supported DNSSEC. That probe was hard
+    // wired to "updates.moneropulse.org" — we removed it because (a) it
+    // pinged Monero infrastructure on every wallet/daemon start, and
+    // (b) the privacy-preferred branch was the fallback anyway.
+    ub_ctx_delete(m_data->m_ub_context);
+    m_data->m_ub_context = ub_ctx_create();
+    add_anchors(m_data->m_ub_context);
+    for (const auto &ip: DEFAULT_DNS_PUBLIC_ADDR)
+      ub_ctx_set_fwd(m_data->m_ub_context, string_copy(ip));
+    ub_ctx_set_option(m_data->m_ub_context, string_copy("do-udp:"), string_copy("no"));
+    ub_ctx_set_option(m_data->m_ub_context, string_copy("do-tcp:"), string_copy("yes"));
   }
 }
 
@@ -318,7 +319,7 @@ std::vector<std::string> DNSResolver::get_record(const std::string& url, int rec
     if (dnssec_available && !dnssec_valid)
     {
       MWARNING("Invalid DNSSEC " << get_record_name(record_type) << " record signature for " << url << ": " << result->why_bogus);
-      MWARNING("Possibly your DNS service is problematic. You can have monerod use an alternate via env variable DNS_PUBLIC. Example: DNS_PUBLIC=tcp://9.9.9.9");
+      MWARNING("Possibly your DNS service is problematic. You can have hideringd use an alternate via env variable DNS_PUBLIC. Example: DNS_PUBLIC=tcp://9.9.9.9");
     }
     if (result->havedata)
     {
