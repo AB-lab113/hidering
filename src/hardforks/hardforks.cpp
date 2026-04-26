@@ -32,50 +32,24 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
 
 const hardfork_t mainnet_hard_forks[] = {
-  // HIDERING mainnet: all features active by block 10 (v15 = BP+, CLSAG, view tags, 2021 scaling).
-  // HardFork::add_fork requires strictly-increasing (height, time) tuples, so we space entries one
-  // block/second apart instead of stacking them all on height 1.
-  { 1,  1,  0, 1713700000 },
-  { 7,  2,  0, 1713700001 },
-  { 8,  3,  0, 1713700002 },
-  { 9,  4,  0, 1713700003 },
-  { 10, 5,  0, 1713700004 },
-  { 11, 6,  0, 1713700005 },
-  { 12, 7,  0, 1713700006 },
-  { 13, 8,  0, 1713700007 },
-  { 14, 9,  0, 1713700008 },
-  { 15, 10, 0, 1713700009 },
+  // HIDERING mainnet: launch directly at HFv15 from the first mined block.
+  // v15 >= RX_BLOCK_VERSION (12), so PoW is RandomX (rx_slow_hash) starting at
+  // height 1 — no CryptoNight warm-up. Genesis (height 0) keeps original_version
+  // = 1 from the HardFork ctor; its PoW is never re-validated against the chain.
+  { 15, 1, 0, 1713700001 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = 0;
 
 const hardfork_t testnet_hard_forks[] = {
-  // HIDERING testnet: all features active by block 10 (same rationale as mainnet)
-  { 1,  1,  0, 1713700000 },
-  { 7,  2,  0, 1713700001 },
-  { 8,  3,  0, 1713700002 },
-  { 9,  4,  0, 1713700003 },
-  { 10, 5,  0, 1713700004 },
-  { 11, 6,  0, 1713700005 },
-  { 12, 7,  0, 1713700006 },
-  { 13, 8,  0, 1713700007 },
-  { 14, 9,  0, 1713700008 },
-  { 15, 10, 0, 1713700009 },
+  // HIDERING testnet: same launch profile as mainnet — v15 + RandomX from height 1.
+  { 15, 1, 0, 1713700001 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
 const uint64_t testnet_hard_fork_version_1_till = 0;
 
 const hardfork_t stagenet_hard_forks[] = {
-  // HIDERING stagenet: all features active by block 10 (same rationale as mainnet)
-  { 1,  1,  0, 1713700000 },
-  { 7,  2,  0, 1713700001 },
-  { 8,  3,  0, 1713700002 },
-  { 9,  4,  0, 1713700003 },
-  { 10, 5,  0, 1713700004 },
-  { 11, 6,  0, 1713700005 },
-  { 12, 7,  0, 1713700006 },
-  { 13, 8,  0, 1713700007 },
-  { 14, 9,  0, 1713700008 },
-  { 15, 10, 0, 1713700009 },
+  // HIDERING stagenet: same launch profile as mainnet — v15 + RandomX from height 1.
+  { 15, 1, 0, 1713700001 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);
