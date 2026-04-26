@@ -32,24 +32,32 @@
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
 
 const hardfork_t mainnet_hard_forks[] = {
-  // HIDERING mainnet: launch directly at HFv15 from the first mined block.
-  // v15 >= RX_BLOCK_VERSION (12), so PoW is RandomX (rx_slow_hash) starting at
-  // height 1 — no CryptoNight warm-up. Genesis (height 0) keeps original_version
-  // = 1 from the HardFork ctor; its PoW is never re-validated against the chain.
+  // HIDERING mainnet: v1 covers ONLY the genesis block (height 0); v15 takes over
+  // at height 1, so PoW is RandomX (rx_slow_hash, since v15 >= RX_BLOCK_VERSION=12)
+  // and BP+/CLSAG/view-tags/ring 32-64 apply from the very first mined block.
+  //
+  // The v1 row is mandatory: HardFork::init() only injects the original_version
+  // placeholder when `heights` is empty, so dropping this entry made
+  // `m_hardfork->check(genesis)` reject the v1 coinbase blob ("has old version: 1
+  // / current: 15"). HardFork::add_fork requires strictly-increasing (version,
+  // height, time) tuples, hence the t=…000 / t=…001 spacing.
+  { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = 0;
 
 const hardfork_t testnet_hard_forks[] = {
-  // HIDERING testnet: same launch profile as mainnet — v15 + RandomX from height 1.
+  // HIDERING testnet: same launch profile as mainnet — v1 genesis, v15 from height 1.
+  { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
 const uint64_t testnet_hard_fork_version_1_till = 0;
 
 const hardfork_t stagenet_hard_forks[] = {
-  // HIDERING stagenet: same launch profile as mainnet — v15 + RandomX from height 1.
+  // HIDERING stagenet: same launch profile as mainnet — v1 genesis, v15 from height 1.
+  { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);
