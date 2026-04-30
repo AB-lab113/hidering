@@ -92,9 +92,21 @@ namespace cryptonote {
         return true;
     }
 
-    // Calcul nombre de blocs approximatif (pour déterminer halvings)
-    uint64_t current_height = already_generated_coins / INITIAL_REWARD_LOCAL;
-    uint64_t halvings = current_height / HALVING_INTERVAL_LOCAL;
+    // Calcul exact du nombre de halvings par simulation itérative
+    // (évite l'approximation fausse après le 1er halving)
+    uint64_t halvings = 0;
+    {
+        uint64_t coins_counted = 0;
+        uint64_t period_reward = INITIAL_REWARD_LOCAL;
+        while (period_reward > 0) {
+            uint64_t period_coins = period_reward * HALVING_INTERVAL_LOCAL;
+            if (coins_counted + period_coins > already_generated_coins)
+                break;
+            coins_counted += period_coins;
+            halvings++;
+            period_reward >>= 1;
+        }
+    }
     
     // Base reward après halvings (division par 2^halvings)
     uint64_t base_reward = INITIAL_REWARD_LOCAL >> halvings;
