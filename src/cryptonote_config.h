@@ -250,7 +250,7 @@ namespace config
   boost::uuids::uuid const NETWORK_ID = { {
       0x48, 0x52, 0x47, 0x01, 0x48, 0x49, 0x44, 0x45, 0x52, 0x49, 0x4E, 0x47, 0x4D, 0x41, 0x49, 0x4E
     } }; // HIDERING mainnet
-  std::string const GENESIS_TX = "013c01ff00018090858fb0dd23024865650f6719bc3a8bc965ecf76021c7e2113d59acd41ae9d6514f07912840c12101eb7a61731d3fdde2496f6eb4abe178794162d5896fedf29d21da28a18c0ea2c5";
+  std::string const GENESIS_TX = "013c01ff00018090858fb0dd2302bb0e85edf7e295a84d172c26a759978dc1febea3e2608a240495368a74cdb2d22101f8ae2e22119ef501e05a9f8f347632f0ada2a69cee150d156c41d10df98fbe9f";
   uint32_t const GENESIS_NONCE = 10000; // HIDERING genesis: 157.14 HRG initial reward
 
   // Hash domain separators
@@ -293,7 +293,7 @@ namespace config
     boost::uuids::uuid const NETWORK_ID = { {
         0x48, 0x52, 0x47, 0x02, 0x48, 0x49, 0x44, 0x45, 0x52, 0x49, 0x4E, 0x47, 0x54, 0x45, 0x53, 0x54
       } }; // HIDERING testnet
-    std::string const GENESIS_TX = "013c01ff00018090858fb0dd23024865650f6719bc3a8bc965ecf76021c7e2113d59acd41ae9d6514f07912840c12101eb7a61731d3fdde2496f6eb4abe178794162d5896fedf29d21da28a18c0ea2c5";
+    std::string const GENESIS_TX = "013c01ff00018090858fb0dd2302bb0e85edf7e295a84d172c26a759978dc1febea3e2608a240495368a74cdb2d22101f8ae2e22119ef501e05a9f8f347632f0ada2a69cee150d156c41d10df98fbe9f";
     uint32_t const GENESIS_NONCE = 10001;
   }
 
@@ -308,7 +308,7 @@ namespace config
     boost::uuids::uuid const NETWORK_ID = { {
         0x48, 0x52, 0x47, 0x03, 0x48, 0x49, 0x44, 0x45, 0x52, 0x49, 0x4E, 0x47, 0x53, 0x54, 0x41, 0x47
       } }; // HIDERING stagenet
-    std::string const GENESIS_TX = "013c01ff00018090858fb0dd23024865650f6719bc3a8bc965ecf76021c7e2113d59acd41ae9d6514f07912840c12101eb7a61731d3fdde2496f6eb4abe178794162d5896fedf29d21da28a18c0ea2c5";
+    std::string const GENESIS_TX = "013c01ff00018090858fb0dd2302bb0e85edf7e295a84d172c26a759978dc1febea3e2608a240495368a74cdb2d22101f8ae2e22119ef501e05a9f8f347632f0ada2a69cee150d156c41d10df98fbe9f";
     uint32_t const GENESIS_NONCE = 10002;
   }
 }

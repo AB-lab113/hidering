@@ -4325,13 +4325,15 @@ leave:
   uint64_t base_reward = 0;
   uint64_t already_generated_coins = blockchain_height ? m_db->get_block_already_generated_coins(blockchain_height - 1) : 0;
   // HIDERING: Skip miner transaction validation for the genesis block.
-  // Genesis miner_tx carries a single output of amount 0 (fair launch, no premine);
-  // the standard validate_miner_transaction() path would reject it because at
-  // version 1 it requires base_reward + fee == money_in_use and the formula
-  // returns base_reward = INITIAL_BLOCK_REWARD for height 0 even though the
-  // genesis output deliberately claims nothing. Block 1 is the first emitted reward.
+  // The hard-coded GENESIS_TX carries a single output of 157.14 HRG locked
+  // under a NUMS (nothing-up-my-sleeve) one-time key derived from a public
+  // domain string; see GENESIS_PROOF.md. The output is therefore unspendable
+  // by construction. validate_miner_transaction() would still reject the
+  // block because already_generated_coins=0 and the v1 path expects
+  // base_reward+fee == money_in_use, so we short-circuit here.
+  // Block 1 is the first economically-emitted reward.
   if (blockchain_height == 0) {
-    MGINFO("Genesis block: HIDERING fair launch - 0 HRG genesis reward, mining starts at block 1");
+    MGINFO("Genesis block: HIDERING fair launch - 157.14 HRG locked under NUMS key (unspendable), mining starts at block 1");
   } else
   if(!validate_miner_transaction(bl, cumulative_block_weight, fee_summary, base_reward, already_generated_coins, bvc.m_partial_block_reward, m_hardfork->get_current_version()))
   {
