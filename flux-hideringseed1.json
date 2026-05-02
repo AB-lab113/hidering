@@ -1,0 +1,31 @@
+{
+  "version": 7,
+  "name": "hideringseed1",
+  "description": "Hidering (HRG) public seed node — RandomX, mainnet (network id HRG\\x01HIDERINGMAIN), genesis 67d82b8fad88f120cf7de42e3f1c274cf94f778b90a18f0b4805618c4e35f5cc. P2P 19740, restricted RPC 19741.",
+  "owner": "<<TON_ZELID_ICI>>",
+  "compose": [
+    {
+      "name": "seed",
+      "description": "hideringd public node (image digest sha256:7e0bb4fc1d018ee1e78d9bebdedf84143e9d73111664b8dec43fe9b8ca771b93)",
+      "repotag": "ab113hrg/hidering-seed:0b6d81b3e",
+      "ports": [19740, 19741],
+      "containerPorts": [19740, 19741],
+      "domains": ["", ""],
+      "environmentParameters": [],
+      "commands": [],
+      "containerData": "/home/hidering/.hidering",
+      "cpu": 1,
+      "ram": 2000,
+      "hdd": 10,
+      "tiered": false,
+      "secrets": "",
+      "repoauth": ""
+    }
+  ],
+  "instances": 3,
+  "contacts": [],
+  "geolocation": [],
+  "expire": 22000,
+  "nodes": [],
+  "staticip": false
+}

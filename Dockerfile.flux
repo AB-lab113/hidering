@@ -18,7 +18,7 @@ RUN set -ex && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY build/bin/hideringd /usr/local/bin/hideringd
+COPY build/release/bin/hideringd /usr/local/bin/hideringd
 
 RUN useradd --system --create-home --shell /usr/sbin/nologin hidering
 USER hidering
