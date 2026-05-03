@@ -114,8 +114,8 @@ cryptonote_tx_utils.cpp).
 - Committer des clés privées ou tokens GitHub
 
 ## DOCKER ET DEPLOIEMENT
-- Image : `ab113hrg/hidering-seed:0b6d81b3e` (tag `latest` = même digest)
-- Digest pushé : `sha256:7e0bb4fc1d018ee1e78d9bebdedf84143e9d73111664b8dec43fe9b8ca771b93`
+- Image : `ab113hrg/hidering-seed:6a85d41e2` (tag `latest` = même digest)
+- Digest pushé : `sha256:d69ce559b0a9ef1caeff50e9946de7a0c11a584e8a4cb57dfe6afe1e507cdbb0`
 - Flux app : `hideringseed1`
   - Ports : P2P 19740, RPC 19741
   - IP courante : **ne pas hard-coder** — Flux re-schedule sur d'autres nodes à chaque delete/recreate (vu 3 IPs différentes en une session). Source de vérité : `curl https://api.runonflux.io/apps/location/hideringseed1`
