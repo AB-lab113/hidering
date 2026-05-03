@@ -71,17 +71,19 @@
 // aligns with Monero's atomic-unit granularity (1 HRG = 10^12 piconero-equivalent).
 #define COIN                                            ((uint64_t)1000000000000) // 10^12
 
-// Hidering fee constants — PLACEHOLDER values inherited from Monero (which also uses COIN = 10^12),
-// so the atomic-unit numbers map 1:1 to the original XMR calibration. A proper economic retuning
-// for Hidering block times / supply / target users is still pending.
-// TODO(phase3c): retune FEE_PER_* and DYNAMIC_FEE_* for Hidering economics.
-#define FEE_PER_KB_OLD                                  ((uint64_t)10000000000) // placeholder
-#define FEE_PER_KB                                      ((uint64_t)2000000000)  // placeholder
-#define FEE_PER_BYTE                                    ((uint64_t)300000)       // placeholder
-#define DYNAMIC_FEE_PER_KB_BASE_FEE                     ((uint64_t)2000000000)  // placeholder
-#define DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD            ((uint64_t)10000000000000) // placeholder
-#define DYNAMIC_FEE_PER_KB_BASE_FEE_V5                  ((uint64_t)2000000000 * (uint64_t)CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2 / CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5) // placeholder
-#define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT         ((uint64_t)3000)        // placeholder
+// Hidering fee constants — Option B calibration: divided by 262 = HRG/XMR reward ratio
+// (157.14 HRG initial / 0.6 XMR Monero tail) so fee value-in-HRG ≈ fee value-in-XMR.
+// Active in HF15+: FEE_PER_BYTE (static-fee floor, wallet2.cpp:8489) and
+// DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT (numerator of the dynamic fee formula
+// blockchain.cpp:3690-3703). The other constants are unreachable at HF15 (legacy
+// pre-HFv8 paths) but rescaled identically for ratio consistency.
+#define FEE_PER_KB_OLD                                  ((uint64_t)38167939)    // legacy, unreachable in HF15
+#define FEE_PER_KB                                      ((uint64_t)7633588)     // legacy, unreachable in HF15
+#define FEE_PER_BYTE                                    ((uint64_t)1150)        // active in HF15
+#define DYNAMIC_FEE_PER_KB_BASE_FEE                     ((uint64_t)7633588)     // legacy, unreachable in HF15
+#define DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD            ((uint64_t)38167938931) // legacy, unreachable in HF15
+#define DYNAMIC_FEE_PER_KB_BASE_FEE_V5                  ((uint64_t)7633588 * (uint64_t)CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2 / CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5) // legacy, unreachable in HF15
+#define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT        ((uint64_t)12)          // active in HF15 (~3000/262)
 
 #define ORPHANED_BLOCKS_MAX_COUNT                       100
 
