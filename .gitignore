@@ -131,3 +131,6 @@ fix_genesis*.py
 fix_clean_genesis.py
 genesis_fix*.patch
 fix_supply.patch
+
+# cake wallet import binary (contains sensitive material)
+cake-import
