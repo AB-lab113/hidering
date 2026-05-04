@@ -302,7 +302,11 @@ namespace nodetool
 
   private:
     const std::vector<std::string> m_seed_nodes_list =
-    { // HIDERING: no DNS seeds yet — add seed.hidering.org when available
+    {
+      "seed1.hidering.org",
+      "seed2.hidering.org",
+      "seed3.hidering.org",
+      "seed4.hidering.org",
     };
 
     bool islimitup=false;

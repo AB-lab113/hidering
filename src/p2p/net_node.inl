@@ -741,7 +741,9 @@ namespace nodetool
     }
     else
     {
-      full_addrs.insert("149.154.177.90:19740");
+      // No IPv4 fallback: mainnet seeds are dynamic (Flux re-schedules) and
+      // resolved via DNS in m_seed_nodes_list. Pinning a literal here ages
+      // out the moment Flux reschedules the seed onto a different host.
     }
     return full_addrs;
   }
