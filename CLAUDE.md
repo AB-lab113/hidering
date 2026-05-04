@@ -89,7 +89,7 @@ cryptonote_tx_utils.cpp).
 2. Wipe ~/.hidering + smoke test genesis NUMS
 3. Daemon --offline valider genesis hash
 4. Rebuild Docker image ab113hrg/hidering-seed:latest
-5. Redéployer Flux seed node hideringseed1 (149.154.177.90:19740)
+5. Redéployer Flux seed node hideringseed1 (IP dynamique via Flux API, cf. section DOCKER ET DEPLOIEMENT)
 6. DNS seed nodes
 7. Block explorer
 8. Binaires publics (Linux/Windows/Mac)
