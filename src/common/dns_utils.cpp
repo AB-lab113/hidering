@@ -48,6 +48,12 @@ using namespace epee;
 
 static const char *DEFAULT_DNS_PUBLIC_ADDR[] =
 {
+  // Quad9 first: it propagates RRSIG/NSEC over TCP (required by libunbound's
+  // forward+validate mode below). Some of the privacy-leaning NGO resolvers
+  // that follow strip DNSSEC records, which makes libunbound mark every
+  // answer SERVFAIL/bogus and breaks seed bootstrap.
+  "9.9.9.9",            // Quad9 (Switzerland)
+  "149.112.112.112",    // Quad9 secondary
   "194.150.168.168",    // CCC (Germany)
   "80.67.169.40",       // FDN (France)
   "89.233.43.71",       // http://censurfridns.dk (Denmark)
@@ -252,6 +258,11 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
       ub_ctx_set_fwd(m_data->m_ub_context, string_copy(ip.c_str()));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-udp:"), string_copy("no"));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-tcp:"), string_copy("yes"));
+    // Forwarders that don't relay RRSIG/NSEC would otherwise cause every
+    // unsigned-zone lookup (e.g. hidering.org) to come back as bogus and be
+    // treated as NXDOMAIN. Permissive mode still flags bogus to the caller
+    // via dnssec_valid=false but does not drop the record.
+    ub_ctx_set_option(m_data->m_ub_context, string_copy("val-permissive-mode:"), string_copy("yes"));
   }
   else {
     // look for "/etc/resolv.conf" and "/etc/hosts" or platform equivalent
@@ -281,6 +292,9 @@ DNSResolver::DNSResolver() : m_data(new DNSResolverData())
       ub_ctx_set_fwd(m_data->m_ub_context, string_copy(ip));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-udp:"), string_copy("no"));
     ub_ctx_set_option(m_data->m_ub_context, string_copy("do-tcp:"), string_copy("yes"));
+    // Same reason as the use_dns_public branch: don't turn an "insecure"
+    // zone into NXDOMAIN just because the forwarder didn't ship RRSIGs.
+    ub_ctx_set_option(m_data->m_ub_context, string_copy("val-permissive-mode:"), string_copy("yes"));
   }
 }
 
