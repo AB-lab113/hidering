@@ -6,8 +6,8 @@
   "compose": [
     {
       "name": "seed",
-      "description": "hideringd public node (image digest sha256:7e0bb4fc1d018ee1e78d9bebdedf84143e9d73111664b8dec43fe9b8ca771b93)",
-      "repotag": "ab113hrg/hidering-seed:0b6d81b3e",
+      "description": "hideringd public node (image digest sha256:610c9dce7189191907e8829b69f179025dce3b1e1ca3ad676e3948c2e49ec58b)",
+      "repotag": "ab113hrg/hidering-seed:b74c8da50",
       "ports": [19740, 19741],
       "containerPorts": [19740, 19741],
       "domains": ["", ""],
