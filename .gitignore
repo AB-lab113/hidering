@@ -134,3 +134,6 @@ fix_supply.patch
 
 # cake wallet import binary (contains sensitive material)
 cake-import
+
+# release tarballs assembled by build-release workflow / local packaging
+/dist/
