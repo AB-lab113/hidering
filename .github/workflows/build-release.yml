@@ -68,7 +68,7 @@ jobs:
         run: |
           ccache --max-size=300M
           cmake -S . -B build -D ARCH="default" -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release -D USE_DEVICE_TREZOR=OFF
-          cmake --build build --target daemon wallet-cli wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
+          cmake --build build --target daemon simplewallet wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
       - name: package
         run: |
           VERSION="${{ needs.resolve-tag.outputs.version }}"
@@ -112,7 +112,7 @@ jobs:
         run: |
           ccache --max-size=300M
           cmake -S . -B build -D ARCH="default" -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release -D USE_DEVICE_TREZOR=OFF
-          cmake --build build --target daemon wallet-cli wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
+          cmake --build build --target daemon simplewallet wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
       - name: package
         run: |
           VERSION="${{ needs.resolve-tag.outputs.version }}"
@@ -175,7 +175,7 @@ jobs:
         run: |
           ccache --max-size=300M
           cmake -S . -B build -G "MSYS Makefiles" -D ARCH="default" -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release -D USE_DEVICE_TREZOR=OFF -D Boost_NO_BOOST_CMAKE=ON
-          cmake --build build --target daemon wallet-cli wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
+          cmake --build build --target daemon simplewallet wallet_rpc_server -j${{ env.MAKE_JOB_COUNT }}
       - name: package
         run: |
           VERSION="${{ needs.resolve-tag.outputs.version }}"
