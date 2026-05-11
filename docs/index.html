@@ -601,6 +601,140 @@
     border-radius: 2px;
   }
 
+  /* RELEASES */
+  .release-card {
+    border: 1px solid var(--border-bright);
+    background: var(--dark);
+    padding: 2.5rem;
+    margin-top: 3rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .release-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(201,168,76,0.06), transparent 60%);
+    pointer-events: none;
+  }
+
+  .release-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .release-header h3 {
+    font-family: 'Cinzel', serif;
+    font-size: 1.3rem;
+    color: var(--white);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.04em;
+  }
+
+  .release-tagline {
+    font-family: 'Fira Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--gold-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .release-contents {
+    list-style: none;
+    margin-bottom: 2rem;
+    padding-left: 0;
+    position: relative;
+  }
+
+  .release-contents li {
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .release-contents li:last-child { border-bottom: none; }
+
+  .release-contents li::before {
+    content: '▸';
+    color: var(--gold);
+    font-size: 0.75rem;
+  }
+
+  .release-contents code {
+    font-family: 'Fira Mono', monospace;
+    color: var(--gold);
+    font-size: 0.85rem;
+  }
+
+  .release-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    background: var(--dark3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .meta-label {
+    font-family: 'Fira Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+
+  .meta-value {
+    font-family: 'Fira Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--gold);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  .meta-value.sha {
+    font-size: 0.72rem;
+    color: var(--gold-dim);
+  }
+
+  .release-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .release-note {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 1.25rem;
+    position: relative;
+  }
+
+  .release-note code {
+    font-family: 'Fira Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--gold-dim);
+    background: var(--dark3);
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+  }
+
   /* FOOTER */
   footer {
     border-top: 1px solid var(--border);
@@ -685,6 +819,7 @@
     <li><a href="#privacy">Privacy</a></li>
     <li><a href="#tokenomics">Tokenomics</a></li>
     <li><a href="#mine">Mine</a></li>
+    <li><a href="#releases">Releases</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#faq">FAQ</a></li>
     <li><a href="#" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.72rem;">Whitepaper</a></li>
@@ -878,8 +1013,8 @@
       <div class="step-num">01</div>
       <div>
         <h3>Download the binaries</h3>
-        <p>Download the latest HIDERING binaries for your platform. Linux, Windows and macOS builds available on GitHub Releases.</p>
-        <div class="code-block"><span class="cmd"># Extract the archive</span><br>tar -xzf hidering-linux-x64.tar.gz<br>cd hidering/</div>
+        <p>Grab the latest HIDERING release from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Linux x86_64 binaries are available now; Windows and macOS land in v1.0.1.</p>
+        <div class="code-block"><span class="cmd"># Verify and extract</span><br>sha256sum -c hidering-v1.0.0-linux-x64.tar.gz.sha256<br>tar -xzf hidering-v1.0.0-linux-x64.tar.gz<br>cd hidering-v1.0.0-linux-x64/</div>
       </div>
     </div>
     <div class="step">
@@ -924,6 +1059,49 @@
         <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><br><span class="cmd">show_transfers</span>       <span style="color:var(--text-dim)"># transaction history</span></div>
       </div>
     </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- RELEASES -->
+<section id="releases">
+  <div class="section-label reveal">Downloads</div>
+  <h2 class="section-title reveal">Latest Release · v1.0.0</h2>
+  <p class="section-sub reveal">Verified binaries for the HIDERING full node and wallet, published on GitHub. Every asset ships with a SHA256 sidecar so you can confirm the file you downloaded is the one we built.</p>
+
+  <div class="release-card reveal">
+    <div class="release-header">
+      <div>
+        <h3>HIDERING v1.0.0 — First Public Binaries</h3>
+        <p class="release-tagline">Linux x86_64 · stripped · 14 MB · published 11 May 2026</p>
+      </div>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v1.0.0" class="btn btn-outline">View on GitHub</a>
+    </div>
+
+    <ul class="release-contents">
+      <li><code>hideringd</code> — full node daemon (P2P + RPC)</li>
+      <li><code>hidering-wallet-cli</code> — interactive wallet (send / receive / mine)</li>
+      <li><code>hidering-wallet-rpc</code> — headless wallet for integrations</li>
+    </ul>
+
+    <div class="release-meta">
+      <div>
+        <div class="meta-label">Filename</div>
+        <div class="meta-value">hidering-v1.0.0-linux-x64.tar.gz</div>
+      </div>
+      <div>
+        <div class="meta-label">SHA256</div>
+        <div class="meta-value sha">d4a75a0d3c626e7dc3e726225b2cc67e8eb7396508c5cf6e54c459dedf333b8b</div>
+      </div>
+    </div>
+
+    <div class="release-actions">
+      <a href="https://github.com/AB-lab113/hidering/releases/download/v1.0.0/hidering-v1.0.0-linux-x64.tar.gz" class="btn btn-primary">Download Linux x64</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/download/v1.0.0/hidering-v1.0.0-linux-x64.tar.gz.sha256" class="btn btn-outline">SHA256 sidecar</a>
+    </div>
+
+    <p class="release-note">Windows and macOS builds are coming in <strong style="color:var(--gold);">v1.0.1</strong>. Verify your download before extracting with <code>sha256sum -c hidering-v1.0.0-linux-x64.tar.gz.sha256</code> — it should print <code>OK</code>.</p>
   </div>
 </section>
 
@@ -1062,10 +1240,10 @@
   <div class="footer-sub">HRG · Privacy by Protocol</div>
   <ul class="footer-links">
     <li><a href="#">Whitepaper</a></li>
-    <li><a href="#">GitHub</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering/releases/latest">Latest Release</a></li>
     <li><a href="#">Block Explorer</a></li>
-    <li><a href="#">Mining Guide</a></li>
-    <li><a href="#">Contact</a></li>
+    <li><a href="#mine">Mining Guide</a></li>
   </ul>
   <div class="footer-copy">© 2026 HIDERING. Fair launch. Zero premine. Open source.</div>
 </footer>
