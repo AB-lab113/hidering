@@ -1,15 +1,19 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 11 Mai 2026 (release v1.0.0 Linux publiée)**
+**Dernière MAJ : 12 Mai 2026 (release v1.0.1 Linux publiée — MONEY_SUPPLY corrigé, rebrand strings nettoyés)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Ticker : HRG
 - Binaires : hideringd, hidering-wallet-cli, hidering-wallet-rpc
-- Branche active : v2-privacy (HEAD : 739523ee6 au 11 mai 2026)
-- Commit stable : 073f70af1
-- Tag publié : **v1.0.0** → commit eb8ad1ee9 (rebrand banner + workflow CI)
-- Release : https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64 only)
+- Branche active : v2-privacy (HEAD : 47795728f au 12 mai 2026)
+- Commit stable : 47795728f (= tag v1.0.1)
+- Tags publiés :
+  - **v1.0.1** → commit 47795728f — MONEY_SUPPLY corrigé (18M cap + 42.86 reward) + rebrand strings + version bump
+  - **v1.0.0** → commit eb8ad1ee9 — rebrand banner initial + workflow CI (porte encore l'overflow MONEY_SUPPLY)
+- Releases :
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.1 (Linux x64, stripped, 14.3 MB)
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64, historique)
 - Repo : https://github.com/AB-lab113/hidering
 - Build actif : build/release/bin/
 
@@ -29,7 +33,7 @@ la CI v1.0.0 sur macOS clang. Décision tokenomics (11 mai 2026) : baisser le ca
 rester représentable en uint64 sans toucher aux décimales. La récompense initiale est ajustée à
 42.86 HRG/bloc pour que la somme géométrique des halvings (210K interval × ½) converge exactement
 vers 18M. Les binaires v1.0.0 publiés portent encore les anciennes valeurs (157.14 / cap 14.55M
-effectif après wrap). Patch source à appliquer en v1.0.1.
+effectif après wrap). **Patch source appliqué en v1.0.1 (12 mai 2026, commit dca7dd433).**
 
 ## SPECS RÉSEAU
 - Network ID (Mainnet) : HRG\x01HIDERINGMAIN
@@ -86,19 +90,16 @@ itérative est mathématiquement équivalente et évite un refactor des ≥6
 call sites de get_block_reward (blockchain.cpp, tx_pool.cpp,
 cryptonote_tx_utils.cpp).
 
-## BUG CRITIQUE — DECISION TRANCHEE, IMPL EN ATTENTE v1.0.1
-### MONEY_SUPPLY overflow uint64_t — option (b) adoptée : cap baissé à 18M HRG
+## BUG CRITIQUE — RESOLU (v1.0.1, commit dca7dd433, 12 mai 2026)
+### MONEY_SUPPLY overflow uint64_t — option (b) appliquée : cap = 18M HRG
 Localisation : src/cryptonote_config.h:54 et src/cryptonote_basic/cryptonote_basic_impl.cpp:85
 
 Le littéral `33000000000000000000ULL` (= 33 × 10¹⁹ = 33M HRG × 10¹² atomes)
-**dépasse UINT64_MAX** (1.84 × 10¹⁹). Comportement actuel des binaires v1.0.0 :
+**dépassait UINT64_MAX** (1.84 × 10¹⁹). Comportement des binaires v1.0.0 (historique) :
 - Linux gcc : wrap silencieux → MONEY_SUPPLY effectif = 14,553,255,926,290,448,384
   atomes ≈ **14.55M HRG** (au lieu des 33M annoncés à l'époque)
-- macOS clang : erreur fatale de compilation, **macOS ne build pas**
+- macOS clang : erreur fatale de compilation, **macOS ne buildait pas**
 - Windows MSYS2/mingw : non testé après le fix workflow (présumé : wrap comme Linux)
-
-Conséquence sur v1.0.0 Linux publié : le cap d'émission est **14.55M HRG**.
-Site web et docs reflètent le nouveau design 18M depuis le 11 mai 2026.
 
 Cause racine architecturale : avec 12 décimales atomiques (héritées Monero),
 uint64_t ne peut représenter QUE jusqu'à ~18.4M HRG. Trois options évaluées :
@@ -111,13 +112,19 @@ des halvings converge sur 18M (= 9,000,000 / 210,000). Interval halving
 inchangé (210K blocs, parallélisme Bitcoin préservé). 12 décimales atomiques
 maintenues (compat Monero tooling : Cake, block explorers, etc.).
 
-Implémentation v1.0.1 — changements source à appliquer :
-- src/cryptonote_config.h:54 : `MONEY_SUPPLY ((uint64_t)18000000000000000000ULL)` ← attention 18 × 10¹⁸ = 1.8 × 10¹⁹, tient TOUT JUSTE dans uint64 (max 1.844 × 10¹⁹). Marge ~2.5%.
+**Patch v1.0.1 appliqué (commit dca7dd433, 12 mai 2026) :**
+- src/cryptonote_config.h:54 : `MONEY_SUPPLY ((uint64_t)18000000000000000000ULL)` (1.8e19, marge uint64 ~2.5%)
+- src/cryptonote_config.h:56 : `INITIAL_BLOCK_REWARD ((uint64_t)42857142857143ULL)` (macro doc, alignée par cohérence)
 - src/cryptonote_basic/cryptonote_basic_impl.cpp:85 : `MONEY_SUPPLY_LOCAL = 18000000000000000000ULL`
-- src/cryptonote_basic/cryptonote_basic_impl.cpp:86 : `INITIAL_REWARD_LOCAL = 42857142857143ULL` (42.857142... × 10¹², soit 9e18 / 210000)
-- Whitepaper et GENESIS_PROOF.md à reviser pour cohérence (genesis NUMS reward devient 42.86 HRG au lieu de 157.14)
+- src/cryptonote_basic/cryptonote_basic_impl.cpp:87 : `INITIAL_REWARD_LOCAL = 42857142857143ULL`
 
-Mémoire persistante associée :
+NB : `src/gen_genesis/gen_genesis.cpp:18` (`INITIAL_REWARD = 157140000000000ULL`)
+**laissé inchangé** intentionnellement — y toucher modifierait le hash genesis et
+invaliderait la chaîne déployée. Le whitepaper et GENESIS_PROOF.md doivent être
+révisés côté doc pour mentionner le NUMS genesis comme « 157.14 HRG locked, héritage
+v1.0.0 » même si le nouveau cap est 18M.
+
+Mémoires persistantes associées :
 `~/.claude/projects/-home-shark-hidering/memory/project_money_supply_overflow_v1.0.0.md`
 `~/.claude/projects/-home-shark-hidering/memory/project_v1.0.1_punch_list.md`
 
@@ -129,7 +136,7 @@ Mémoire persistante associée :
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
 - Phase 3C : Infrastructure seed nodes — EN COURS
 - Phase 4A-C : Mainnet public launch — A FAIRE (Cible T2 2026)
-- Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.0 publié, macOS bloqué par MONEY_SUPPLY, Windows à re-tester en v1.0.1)
+- Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.1 publié manuellement, macOS/Windows en attente — CI GitHub Actions bloquée par billing depuis 12 mai 2026)
 - Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
@@ -140,24 +147,40 @@ Mémoire persistante associée :
 5. Redéployer Flux seed node hideringseed1 (IP dynamique via Flux API, cf. section DOCKER ET DEPLOIEMENT)
 6. DNS seed nodes
 7. Block explorer
-8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0), Win/Mac → v1.0.1
+8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0 + v1.0.1), Win/Mac → v1.0.2 (déblocage billing GH Actions requis, ou cross-build local)
 9. Pool mining compatible
 10. Site web public
 11. Phase 4 Launch
 
-## RELEASE v1.0.0 (11 Mai 2026)
+## RELEASE v1.0.1 (12 Mai 2026 — courante)
+- Tag : v1.0.1 → commit 47795728f
+- Commits inclus depuis v1.0.0 :
+  - `dca7dd433` — fix(consensus): cap 18M HRG + reward 42.86 HRG (résout overflow uint64)
+  - `b58e13850` — chore(rebrand): 12+ strings "Monero"/"monero-wallet-cli" résiduelles → Hidering
+  - `47795728f` — chore(release): bump DEF_MONERO_VERSION 1.0.0 → 1.0.1
+- Asset publié : `hidering-v1.0.1-linux-x64.tar.gz` (14.3 MB, strippé, gcc Ubuntu 24.04)
+- SHA256 : `33e58c23e534fa7614e4731fca858a1a289b63fb9f069ef3096203cd39dd82b0`
+- Contenu tarball : hideringd, hidering-wallet-cli, hidering-wallet-rpc + README.md + LICENSE + GENESIS_PROOF.md
+- Build CI : workflow `.github/workflows/build-release.yml` déclenché par le tag mais **stoppé immédiatement par le billing GitHub Actions** (run `25739049536`). Asset Linux uploadé manuellement via `gh release create`. Pour macOS/Windows : régler le billing puis `gh run rerun 25739049536`, ou supprimer/recréer le tag.
+
+## RELEASE v1.0.0 (11 Mai 2026 — historique)
 - Tag : v1.0.0 → commit eb8ad1ee9 (rebrand "Monero '" → "Hidering '" sur 19 sites + bump version 0.18.1.0 → 1.0.0)
 - Asset publié : `hidering-v1.0.0-linux-x64.tar.gz` (14 MB, stripped, statically built sur Ubuntu 24.04)
 - SHA256 : `d4a75a0d3c626e7dc3e726225b2cc67e8eb7396508c5cf6e54c459dedf333b8b`
 - Contenu tarball : hideringd, hidering-wallet-cli, hidering-wallet-rpc + README + LICENSE + GENESIS_PROOF.md
-- Workflow CI : `.github/workflows/build-release.yml` (déclenché sur `git tag v*`, jobs ubuntu/macos/windows + release softprops). Fix commit 739523ee6 sur v2-privacy corrige le target name `wallet-cli` → `simplewallet` (sera appliqué automatiquement au prochain tag depuis v2-privacy HEAD).
+- Cap d'émission effectif : 14.55M HRG (overflow uint64 non corrigé — cf. BUG CRITIQUE MONEY_SUPPLY). Conserver pour traçabilité, **ne pas réutiliser pour mainnet**.
 
-### Punch list v1.0.1 (à traiter avant de retag)
-1. **MONEY_SUPPLY** — décision tranchée 11 mai 2026 : cap = 18M HRG, reward initial = 42.86 HRG/bloc, interval halving inchangé (210K). Patch source à appliquer (3 lignes, voir section BUG CRITIQUE ci-dessus). Débloque macOS.
-2. **std::bad_alloc au démarrage du daemon** — exception levée sur thread auxiliaire après "Genesis block" log (probablement le thread DNS checkpoint malgré --offline). Le daemon survit et continue normalement, mais l'exception au boot mérite investigation. Reproduction : `hideringd --offline --data-dir /tmp/foo`.
-3. **Strings "Monero" / "monero-wallet-cli" résiduels** dans les help/usage/log filenames (le sed initial n'a touché que les sites `"Monero '" << MONERO_RELEASE_NAME`). Liste complète des file:line dans la mémoire `project_v1.0.1_punch_list.md`.
-4. **CI workflow** — fix déjà mergé sur v2-privacy (commit 739523ee6), pas à refaire.
-5. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le nouveau design 18M / 42.86 si la révision du whitepaper est publiée.
+### Punch list v1.0.2 (post-v1.0.1)
+1. **std::bad_alloc au démarrage du daemon** — exception levée sur thread auxiliaire après "Genesis block" log (probablement le thread DNS checkpoint malgré --offline). Le daemon survit et continue normalement, mais l'exception au boot mérite investigation. Reproduction : `hideringd --offline --data-dir /tmp/foo`. **Toujours ouvert après v1.0.1** (orthogonal au patch consensus).
+2. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun 25739049536` pour publier les assets manquants sur la release v1.0.1 existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.1 ... --clobber`.
+3. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le design 18M / 42.86 (le NUMS genesis reste à 157.14 verrouillés pour préserver la chaîne, à expliquer dans la doc).
+
+### Punch list v1.0.1 — RESOLUE (12 mai 2026)
+1. ~~MONEY_SUPPLY~~ → fix dans commit `dca7dd433`.
+2. (déplacé en v1.0.2 punch list item #1 — `bad_alloc` non traité)
+3. ~~Rebrand strings résiduelles~~ → fix dans commit `b58e13850`.
+4. ~~CI workflow target name~~ → déjà fixé dans `739523ee6`, présent sur v2-privacy.
+5. (déplacé en v1.0.2 punch list item #3 — révision doc whitepaper)
 
 Mémoires persistantes associées :
 - `~/.claude/projects/-home-shark-hidering/memory/project_money_supply_overflow_v1.0.0.md`
