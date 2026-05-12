@@ -81,10 +81,10 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint8_t version) {
-    // Hidering Bitcoin-style halving emission - 33M HRG cap
-    const uint64_t MONEY_SUPPLY_LOCAL = 33000000000000000000ULL; // 33M HRG
+    // Hidering Bitcoin-style halving emission - 18M HRG cap (uint64-safe)
+    const uint64_t MONEY_SUPPLY_LOCAL = 18000000000000000000ULL; // 18M HRG
     const uint64_t HALVING_INTERVAL_LOCAL = 210000;
-    const uint64_t INITIAL_REWARD_LOCAL = 157140000000000ULL; // 157.14 HRG
+    const uint64_t INITIAL_REWARD_LOCAL = 42857142857143ULL; // 42.857142... HRG (= 9e18 / 210000)
 
     // Cap atteint, plus de reward
     if (already_generated_coins >= MONEY_SUPPLY_LOCAL) {
