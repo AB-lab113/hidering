@@ -1,12 +1,12 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 13 Mai 2026 (release v1.0.2 Linux publiée — bad_alloc boot fix shippé)**
+**Dernière MAJ : 13 Mai 2026 (release v1.0.2 Linux publiée — bad_alloc boot fix shippé ; whitepaper v1.3 + GENESIS_PROOF.md harmonisés 18M/42.86)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Ticker : HRG
 - Binaires : hideringd, hidering-wallet-cli, hidering-wallet-rpc
-- Branche active : v2-privacy (HEAD : 9d0e593a6 au 13 mai 2026)
+- Branche active : v2-privacy (HEAD : f7ba0b1dd au 13 mai 2026 — docs only depuis v1.0.2)
 - Commit stable : 9d0e593a6 (= tag v1.0.2)
 - Tags publiés :
   - **v1.0.2** → commit 9d0e593a6 — fix RandomX/huge-pages bad_alloc au boot + version bump 1.0.2
@@ -122,9 +122,10 @@ maintenues (compat Monero tooling : Cake, block explorers, etc.).
 
 NB : `src/gen_genesis/gen_genesis.cpp:18` (`INITIAL_REWARD = 157140000000000ULL`)
 **laissé inchangé** intentionnellement — y toucher modifierait le hash genesis et
-invaliderait la chaîne déployée. Le whitepaper et GENESIS_PROOF.md doivent être
-révisés côté doc pour mentionner le NUMS genesis comme « 157.14 HRG locked, héritage
-v1.0.0 » même si le nouveau cap est 18M.
+invaliderait la chaîne déployée. Le whitepaper et GENESIS_PROOF.md **ont été
+harmonisés 13 mai 2026** (commits `de1db6c5e` + `f7ba0b1dd`) : cap = 18M, reward
+initial = 42.86 HRG, et le NUMS genesis reste explicité comme « 157.14 HRG locked,
+héritage v1.0.0 » pour préserver la chaîne déployée.
 
 Mémoires persistantes associées :
 `~/.claude/projects/-home-shark-hidering/memory/project_money_supply_overflow_v1.0.0.md`
@@ -186,19 +187,19 @@ Mémoires persistantes associées :
 
 ### Punch list v1.0.3 (post-v1.0.2)
 1. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun` sur le run associé au tag v1.0.2 pour publier les assets manquants sur la release existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.2 ... --clobber`. (Item récurrent depuis v1.0.1 — tant que le billing reste bloqué, chaque release est Linux-only.)
-2. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le design 18M / 42.86 (le NUMS genesis reste à 157.14 verrouillés pour préserver la chaîne, à expliquer dans la doc). (Item récurrent depuis v1.0.1.)
+2. ~~**Whitepaper + GENESIS_PROOF.md**~~ → harmonisés 13 mai 2026. Commit `de1db6c5e` publie `docs/whitepaper_v1.3.md` (cap 18M, reward 42.86 HRG, roadmap v1.0.0→v1.0.2 à jour, code snippet `MONEY_SUPPLY = 18000000000000000000ULL` uint64-safe). Commit `f7ba0b1dd` patche `GENESIS_PROOF.md` (cap 33M → 18M dans TL;DR et section unspendability, circulant effectif 32 999 842.86 → 17 999 842.86 HRG ; construction NUMS, domain strings et amount genesis 157.14 HRG inchangés pour préserver le hash de la chaîne déployée). Item récurrent depuis v1.0.1 clos.
 
 ### Punch list v1.0.2 — RESOLUE partiellement (13 mai 2026)
 1. ~~**std::bad_alloc au démarrage du daemon**~~ → fix dans commit `6b9cf60de`. Cause racine : thread `rx_set_main_seedhash_thread` (`src/crypto/rx-slow-hash.c:350`) appelle `randomx_alloc_cache(... | RANDOMX_FLAG_LARGE_PAGES)`, et `LargePageAllocator::allocMemory` (`external/randomx/src/allocator.cpp:55`) throw `std::bad_alloc` quand `mmap(MAP_HUGETLB)` échoue sur un hôte sans huge pages (vm.nr_hugepages = 0, le défaut partout). Le throw est rattrapé en interne mais l'interposer `__cxa_throw` (`src/common/stack_trace.cpp:91`) logge tout throw avant le catch. Fix : helper `rx_large_pages_available()` qui sonde `/proc/sys/vm/nr_hugepages` une fois et désactive `RANDOMX_FLAG_LARGE_PAGES` sur les 4 call sites (rx_alloc_dataset, rx_alloc_cache, rx_init_full_vm, rx_init_light_vm). Hypothèse initiale (thread DNS) **incorrecte**.
 2. (déplacé en v1.0.3 punch list item #1 — macOS/Windows binaires, blocage billing GH Actions toujours actif)
-3. (déplacé en v1.0.3 punch list item #2 — révision doc whitepaper/GENESIS_PROOF non traitée)
+3. (déplacé en v1.0.3 punch list item #2 — révision doc whitepaper/GENESIS_PROOF, ✅ résolu en v1.0.3 le 13 mai 2026)
 
 ### Punch list v1.0.1 — RESOLUE (12 mai 2026)
 1. ~~MONEY_SUPPLY~~ → fix dans commit `dca7dd433`.
 2. (déplacé en v1.0.2 punch list item #1 — `bad_alloc` non traité, ✅ résolu en v1.0.2)
 3. ~~Rebrand strings résiduelles~~ → fix dans commit `b58e13850`.
 4. ~~CI workflow target name~~ → déjà fixé dans `739523ee6`, présent sur v2-privacy.
-5. (déplacé en v1.0.2 punch list item #3 — révision doc whitepaper, ⏸ encore ouvert en v1.0.3)
+5. (déplacé en v1.0.2 punch list item #3 — révision doc whitepaper, ✅ résolu en v1.0.3 le 13 mai 2026)
 
 Mémoires persistantes associées :
 - `~/.claude/projects/-home-shark-hidering/memory/project_money_supply_overflow_v1.0.0.md`
