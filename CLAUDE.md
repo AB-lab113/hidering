@@ -221,8 +221,9 @@ Mémoires persistantes associées :
 - Committer des clés privées ou tokens GitHub
 
 ## DOCKER ET DEPLOIEMENT
-- Image : `ab113hrg/hidering-seed:b43a29862` (tag `latest` = même digest)
-- Digest pushé : `sha256:0a92296ce842edc690c72f2eecae32f737628381f4e9de58c556984119557c5e`
+- Image : `ab113hrg/hidering-seed:v1.0.2` (tag `latest` = même digest, push 13 mai 2026)
+- Digest pushé : `sha256:2ec8eb28cfe7c80d8c24e00032a227995583f3659026c0bc01b6464e586e32b0`
+- Digest historique v1.0.1 (build b43a29862) : `sha256:0a92296ce842edc690c72f2eecae32f737628381f4e9de58c556984119557c5e`
 - Flux app : `hideringseed1`
   - Ports : P2P 19740, RPC 19741
   - IP courante : **ne pas hard-coder** — Flux re-schedule sur d'autres nodes à chaque delete/recreate (vu 3 IPs différentes en une session). Source de vérité : `curl https://api.runonflux.io/apps/location/hideringseed1`
