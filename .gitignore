@@ -137,3 +137,10 @@ cake-import
 
 # release tarballs assembled by build-release workflow / local packaging
 /dist/
+
+# release tarballs + checksums left at repo root by manual packaging (gh release upload)
+hidering-v*.tar.gz
+hidering-v*.tar.gz.sha256
+
+# local wallet directories (test/dev — never commit)
+hrg-wallet*
