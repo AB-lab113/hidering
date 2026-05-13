@@ -96,6 +96,45 @@ static void hash2hex(const char* hash, char* hex) {
   hex[HASH_SIZE * 2] = '\0';
 }
 
+// Returns true if the OS has huge pages available right now. On Linux,
+// huge pages must be reserved via vm.nr_hugepages (root-only sysctl);
+// the default on virtually every desktop and server install is 0, which
+// makes mmap(MAP_HUGETLB) inside RandomX's LargePageAllocator fail and
+// throw std::bad_alloc. The throw is caught by randomx_alloc_cache /
+// randomx_alloc_dataset internally and the fallback to the default
+// allocator works fine, but the daemon's __cxa_throw interposer
+// (src/common/stack_trace.cpp) logs every throw, producing a scary
+// bad_alloc trace at every daemon boot. We probe the sysctl once so the
+// LARGE_PAGES path is skipped when it can't possibly succeed.
+//
+// On non-Linux platforms we return true to preserve existing behavior.
+static bool rx_large_pages_available(void) {
+  static int avail = -1;
+  if (avail != -1) {
+    return avail != 0;
+  }
+#if defined(__linux__)
+  FILE *f = fopen("/proc/sys/vm/nr_hugepages", "r");
+  if (!f) {
+    avail = 0;
+    return false;
+  }
+  unsigned long n = 0;
+  if (fscanf(f, "%lu", &n) != 1) {
+    n = 0;
+  }
+  fclose(f);
+  avail = (n > 0) ? 1 : 0;
+#else
+  avail = 1;
+#endif
+  return avail != 0;
+}
+
+static inline randomx_flags rx_large_pages_flag(void) {
+  return rx_large_pages_available() ? RANDOMX_FLAG_LARGE_PAGES : 0;
+}
+
 static inline int disabled_flags(void) {
   static int flags = -1;
 
@@ -213,7 +252,7 @@ static void rx_alloc_dataset(randomx_flags flags, randomx_dataset** dataset, int
     return;
   }
 
-  *dataset = randomx_alloc_dataset((flags | RANDOMX_FLAG_LARGE_PAGES) & ~disabled_flags());
+  *dataset = randomx_alloc_dataset((flags | rx_large_pages_flag()) & ~disabled_flags());
   if (!*dataset) {
     alloc_err_msg("Couldn't allocate RandomX dataset using large pages");
     *dataset = randomx_alloc_dataset(flags & ~disabled_flags());
@@ -229,7 +268,7 @@ static void rx_alloc_cache(randomx_flags flags, randomx_cache** cache)
     return;
   }
 
-  *cache = randomx_alloc_cache((flags | RANDOMX_FLAG_LARGE_PAGES) & ~disabled_flags());
+  *cache = randomx_alloc_cache((flags | rx_large_pages_flag()) & ~disabled_flags());
   if (!*cache) {
     alloc_err_msg("Couldn't allocate RandomX cache using large pages");
     *cache = randomx_alloc_cache(flags & ~disabled_flags());
@@ -247,7 +286,7 @@ static void rx_init_full_vm(randomx_flags flags, randomx_vm** vm)
     flags |= RANDOMX_FLAG_SECURE;
   }
 
-  *vm = randomx_create_vm((flags | RANDOMX_FLAG_LARGE_PAGES | RANDOMX_FLAG_FULL_MEM) & ~disabled_flags(), NULL, main_dataset);
+  *vm = randomx_create_vm((flags | rx_large_pages_flag() | RANDOMX_FLAG_FULL_MEM) & ~disabled_flags(), NULL, main_dataset);
   if (!*vm) {
     static int shown = 0;
     if (!shown) {
@@ -274,7 +313,7 @@ static void rx_init_light_vm(randomx_flags flags, randomx_vm** vm, randomx_cache
 
   flags &= ~RANDOMX_FLAG_FULL_MEM;
 
-  *vm = randomx_create_vm((flags | RANDOMX_FLAG_LARGE_PAGES) & ~disabled_flags(), cache, NULL);
+  *vm = randomx_create_vm((flags | rx_large_pages_flag()) & ~disabled_flags(), cache, NULL);
   if (!*vm) {
     static int shown = 0;
     if (!shown) {
