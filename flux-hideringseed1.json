@@ -1,31 +1,32 @@
 {
-  "version": 7,
+  "version": 8,
   "name": "hideringseed1",
-  "description": "Hidering (HRG) public seed node — RandomX, mainnet (network id HRG\\x01HIDERINGMAIN), genesis 67d82b8fad88f120cf7de42e3f1c274cf94f778b90a18f0b4805618c4e35f5cc. P2P 19740, restricted RPC 19741.",
-  "owner": "<<TON_ZELID_ICI>>",
+  "description": "HIDERING HRG seed node",
+  "owner": "0xb4a7d8a91f80cce5c4b7c9e16a1315101c89a12d",
   "compose": [
     {
-      "name": "seed",
-      "description": "hideringd public node (image digest sha256:0a92296ce842edc690c72f2eecae32f737628381f4e9de58c556984119557c5e)",
-      "repotag": "ab113hrg/hidering-seed:b43a29862",
+      "name": "hideringseed",
+      "description": "HIDERING HRG seed node (image :latest, currently bound to v1.0.2 = commit 9d0e593a6)",
+      "repotag": "ab113hrg/hidering-seed:latest",
       "ports": [19740, 19741],
-      "containerPorts": [19740, 19741],
       "domains": ["", ""],
       "environmentParameters": [],
       "commands": [],
+      "containerPorts": [19740, 19741],
       "containerData": "/home/hidering/.hidering",
-      "cpu": 1,
-      "ram": 2000,
-      "hdd": 10,
-      "tiered": false,
-      "secrets": "",
+      "cpu": 0.1,
+      "ram": 1000,
+      "hdd": 30,
       "repoauth": ""
     }
   ],
-  "instances": 3,
-  "contacts": [],
+  "instances": 1,
+  "contacts": ["F_S_CONTACTS=https://storage.runonflux.io/v1/contacts/358081332282971"],
   "geolocation": [],
-  "expire": 22000,
+  "expire": 67640,
   "nodes": [],
-  "staticip": false
+  "staticip": true,
+  "enterprise": "",
+  "hash": "cd8bb85490d100ac8a5a515547f22eae3b1813361ddf81d03b7ff90635cc894a",
+  "height": 2562377
 }
