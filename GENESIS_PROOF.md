@@ -7,8 +7,12 @@ construction below in under a minute.
 
 ## TL;DR
 
-- Genesis amount is unchanged (157.14 HRG) so the maximum supply remains 33 M
-  HRG; the genesis output simply burns 157.14 HRG forever.
+- Genesis amount is unchanged (157.14 HRG) — a legacy value preserved to
+  keep the deployed chain hash valid. The current maximum supply is
+  **18,000,000 HRG** (cap revised 2026-05-11; see whitepaper §4.4 and
+  `CLAUDE.md` BUG CRITIQUE MONEY_SUPPLY). The genesis output simply
+  burns 157.14 HRG forever, so the effective circulating max is
+  **17,999,842.86 HRG**.
 - The output one-time public key `P` and the transaction public key `R` were
   derived from a **public domain string + integer counter** via SHA-256
   try-and-increment until the result decodes as a valid Ed25519 point.
@@ -136,7 +140,8 @@ such that `x · G = P`. Two attack avenues exist:
 
 No third path exists in current public knowledge. The 157.14 HRG sitting
 at this output are therefore permanently locked, reducing the effective
-maximum circulating supply to **32 999 842.86 HRG**.
+maximum circulating supply to **17 999 842.86 HRG** (against the
+18,000,000 HRG hard cap set in `cryptonote_config.h` since v1.0.1).
 
 ## Network-wide identity
 
