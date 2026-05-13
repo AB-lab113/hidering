@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 12 Mai 2026 (release v1.0.1 Linux publiée — MONEY_SUPPLY corrigé, rebrand strings nettoyés)**
+**Dernière MAJ : 13 Mai 2026 (commit `6b9cf60de` — bad_alloc boot RandomX/huge-pages résolu, v1.0.2 punch list item #1 closed)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -171,7 +171,7 @@ Mémoires persistantes associées :
 - Cap d'émission effectif : 14.55M HRG (overflow uint64 non corrigé — cf. BUG CRITIQUE MONEY_SUPPLY). Conserver pour traçabilité, **ne pas réutiliser pour mainnet**.
 
 ### Punch list v1.0.2 (post-v1.0.1)
-1. **std::bad_alloc au démarrage du daemon** — exception levée sur thread auxiliaire après "Genesis block" log (probablement le thread DNS checkpoint malgré --offline). Le daemon survit et continue normalement, mais l'exception au boot mérite investigation. Reproduction : `hideringd --offline --data-dir /tmp/foo`. **Toujours ouvert après v1.0.1** (orthogonal au patch consensus).
+1. ~~**std::bad_alloc au démarrage du daemon**~~ — **RESOLU 13 mai 2026 (commit `6b9cf60de`)**. Cause racine identifiée : thread `rx_set_main_seedhash_thread` (`src/crypto/rx-slow-hash.c:350`) appelle `randomx_alloc_cache(... | RANDOMX_FLAG_LARGE_PAGES)`, et `LargePageAllocator::allocMemory` (`external/randomx/src/allocator.cpp:55`) throw `std::bad_alloc` quand `mmap(MAP_HUGETLB)` échoue sur un hôte sans huge pages (vm.nr_hugepages = 0, le défaut partout). Le throw est rattrapé en interne, le fallback default-allocator marche, mais l'interposer `__cxa_throw` (`src/common/stack_trace.cpp:91`) logge tout throw avant le catch — d'où la stacktrace effrayante. Fix : helper `rx_large_pages_available()` qui sonde `/proc/sys/vm/nr_hugepages` une fois et désactive le flag LARGE_PAGES sur les 4 call sites (rx_alloc_dataset, rx_alloc_cache, rx_init_full_vm, rx_init_light_vm). Hypothèse initiale (thread DNS) **incorrecte**. Comportement préservé sur hôtes huge-pages-enabled et non-Linux.
 2. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun 25739049536` pour publier les assets manquants sur la release v1.0.1 existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.1 ... --clobber`.
 3. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le design 18M / 42.86 (le NUMS genesis reste à 157.14 verrouillés pour préserver la chaîne, à expliquer dans la doc).
 
