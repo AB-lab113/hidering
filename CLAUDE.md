@@ -1,17 +1,19 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 13 Mai 2026 (commit `6b9cf60de` — bad_alloc boot RandomX/huge-pages résolu, v1.0.2 punch list item #1 closed)**
+**Dernière MAJ : 13 Mai 2026 (release v1.0.2 Linux publiée — bad_alloc boot fix shippé)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Ticker : HRG
 - Binaires : hideringd, hidering-wallet-cli, hidering-wallet-rpc
-- Branche active : v2-privacy (HEAD : 47795728f au 12 mai 2026)
-- Commit stable : 47795728f (= tag v1.0.1)
+- Branche active : v2-privacy (HEAD : 9d0e593a6 au 13 mai 2026)
+- Commit stable : 9d0e593a6 (= tag v1.0.2)
 - Tags publiés :
+  - **v1.0.2** → commit 9d0e593a6 — fix RandomX/huge-pages bad_alloc au boot + version bump 1.0.2
   - **v1.0.1** → commit 47795728f — MONEY_SUPPLY corrigé (18M cap + 42.86 reward) + rebrand strings + version bump
   - **v1.0.0** → commit eb8ad1ee9 — rebrand banner initial + workflow CI (porte encore l'overflow MONEY_SUPPLY)
 - Releases :
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.2 (Linux x64, stripped, 14.35 MB) — courante
   - https://github.com/AB-lab113/hidering/releases/tag/v1.0.1 (Linux x64, stripped, 14.3 MB)
   - https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64, historique)
 - Repo : https://github.com/AB-lab113/hidering
@@ -136,7 +138,7 @@ Mémoires persistantes associées :
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
 - Phase 3C : Infrastructure seed nodes — EN COURS
 - Phase 4A-C : Mainnet public launch — A FAIRE (Cible T2 2026)
-- Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.1 publié manuellement, macOS/Windows en attente — CI GitHub Actions bloquée par billing depuis 12 mai 2026)
+- Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.2 publié manuellement le 13 mai 2026, macOS/Windows en attente — CI GitHub Actions bloquée par billing depuis 12 mai 2026)
 - Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
@@ -147,12 +149,24 @@ Mémoires persistantes associées :
 5. Redéployer Flux seed node hideringseed1 (IP dynamique via Flux API, cf. section DOCKER ET DEPLOIEMENT)
 6. DNS seed nodes
 7. Block explorer
-8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0 + v1.0.1), Win/Mac → v1.0.2 (déblocage billing GH Actions requis, ou cross-build local)
+8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0 + v1.0.1 + v1.0.2), Win/Mac → débloquer billing GH Actions et `gh run rerun` sur le run associé au tag v1.0.2, ou cross-build local + `gh release upload v1.0.2 ... --clobber`
 9. Pool mining compatible
 10. Site web public
 11. Phase 4 Launch
 
-## RELEASE v1.0.1 (12 Mai 2026 — courante)
+## RELEASE v1.0.2 (13 Mai 2026 — courante)
+- Tag : v1.0.2 → commit 9d0e593a6
+- Commits inclus depuis v1.0.1 :
+  - `6b9cf60de` — fix(daemon): bad_alloc on auxiliary thread at startup (RandomX huge-pages probe)
+  - `9928215e7` — docs(claude-md): mark v1.0.2 bad_alloc resolved
+  - `9d0e593a6` — chore(release): bump DEF_MONERO_VERSION 1.0.1 → 1.0.2 + release notes
+- Asset publié : `hidering-v1.0.2-linux-x64.tar.gz` (14.35 MB, strippé, gcc Ubuntu 24.04)
+- SHA256 : `da92781f5e0d085a08a656b48ea49be3d54201b3db32b736204266ea89fd2b8b`
+- Contenu tarball : hideringd, hidering-wallet-cli, hidering-wallet-rpc + README.md + LICENSE + GENESIS_PROOF.md
+- Build CI : même situation que v1.0.1 — workflow déclenché par le tag mais billing GH Actions toujours bloqué. Asset Linux uploadé manuellement via `gh release create`. macOS/Windows à shipper plus tard sur la release existante (`gh release upload v1.0.2 ... --clobber`).
+- Compat : drop-in v1.0.1 → v1.0.2 (pas de change consensus/wire/LMDB). RELEASE_NOTES_v1.0.2.md à la racine du repo.
+
+## RELEASE v1.0.1 (12 Mai 2026)
 - Tag : v1.0.1 → commit 47795728f
 - Commits inclus depuis v1.0.0 :
   - `dca7dd433` — fix(consensus): cap 18M HRG + reward 42.86 HRG (résout overflow uint64)
@@ -170,17 +184,21 @@ Mémoires persistantes associées :
 - Contenu tarball : hideringd, hidering-wallet-cli, hidering-wallet-rpc + README + LICENSE + GENESIS_PROOF.md
 - Cap d'émission effectif : 14.55M HRG (overflow uint64 non corrigé — cf. BUG CRITIQUE MONEY_SUPPLY). Conserver pour traçabilité, **ne pas réutiliser pour mainnet**.
 
-### Punch list v1.0.2 (post-v1.0.1)
-1. ~~**std::bad_alloc au démarrage du daemon**~~ — **RESOLU 13 mai 2026 (commit `6b9cf60de`)**. Cause racine identifiée : thread `rx_set_main_seedhash_thread` (`src/crypto/rx-slow-hash.c:350`) appelle `randomx_alloc_cache(... | RANDOMX_FLAG_LARGE_PAGES)`, et `LargePageAllocator::allocMemory` (`external/randomx/src/allocator.cpp:55`) throw `std::bad_alloc` quand `mmap(MAP_HUGETLB)` échoue sur un hôte sans huge pages (vm.nr_hugepages = 0, le défaut partout). Le throw est rattrapé en interne, le fallback default-allocator marche, mais l'interposer `__cxa_throw` (`src/common/stack_trace.cpp:91`) logge tout throw avant le catch — d'où la stacktrace effrayante. Fix : helper `rx_large_pages_available()` qui sonde `/proc/sys/vm/nr_hugepages` une fois et désactive le flag LARGE_PAGES sur les 4 call sites (rx_alloc_dataset, rx_alloc_cache, rx_init_full_vm, rx_init_light_vm). Hypothèse initiale (thread DNS) **incorrecte**. Comportement préservé sur hôtes huge-pages-enabled et non-Linux.
-2. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun 25739049536` pour publier les assets manquants sur la release v1.0.1 existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.1 ... --clobber`.
-3. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le design 18M / 42.86 (le NUMS genesis reste à 157.14 verrouillés pour préserver la chaîne, à expliquer dans la doc).
+### Punch list v1.0.3 (post-v1.0.2)
+1. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun` sur le run associé au tag v1.0.2 pour publier les assets manquants sur la release existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.2 ... --clobber`. (Item récurrent depuis v1.0.1 — tant que le billing reste bloqué, chaque release est Linux-only.)
+2. **Whitepaper + GENESIS_PROOF.md** — encore basés sur les anciens chiffres 33M / 157.14. À harmoniser avec le design 18M / 42.86 (le NUMS genesis reste à 157.14 verrouillés pour préserver la chaîne, à expliquer dans la doc). (Item récurrent depuis v1.0.1.)
+
+### Punch list v1.0.2 — RESOLUE partiellement (13 mai 2026)
+1. ~~**std::bad_alloc au démarrage du daemon**~~ → fix dans commit `6b9cf60de`. Cause racine : thread `rx_set_main_seedhash_thread` (`src/crypto/rx-slow-hash.c:350`) appelle `randomx_alloc_cache(... | RANDOMX_FLAG_LARGE_PAGES)`, et `LargePageAllocator::allocMemory` (`external/randomx/src/allocator.cpp:55`) throw `std::bad_alloc` quand `mmap(MAP_HUGETLB)` échoue sur un hôte sans huge pages (vm.nr_hugepages = 0, le défaut partout). Le throw est rattrapé en interne mais l'interposer `__cxa_throw` (`src/common/stack_trace.cpp:91`) logge tout throw avant le catch. Fix : helper `rx_large_pages_available()` qui sonde `/proc/sys/vm/nr_hugepages` une fois et désactive `RANDOMX_FLAG_LARGE_PAGES` sur les 4 call sites (rx_alloc_dataset, rx_alloc_cache, rx_init_full_vm, rx_init_light_vm). Hypothèse initiale (thread DNS) **incorrecte**.
+2. (déplacé en v1.0.3 punch list item #1 — macOS/Windows binaires, blocage billing GH Actions toujours actif)
+3. (déplacé en v1.0.3 punch list item #2 — révision doc whitepaper/GENESIS_PROOF non traitée)
 
 ### Punch list v1.0.1 — RESOLUE (12 mai 2026)
 1. ~~MONEY_SUPPLY~~ → fix dans commit `dca7dd433`.
-2. (déplacé en v1.0.2 punch list item #1 — `bad_alloc` non traité)
+2. (déplacé en v1.0.2 punch list item #1 — `bad_alloc` non traité, ✅ résolu en v1.0.2)
 3. ~~Rebrand strings résiduelles~~ → fix dans commit `b58e13850`.
 4. ~~CI workflow target name~~ → déjà fixé dans `739523ee6`, présent sur v2-privacy.
-5. (déplacé en v1.0.2 punch list item #3 — révision doc whitepaper)
+5. (déplacé en v1.0.2 punch list item #3 — révision doc whitepaper, ⏸ encore ouvert en v1.0.3)
 
 Mémoires persistantes associées :
 - `~/.claude/projects/-home-shark-hidering/memory/project_money_supply_overflow_v1.0.0.md`
