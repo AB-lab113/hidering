@@ -125,6 +125,11 @@ premine
 premine/
 test_wallet*
 
+# daemon-generated RPC TLS keypair (regenerated automatically on next launch)
+data/rpc_ssl.key
+data/rpc_ssl.crt
+data/rpc_ssl.fingerprint
+
 # one-shot dev scripts kept local only
 fix_premine*.py
 fix_genesis*.py
