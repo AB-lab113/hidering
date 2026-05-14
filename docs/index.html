@@ -1024,17 +1024,18 @@
     <div class="step">
       <div class="step-num">01</div>
       <div>
-        <h3>Download the binaries</h3>
-        <p>Grab the latest HIDERING release from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Linux x86_64 binaries are available now; Windows and macOS coming soon.</p>
-        <div class="code-block"><span class="cmd"># Verify and extract</span><br>sha256sum -c hidering-v1.0.2-linux-x64.tar.gz.sha256<br>tar -xzf hidering-v1.0.2-linux-x64.tar.gz<br>cd hidering-v1.0.2-linux-x64/</div>
+        <h3>Download, verify, and extract</h3>
+        <p>Grab the latest HIDERING release from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Download both the <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.tar.gz</code> and the matching <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.sha256</code> file into the same folder, then run the three commands below in order. Linux x86_64 binaries are available now; Windows and macOS coming soon.</p>
+        <div class="code-block"><span class="cmd"># 1. Verify the archive (must print: OK)</span><br>sha256sum -c hidering-v1.0.2-linux-x64.tar.gz.sha256<br><br><span class="cmd"># 2. Extract the archive</span><br>tar -xzf hidering-v1.0.2-linux-x64.tar.gz<br><br><span class="cmd"># 3. Move into the extracted folder</span><br>cd hidering-v1.0.2-linux-x64/</div>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">You are now inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">hidering-v1.0.2-linux-x64/</code>, which contains the two binaries you will use in the next steps: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hideringd</code> (full node daemon) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hidering-wallet-cli</code> (wallet CLI). Stay in this folder.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-num">02</div>
       <div>
         <h3>Launch the daemon &amp; sync</h3>
-        <p>Open a terminal and start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
-        <div class="code-block"><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740</div>
+        <p>Still inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-v1.0.2-linux-x64/</code> from step 01, start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
+        <div class="code-block"><span class="cmd"># Run from the hidering-v1.0.2-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740</div>
         <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
         <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">If <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1.hidering.org</code> is unreachable, query the live Flux endpoint for the current IP:<br><code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">curl https://api.runonflux.io/apps/location/hideringseed1</code> &nbsp;→ use the returned IP with <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">--add-priority-node &lt;IP&gt;:19740</code></p>
       </div>
