@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 13 Mai 2026 (release v1.0.2 Linux publiée — bad_alloc boot fix shippé ; whitepaper v1.3 + GENESIS_PROOF.md harmonisés 18M/42.86)**
+**Dernière MAJ : 14 Mai 2026 (Phase 4E pool mining validé local via monero-pool jtgrassie — 2 blocs minés, reward 42.86 HRG/bloc confirmé live ; mainnet observé actif à h≈3577 le 14 mai — statut Phase 4A-C corrigé)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -138,8 +138,9 @@ Mémoires persistantes associées :
 - Phase 3A : Rebranding complet — COMPLETE
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
 - Phase 3C : Infrastructure seed nodes — EN COURS
-- Phase 4A-C : Mainnet public launch — A FAIRE (Cible T2 2026)
+- Phase 4A-C : Mainnet public launch — **EN COURS** (mainnet observé actif le 14 mai 2026 : seed Flux à h=2796, wallet B5TL... synced à h≈3577 avec balance ≈472K HRG ≈11K blocs minés depuis fin avril 2026 — launch *officiel public* toujours cible T2 2026)
 - Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.2 publié manuellement le 13 mai 2026, macOS/Windows en attente — CI GitHub Actions bloquée par billing depuis 12 mai 2026)
+- Phase 4E : Pool mining — **VALIDÉ LOCAL** (14 mai 2026, voir section POOL MINING ci-dessous). Stack : monero-pool jtgrassie. Prod VPS à déployer.
 - Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
@@ -151,7 +152,7 @@ Mémoires persistantes associées :
 6. DNS seed nodes
 7. Block explorer
 8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0 + v1.0.1 + v1.0.2), Win/Mac → débloquer billing GH Actions et `gh run rerun` sur le run associé au tag v1.0.2, ou cross-build local + `gh release upload v1.0.2 ... --clobber`
-9. Pool mining compatible
+9. Pool mining compatible — VALIDÉ LOCAL (monero-pool jtgrassie, voir section POOL MINING) ; à déployer sur VPS prod avec daemon HRG dédié sync mainnet
 10. Site web public
 11. Phase 4 Launch
 
@@ -232,6 +233,40 @@ Mémoires persistantes associées :
 - Dockerfile : `Dockerfile.flux` à la racine (binaire copié depuis `build/release/bin/hideringd`)
 - Spec Flux complète (pour delete/recréer) : `flux-hideringseed1.json` à la racine
 - Gotcha : tout changement qui modifie le hash genesis (ex. NUMS migration `073f70af1`) nécessite un **wipe du volume persistant** au redeploy, sinon l'app reste sur l'ancien fork.
+
+## POOL MINING (Phase 4E — VALIDÉ LOCAL 14 Mai 2026)
+Stack retenue : **monero-pool** (https://github.com/jtgrassie/monero-pool) — C, single binary ~2.6 MB, link statique aux libs HRG, config plain text. Alternatives écartées : MoneroOcean nodejs-pool (multi-coin/MySQL, 206 default config rows, ~4-8h adapt + cryptonote-util native binding à patcher) ; p2pool (sidechain hardcoded Monero — prefix 18, reward formula, network ID — fork sidechain + bootstrap 1-2 semaines).
+
+### Build recipe (sur la machine de build HRG)
+```bash
+sudo apt install -y libjson-c-dev uuid-dev liblmdb-dev libevent-dev
+cd ~ && git clone https://github.com/jtgrassie/monero-pool
+# Patch Makefile ligne 76 : -std=c++14 → -std=c++17
+# (HRG epee headers utilisent std::is_standard_layout_v + has_unique_object_representations_v)
+export MONERO_ROOT=/home/shark/hidering
+export MONERO_BUILD_ROOT=/home/shark/hidering/build/release  # override : Makefile cherche build/Linux/<branch>/release/ par défaut
+make release
+```
+Le binaire `build/release/monero-pool` linke `libcryptonote_basic.a` HRG → **prefix 60 (adresses B...) reconnu automatiquement**, aucun patch source nécessaire.
+
+### Config pool.conf — valeurs HRG critiques
+- `rpc-port = 19741` (daemon HRG)
+- `wallet-rpc-port = 19743` (optionnel en solo single-address ; requis multi-worker payouts)
+- `pool-port = 3333` (stratum) / `webui-port = 4243`
+- `pool-wallet = B...` (adresse HRG mainnet, prefix 60)
+- `pool-start-diff = 100` (production) / `1` (test local pour trouver des blocs vite)
+- `disable-payouts = 0` (par défaut ; `1` pour test sans wallet-rpc)
+
+### Test local 14 mai 2026 — résultat
+Daemon offline + monero-pool + xmrig 6.22.0 (2 threads) → 472+ shares acceptées en ~30s, 2 blocs validés par daemon (height 1→3), reward 42.86 HRG/bloc encodée dans coinbase miner_tx (= confirme fix v1.0.1 MONEY_SUPPLY live dans v1.0.2). Wallet `~/hidering/hrg-wallet` montre 472,591.91 HRG préexistants ≈11K blocs mainnet préalables → confirme indirectement le scheme pool→adresse. Reorg refusé pour scanner notre fork offline (3574 blocs derrière chaîne du wallet), comportement attendu.
+
+Workspace test : `~/hidering-pool/` (hors repo, non versionné) — daemon dédié `~/hidering-pool/data/`, pool data `~/hidering-pool/pool-data/`, logs `~/hidering-pool/logs/{hideringd,monero-pool,xmrig}.log`.
+
+### Prod TODO (Phase 4E suite)
+- VPS dédié — Hetzner CX22 (~5€/mois) ou équivalent. **Flux écarté** : containers éphémères, IPs variables (vu 3 IPs en une session sur hideringseed1), mauvais fit pour stratum permanent.
+- Daemon HRG dédié pool, RPC `--rpc-bind-ip 127.0.0.1`, sync mainnet via `--add-priority-node <IP-courante-Flux>:19740` + `--block-notified` pour template refresh instantané.
+- TLS sur stratum (`pool-ssl-port`) + frontend CDN sur webui:4243.
+- Monitoring : pool hashrate, orphan rate, payout queue.
 
 ## POST-QUANTIQUE (PHASE 5 — 2027)
 Hard fork additif (n'altère pas la blockchain existante) :
