@@ -822,7 +822,7 @@
     <li><a href="#releases">Releases</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#faq">FAQ</a></li>
-    <li><a href="#" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.72rem;">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.3.md" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.72rem;">Whitepaper</a></li>
   </ul>
 </nav>
 
@@ -957,9 +957,9 @@
     </thead>
     <tbody>
       <tr>
-        <td>Genesis</td>
+        <td>Genesis<sup style="color:var(--gold-dim);">*</sup></td>
         <td class="gold">0</td>
-        <td class="gold">0 HRG</td>
+        <td class="gold">0 HRG (spendable)</td>
         <td>0 HRG — Fair Launch</td>
       </tr>
       <tr>
@@ -988,6 +988,7 @@
       </tr>
     </tbody>
   </table>
+  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;"><sup style="color:var(--gold-dim);">*</sup> Genesis block carries a 157.14 HRG NUMS (Nothing-Up-My-Sleeve) output that is cryptographically unspendable. No one — not even the developers — can spend it. Full proof in <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md" style="color:var(--gold);">GENESIS_PROOF.md</a>.</p>
 
   <div class="fairlaunch-box reveal">
     <h3>100% Fair Launch</h3>
@@ -1006,7 +1007,18 @@
 <section id="mine">
   <div class="section-label reveal">Mining</div>
   <h2 class="section-title reveal">Start Mining HRG</h2>
-  <p class="section-sub reveal">RandomX is CPU-optimised. Any modern processor can mine HIDERING. No ASICs, no GPU farms — just your CPU.</p>
+  <p class="section-sub reveal">RandomX is CPU-optimised. Any modern processor can mine HIDERING. No ASICs, no GPU farms — just your CPU. Solo mining works today; public pool mining is coming soon.</p>
+
+  <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
+    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Requirements</div>
+    <ul style="list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem 1.5rem;font-size:0.85rem;color:var(--text);padding:0;">
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">OS</span> &nbsp; Linux x86_64 (glibc ≥ 2.39 — Ubuntu 24.04 build)</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">RAM</span> &nbsp; ≥ 2 GB free per mining thread (RandomX dataset)</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
+    </ul>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;">Optional: enable Linux huge pages for higher hashrate — <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">echo 1280 | sudo tee /proc/sys/vm/nr_hugepages</code></p>
+  </div>
 
   <div class="steps reveal">
     <div class="step">
@@ -1021,9 +1033,10 @@
       <div class="step-num">02</div>
       <div>
         <h3>Launch the daemon &amp; sync</h3>
-        <p>Open a terminal and start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining.</p>
-        <div class="code-block"><span class="cmd">./hideringd</span> --non-interactive \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740</div>
+        <p>Open a terminal and start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
+        <div class="code-block"><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740</div>
         <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
+        <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">If <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1.hidering.org</code> is unreachable, query the live Flux endpoint for the current IP:<br><code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">curl https://api.runonflux.io/apps/location/hideringseed1</code> &nbsp;→ use the returned IP with <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">--add-priority-node &lt;IP&gt;:19740</code></p>
       </div>
     </div>
     <div class="step">
@@ -1239,10 +1252,10 @@
   <div class="footer-logo">HIDERING</div>
   <div class="footer-sub">HRG · Privacy by Protocol</div>
   <ul class="footer-links">
-    <li><a href="#">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.3.md">Whitepaper</a></li>
     <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
     <li><a href="https://github.com/AB-lab113/hidering/releases/latest">Latest Release</a></li>
-    <li><a href="#">Block Explorer</a></li>
+    <li><a href="https://hrgexplorer.app.runonflux.io">Block Explorer</a></li>
     <li><a href="#mine">Mining Guide</a></li>
   </ul>
   <div class="footer-copy">© 2026 HIDERING. Fair launch. Zero premine. Open source.</div>
