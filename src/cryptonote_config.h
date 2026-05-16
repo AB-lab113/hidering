@@ -252,8 +252,8 @@ namespace config
   uint16_t const RPC_DEFAULT_PORT = 19741;
   uint16_t const ZMQ_RPC_DEFAULT_PORT = 19742;
   boost::uuids::uuid const NETWORK_ID = { {
-      0x48, 0x52, 0x47, 0x01, 0x48, 0x49, 0x44, 0x45, 0x52, 0x49, 0x4E, 0x47, 0x4D, 0x41, 0x49, 0x4E
-    } }; // HIDERING mainnet
+      0x48, 0x52, 0x47, 0x02, 0x48, 0x49, 0x44, 0x45, 0x52, 0x49, 0x4E, 0x47, 0x4D, 0x41, 0x49, 0x4E
+    } }; // HIDERING mainnet v2.0.0 hard fork
   std::string const GENESIS_TX = "013c01ff00018090858fb0dd2302bb0e85edf7e295a84d172c26a759978dc1febea3e2608a240495368a74cdb2d22101f8ae2e22119ef501e05a9f8f347632f0ada2a69cee150d156c41d10df98fbe9f";
   uint32_t const GENESIS_NONCE = 10000; // HIDERING genesis: 157.14 HRG initial reward
 
