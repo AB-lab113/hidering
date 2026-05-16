@@ -1,21 +1,24 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 14 Mai 2026 (Phase 4E pool mining validé local via monero-pool jtgrassie — 2 blocs minés, reward 42.86 HRG/bloc confirmé live ; mainnet observé actif à h≈3577 le 14 mai — statut Phase 4A-C corrigé)**
+**Dernière MAJ : 16 Mai 2026 (HARD FORK v2.0.0 — NETWORK_ID bumpé HRG\x01 → HRG\x02, magic 0x48524701 → 0x48524702, daemon source recompilé. Chaîne v1.x à h≈3577 abandonnée par décision explicite. Tag/release/Docker/Flux redeploy/announce restent à faire.)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Ticker : HRG
 - Binaires : hideringd, hidering-wallet-cli, hidering-wallet-rpc
-- Branche active : v2-privacy (HEAD : f7ba0b1dd au 13 mai 2026 — docs only depuis v1.0.2)
-- Commit stable : 9d0e593a6 (= tag v1.0.2)
+- Branche active : v2-privacy (HEAD : 41f899049 au 16 mai 2026 + 2 fichiers uncommitted pour v2.0.0 : `src/cryptonote_config.h` NETWORK_ID byte[3] et `src/version.cpp.in` version string)
+- Source courante : v2.0.0 (non tagué) — daemon local rebuilt 16 mai 2026, reporte `Hidering 'Privacy Enhanced' (v2.0.0-41f899049)`
+- Dernière release publique : v1.0.2 → commit 9d0e593a6 (binaire incompatible avec source v2.0.0 — NETWORK_ID different)
 - Tags publiés :
+  - **v2.0.0** → *non tagué* — hard fork NETWORK_ID (HRG\x02HIDERINGMAIN, magic 0x48524702) + version 2.0.0 ; abandon volontaire chaîne v1.x à h≈3577 (16 mai 2026)
   - **v1.0.2** → commit 9d0e593a6 — fix RandomX/huge-pages bad_alloc au boot + version bump 1.0.2
   - **v1.0.1** → commit 47795728f — MONEY_SUPPLY corrigé (18M cap + 42.86 reward) + rebrand strings + version bump
   - **v1.0.0** → commit eb8ad1ee9 — rebrand banner initial + workflow CI (porte encore l'overflow MONEY_SUPPLY)
 - Releases :
-  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.2 (Linux x64, stripped, 14.35 MB) — courante
-  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.1 (Linux x64, stripped, 14.3 MB)
-  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64, historique)
+  - v2.0.0 — *non publié* (tag + binaires + Docker à faire, cf. punch list v2.0.0)
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.2 (Linux x64, stripped, 14.35 MB) — dernière publique, **NE PLUS UTILISER pour mainnet** post-HF
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.1 (Linux x64, stripped, 14.3 MB) — historique
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64) — historique
 - Repo : https://github.com/AB-lab113/hidering
 - Build actif : build/release/bin/
 
@@ -38,8 +41,10 @@ vers 18M. Les binaires v1.0.0 publiés portent encore les anciennes valeurs (157
 effectif après wrap). **Patch source appliqué en v1.0.1 (12 mai 2026, commit dca7dd433).**
 
 ## SPECS RÉSEAU
-- Network ID (Mainnet) : HRG\x01HIDERINGMAIN
-- Magic bytes : 0x48524701
+- Network ID (Mainnet) : **HRG\x02HIDERINGMAIN** (v2.0.0, source `src/cryptonote_config.h:255`)
+- Magic bytes : **0x48524702** (v2.0.0)
+- *Valeurs v1.x (historique, chaîne abandonnée à h≈3577) : NETWORK_ID `HRG\x01HIDERINGMAIN`, magic `0x48524701`*
+- *Collision prefixe : testnet utilise déjà byte[3] = 0x02 (`HRG\x02HIDERINGTEST`). UUID complet reste unique via suffixe `MAIN`/`TEST` — handshake P2P compare le UUID 16 octets, pas le prefixe. Toute intégration tooling qui keyerait sur les 4 premiers octets seuls est ambigüe.*
 - P2P Port : 19740
 - RPC Port : 19741
 - Préfixe adresses : 60 (adresses commençant par "B")
@@ -137,26 +142,41 @@ Mémoires persistantes associées :
 - Phase 2 : Privacy enhancements (5 patches) — COMPLETE
 - Phase 3A : Rebranding complet — COMPLETE
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
-- Phase 3C : Infrastructure seed nodes — EN COURS
-- Phase 4A-C : Mainnet public launch — **EN COURS** (mainnet observé actif le 14 mai 2026 : seed Flux à h=2796, wallet B5TL... synced à h≈3577 avec balance ≈472K HRG ≈11K blocs minés depuis fin avril 2026 — launch *officiel public* toujours cible T2 2026)
-- Phase 4D : Binaires publics — **PARTIEL** (Linux v1.0.2 publié manuellement le 13 mai 2026, macOS/Windows en attente — CI GitHub Actions bloquée par billing depuis 12 mai 2026)
-- Phase 4E : Pool mining — **VALIDÉ LOCAL** (14 mai 2026, voir section POOL MINING ci-dessous). Stack : monero-pool jtgrassie. Prod VPS à déployer.
+- Phase 3C : Infrastructure seed nodes — **RESET v2.0.0** (Flux `hideringseed1` sert encore l'ancienne chaîne v1.x — redeploy avec volume wipe requis avant d'être reachable par les peers v2.0.0)
+- Phase 4A-C : Mainnet public launch — **RESET v2.0.0** (chaîne v1.x à h≈3577 abandonnée par décision 16 mai 2026 ; nouveau mainnet v2.0.0 démarre vierge dès activation. Launch *officiel public* toujours cible T2 2026.)
+- Phase 4D : Binaires publics — **À REFAIRE** (v1.0.2 Linux publié 13 mai obsolète post-HF ; v2.0.0 source rebuilt local, binaires publics + tag à produire — CI GitHub Actions toujours bloquée par billing depuis 12 mai 2026)
+- Phase 4E : Pool mining — **VALIDÉ LOCAL** (14 mai 2026, voir section POOL MINING ci-dessous). Stack : monero-pool jtgrassie. Pool doit linker contre les libs v2.0.0 et pointer un daemon v2.0.0 ; rebuild requis après HF.
 - Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
-1. Build local : make -j$(nproc) hideringd
-2. Wipe ~/.hidering + smoke test genesis NUMS
-3. Daemon --offline valider genesis hash
-4. Rebuild Docker image ab113hrg/hidering-seed:latest
-5. Redéployer Flux seed node hideringseed1 (IP dynamique via Flux API, cf. section DOCKER ET DEPLOIEMENT)
-6. DNS seed nodes
-7. Block explorer
-8. Binaires publics (Linux/Windows/Mac) — Linux DONE (v1.0.0 + v1.0.1 + v1.0.2), Win/Mac → débloquer billing GH Actions et `gh run rerun` sur le run associé au tag v1.0.2, ou cross-build local + `gh release upload v1.0.2 ... --clobber`
-9. Pool mining compatible — VALIDÉ LOCAL (monero-pool jtgrassie, voir section POOL MINING) ; à déployer sur VPS prod avec daemon HRG dédié sync mainnet
-10. Site web public
-11. Phase 4 Launch
+1. Commit v2.0.0 source patches (`src/cryptonote_config.h` + `src/version.cpp.in`)
+2. Rebuild full : `make -j$(nproc)` (daemon target déjà rebuilt 16 mai ; wallet binaries encore en v1.0.2)
+3. Wipe ~/.hidering + smoke test genesis NUMS sur le nouveau réseau
+4. Daemon --offline valider genesis hash (inchangé — NETWORK_ID hors hash bloc)
+5. Tag `v2.0.0` + release notes
+6. Rebuild Docker image `ab113hrg/hidering-seed:v2.0.0`
+7. Redéployer Flux seed node `hideringseed1` **avec volume wipe** (la chaîne v1.x sur disque est orpheline pour un peer v2.0.0)
+8. DNS seed nodes — vérifier que seed1/seed2.hidering.org pointent vers les nouveaux IPs Flux
+9. Block explorer — reset DB ou nouvelle instance (chaîne v1.x indexée invalide)
+10. Binaires publics v2.0.0 (Linux/Windows/Mac) — débloquer billing GH Actions sinon Linux-only via build local + `gh release create v2.0.0`
+11. Pool mining — relink monero-pool contre les libs v2.0.0, pointer un daemon v2.0.0 sync mainnet
+12. Site web public — mettre à jour docs/ (network ID, magic, version) pour redeploy Vercel auto
+13. Announce hard fork (Twitter, Reddit, BitcoinTalk) — communiquer activation + abandon chaîne v1.x
+14. Phase 4 Launch (public officiel)
 
-## RELEASE v1.0.2 (13 Mai 2026 — courante)
+## RELEASE v2.0.0 (16 Mai 2026 — source patché, non tagué/publié)
+- Tag : **non tagué** — source HEAD `41f899049` + 2 fichiers uncommitted
+- Type : **hard fork coordonné** (flag-day) — chaîne v1.x à h≈3577 abandonnée par décision explicite utilisateur
+- Patches source appliqués :
+  - `src/cryptonote_config.h:255` — mainnet NETWORK_ID byte[3] `0x01` → `0x02` → UUID `HRG\x02HIDERINGMAIN`, magic `0x48524702`
+  - `src/version.cpp.in:2` — `DEF_MONERO_VERSION "1.0.2"` → `"2.0.0"`
+- Genesis intentionnellement **inchangé** : `GENESIS_NONCE = 10000`, `GENESIS_TX` blob et `src/gen_genesis/gen_genesis.cpp:18` (`INITIAL_REWARD = 157140000000000ULL`) preservés. NETWORK_ID n'entre pas dans le hash bloc → genesis valide sous v2.0.0, c'est uniquement le handshake P2P qui sépare les réseaux.
+- Build local : 16 mai 2026 — daemon target rebuilt clean, binaire reporte `Hidering 'Privacy Enhanced' (v2.0.0-41f899049)` (15.02 MB, non strippé, dans `build/release/bin/hideringd`)
+- Wallet binaries (`hidering-wallet-cli`, `hidering-wallet-rpc`) : libs sous-jacentes recompilées au link daemon, mais les exécutables wallets ne sont **pas** régénérés tant qu'un `make -j$(nproc)` complet n'est pas lancé.
+- Compat : **wire-break** total — peers v1.x rejetés au handshake (NETWORK_ID mismatch), LMDB v1.x orphelin pour un daemon v2.0.0.
+- Mémoire associée : `~/.claude/projects/-home-shark-hidering/memory/project_v2.0.0_networkid_hardfork.md`
+
+## RELEASE v1.0.2 (13 Mai 2026 — dernière publique avant HF v2.0.0)
 - Tag : v1.0.2 → commit 9d0e593a6
 - Commits inclus depuis v1.0.1 :
   - `6b9cf60de` — fix(daemon): bad_alloc on auxiliary thread at startup (RandomX huge-pages probe)
@@ -186,9 +206,21 @@ Mémoires persistantes associées :
 - Contenu tarball : hideringd, hidering-wallet-cli, hidering-wallet-rpc + README + LICENSE + GENESIS_PROOF.md
 - Cap d'émission effectif : 14.55M HRG (overflow uint64 non corrigé — cf. BUG CRITIQUE MONEY_SUPPLY). Conserver pour traçabilité, **ne pas réutiliser pour mainnet**.
 
-### Punch list v1.0.3 (post-v1.0.2)
-1. **Binaires macOS + Windows** — débloquer le billing GitHub Actions (Settings → Billing & plans), puis `gh run rerun` sur le run associé au tag v1.0.2 pour publier les assets manquants sur la release existante. Alternative : cross-build local et upload manuel via `gh release upload v1.0.2 ... --clobber`. (Item récurrent depuis v1.0.1 — tant que le billing reste bloqué, chaque release est Linux-only.)
-2. ~~**Whitepaper + GENESIS_PROOF.md**~~ → harmonisés 13 mai 2026. Commit `de1db6c5e` publie `docs/whitepaper_v1.3.md` (cap 18M, reward 42.86 HRG, roadmap v1.0.0→v1.0.2 à jour, code snippet `MONEY_SUPPLY = 18000000000000000000ULL` uint64-safe). Commit `f7ba0b1dd` patche `GENESIS_PROOF.md` (cap 33M → 18M dans TL;DR et section unspendability, circulant effectif 32 999 842.86 → 17 999 842.86 HRG ; construction NUMS, domain strings et amount genesis 157.14 HRG inchangés pour préserver le hash de la chaîne déployée). Item récurrent depuis v1.0.1 clos.
+### Punch list v2.0.0 (post-HF 16 Mai 2026 — EN COURS)
+1. **Commit source patches** — `git add src/cryptonote_config.h src/version.cpp.in && git commit -m "[HRG] v2.0.0 hard fork: bump NETWORK_ID HRG\\x01→HRG\\x02 + version 1.0.2→2.0.0"`. Travailler sur la branche v2-privacy comme d'habitude.
+2. **Rebuild complet** — `cd build/release && make -j$(nproc)` pour régénérer `hidering-wallet-cli` + `hidering-wallet-rpc` (le 16 mai seul `daemon` a été rebuilt).
+3. **Tag v2.0.0 + release notes** — `git tag -a v2.0.0 -m "..."` puis `gh release create v2.0.0` avec asset Linux + `RELEASE_NOTES_v2.0.0.md` à la racine.
+4. **Binaires macOS + Windows v2.0.0** — débloquer billing GH Actions (item récurrent depuis v1.0.1), sinon Linux-only via `gh release upload v2.0.0 ...`. Tant que le billing reste bloqué, chaque release reste Linux-only.
+5. **Docker `ab113hrg/hidering-seed:v2.0.0`** — rebuild depuis `Dockerfile.flux`, push DockerHub.
+6. **Flux `hideringseed1` redeploy avec volume wipe** — same gotcha que la migration NUMS dans CLAUDE.md, l'état LMDB sur disque est orphelin pour un peer v2.0.0. Vérifier nouvelle IP via `curl https://api.runonflux.io/apps/location/hideringseed1` après redeploy.
+7. **Block explorer reset** — DB indexée sur la chaîne v1.x est invalide. Reset ou nouvelle instance.
+8. ~~**Docs CLAUDE.md + whitepaper**~~ → harmonisés 16 mai 2026 dans cette même session (CLAUDE.md SPECS RÉSEAU + Tags + Releases + RELEASE v2.0.0 section ; `docs/whitepaper_v1.3.md` lignes 257-258 + roadmap Phase 4).
+9. **GENESIS_PROOF.md** — à vérifier : pas d'impact direct (genesis inchangé) mais ajouter mention que v2.0.0 hard fork n'altère pas le genesis ; le NUMS reste sous l'ancien hash bloc même si plus jamais activé en mainnet.
+10. **Announce hard fork** — Twitter, Reddit, BitcoinTalk + email aux miners connus. Préciser activation flag-day et abandon chaîne v1.x.
+
+### Punch list v1.0.3 — partiellement OBSOLÈTE post-HF v2.0.0
+1. ~~**Binaires macOS + Windows v1.0.2**~~ — **OBSOLÈTE** : binaires v1.0.2 incompatibles avec mainnet v2.0.0 post-HF. Item ré-instancié en punch list v2.0.0 item #4.
+2. ~~**Whitepaper + GENESIS_PROOF.md (v1.0.x)**~~ → harmonisés 13 mai 2026. Commit `de1db6c5e` publie `docs/whitepaper_v1.3.md` (cap 18M, reward 42.86 HRG, roadmap v1.0.0→v1.0.2 à jour, code snippet `MONEY_SUPPLY = 18000000000000000000ULL` uint64-safe). Commit `f7ba0b1dd` patche `GENESIS_PROOF.md` (cap 33M → 18M dans TL;DR et section unspendability, circulant effectif 32 999 842.86 → 17 999 842.86 HRG ; construction NUMS, domain strings et amount genesis 157.14 HRG inchangés pour préserver le hash de la chaîne déployée). Item récurrent depuis v1.0.1 clos.
 
 ### Punch list v1.0.2 — RESOLUE partiellement (13 mai 2026)
 1. ~~**std::bad_alloc au démarrage du daemon**~~ → fix dans commit `6b9cf60de`. Cause racine : thread `rx_set_main_seedhash_thread` (`src/crypto/rx-slow-hash.c:350`) appelle `randomx_alloc_cache(... | RANDOMX_FLAG_LARGE_PAGES)`, et `LargePageAllocator::allocMemory` (`external/randomx/src/allocator.cpp:55`) throw `std::bad_alloc` quand `mmap(MAP_HUGETLB)` échoue sur un hôte sans huge pages (vm.nr_hugepages = 0, le défaut partout). Le throw est rattrapé en interne mais l'interposer `__cxa_throw` (`src/common/stack_trace.cpp:91`) logge tout throw avant le catch. Fix : helper `rx_large_pages_available()` qui sonde `/proc/sys/vm/nr_hugepages` une fois et désactive `RANDOMX_FLAG_LARGE_PAGES` sur les 4 call sites (rx_alloc_dataset, rx_alloc_cache, rx_init_full_vm, rx_init_light_vm). Hypothèse initiale (thread DNS) **incorrecte**.
@@ -223,8 +255,10 @@ Mémoires persistantes associées :
 - Committer des clés privées ou tokens GitHub
 
 ## DOCKER ET DEPLOIEMENT
-- Image : `ab113hrg/hidering-seed:v1.0.2` (tag `latest` = même digest, push 13 mai 2026)
-- Digest pushé : `sha256:2ec8eb28cfe7c80d8c24e00032a227995583f3659026c0bc01b6464e586e32b0`
+- **Statut post-HF v2.0.0 (16 mai 2026) :** image courante `:v1.0.2` STALE — sert encore l'ancienne chaîne v1.x sur Flux, à remplacer par `:v2.0.0` avec volume wipe (cf. punch list v2.0.0 #5-6).
+- Image courante (post-HF, à builder) : `ab113hrg/hidering-seed:v2.0.0`
+- Image déployée Flux (pré-HF, à remplacer) : `ab113hrg/hidering-seed:v1.0.2` (tag `latest` = même digest, push 13 mai 2026)
+- Digest v1.0.2 pushé : `sha256:2ec8eb28cfe7c80d8c24e00032a227995583f3659026c0bc01b6464e586e32b0`
 - Digest historique v1.0.1 (build b43a29862) : `sha256:0a92296ce842edc690c72f2eecae32f737628381f4e9de58c556984119557c5e`
 - Flux app : `hideringseed1`
   - Ports : P2P 19740, RPC 19741

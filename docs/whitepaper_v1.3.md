@@ -1,7 +1,7 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH 100% MINING — ZÉRO PREMINE**  
-**Version 1.3**  
+**Version 1.3 (révisée 16 Mai 2026 — hard fork v2.0.0)**  
 **Mai 2026**
 
 ---
@@ -217,13 +217,11 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 - Site web hidering.org
 
 **PHASE 4 : MAINNET LAUNCH (En cours)**
-- ✅ Mainnet live (189,000+ HRG minés)
-- ✅ Release v1.0.0 Linux
-- ✅ Release v1.0.1 Linux (fix MONEY_SUPPLY 18M)
-- ✅ Release v1.0.2 Linux (fix bad_alloc boot daemon)
-- ⏳ Binaires macOS/Windows (juin 2026)
-- ⏳ Whitepaper v1.3 harmonisé
-- ⏳ Pool mining RandomX/HRG
+- ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
+- ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (pré-launch, ~h≈3577) retirée au profit du nouveau réseau v2.0.0.
+- ⏳ Tag v2.0.0 + release Linux v2.0.0
+- ⏳ Binaires macOS/Windows v2.0.0
+- ⏳ Pool mining RandomX/HRG (relink v2.0.0)
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
@@ -254,8 +252,8 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 |-----------|--------|
 | Ticker | HRG |
 | Fork base | Monero v0.18.1 |
-| Network ID | `HRG\x01HIDERINGMAIN` |
-| Magic bytes | `0x48524701` |
+| Network ID | `HRG\x02HIDERINGMAIN` (v2.0.0) |
+| Magic bytes | `0x48524702` (v2.0.0) |
 | Port P2P | 19740 |
 | Port RPC | 19741 |
 | Préfixe adresses | 60 → "B" |
@@ -299,5 +297,6 @@ Le fair launch garantit une distribution équitable depuis le bloc 1. La roadmap
 
 ---
 
-*Whitepaper v1.3 — Mai 2026*  
-*SHA256 release v1.0.2 : `da92781f5e0d085a08a656b48ea49be3d54201b3db32b736204266ea89fd2b8b`*
+*Whitepaper v1.3 — Mai 2026 (révisé 16 mai 2026 pour hard fork v2.0.0)*  
+*SHA256 release v2.0.0 : à publier — voir https://github.com/AB-lab113/hidering/releases*  
+*SHA256 release v1.0.2 (historique, pré-HF) : `da92781f5e0d085a08a656b48ea49be3d54201b3db32b736204266ea89fd2b8b`*
