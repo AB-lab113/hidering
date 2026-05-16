@@ -831,7 +831,7 @@
   <div class="hero-glow"></div>
   <div class="hero-ring"></div>
 
-  <img src="assets/hrg_logo.png" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:1.5rem;border:2px solid rgba(201,168,76,0.4);" alt="HRG Logo"><div class="hero-badge">Fair Launch · 100% Mining · Zero Premine</div>
+  <img src="assets/hrg_logo.png" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:1.5rem;border:2px solid rgba(201,168,76,0.4);" alt="HRG Logo"><div class="hero-badge">Fair Launch · 100% PoW · RandomX CPU</div>
 
   <h1>HIDE<span>RING</span></h1>
   <div class="hero-ticker">HRG · MAINNET LIVE</div>
@@ -917,7 +917,7 @@
 <div class="token-section" id="tokenomics">
   <div class="section-label reveal">Economics</div>
   <h2 class="section-title reveal">Bitcoin-Style Emission</h2>
-  <p class="section-sub reveal">Fixed supply, predictable halvings, zero premine. The same monetary properties that made Bitcoin trusted — with Monero-grade privacy.</p>
+  <p class="section-sub reveal">Fixed supply, predictable halvings, pure PoW emission. The same monetary properties that made Bitcoin trusted — with Monero-grade privacy.</p>
 
   <div class="token-grid reveal">
     <div class="token-card">
@@ -941,8 +941,8 @@
       <span class="token-card-label">Block Time</span>
     </div>
     <div class="token-card">
-      <span class="token-card-value">0</span>
-      <span class="token-card-label">Premine</span>
+      <span class="token-card-value">RandomX</span>
+      <span class="token-card-label">CPU-only PoW</span>
     </div>
   </div>
 
@@ -960,7 +960,7 @@
         <td>Genesis<sup style="color:var(--gold-dim);">*</sup></td>
         <td class="gold">0</td>
         <td class="gold">0 HRG (spendable)</td>
-        <td>0 HRG — Fair Launch</td>
+        <td>0 HRG (NUMS, unspendable)</td>
       </tr>
       <tr>
         <td>Era 1</td>
@@ -988,16 +988,16 @@
       </tr>
     </tbody>
   </table>
-  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;"><sup style="color:var(--gold-dim);">*</sup> Genesis block reward is 0 HRG — fair launch, zero premine. Full genesis proof in <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md" style="color:var(--gold);">GENESIS_PROOF.md</a>.</p>
+  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;"><sup style="color:var(--gold-dim);">*</sup> Genesis block reward is 0 HRG spendable — the NUMS-locked 157.14 HRG at height 0 is cryptographically unspendable. Full genesis proof in <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md" style="color:var(--gold);">GENESIS_PROOF.md</a>.</p>
 
   <div class="fairlaunch-box reveal">
-    <h3>100% Fair Launch</h3>
-    <p>Block 0 genesis carries zero reward. The first public miner to find block 1 receives the full 42.86 HRG. No team allocation, no seed round, no dev wallet.</p>
+    <h3>Fair Launch · PoW Only</h3>
+    <p>Genesis (block 0) carries zero spendable reward. Emission follows a pure proof-of-work schedule with no seed round, no private sale, and no team token allocation. After the v1.x 51% attack, v2.0.0 includes a short pre-public mining phase to harden the network before opening — once public, every miner competes under the same RandomX rules. See the FAQ for the full v2.0.0 rationale.</p>
     <div class="fairlaunch-items">
-      <span class="fi">Zero Premine</span>
+      <span class="fi">Pure PoW</span>
       <span class="fi">No Private Sale</span>
-      <span class="fi">No Dev Wallet</span>
-      <span class="fi">Team mines publicly</span>
+      <span class="fi">No Seed Round</span>
+      <span class="fi">RandomX CPU</span>
       <span class="fi">Verifiable Genesis</span>
     </div>
   </div>
@@ -1229,7 +1229,7 @@
 
     <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
       <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">What does "fair launch" mean?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Block 0 (genesis) carries zero reward. The very first mined block — found by the first public miner — earns 42.86 HRG. There is no premine, no private sale, no team allocation, and no dev wallet. The development team mines publicly alongside the community from day one.</p>
+      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Genesis (block 0) carries zero spendable reward, and emission follows a pure PoW schedule with no private sale, no seed round, and no team token allocation. After the 51% attack on the v1.x chain (see below), v2.0.0 introduces a short pre-public mining phase on a private network — founder nodes mine to harden the network before public opening, fund GUI / post-quantum development, and build a community reserve. Once the network opens publicly, every miner competes under the same rules: same RandomX algorithm, same block reward, same difficulty. No insider has access to coins that the public cannot also mine after launch.</p>
     </div>
 
     <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
@@ -1254,9 +1254,14 @@
 
     <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);"><h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">How do I choose my ring size?</h3><p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">By default, every transaction uses ring size 32 — the minimum on HIDERING, already 2× Monero's default of 16. For enhanced privacy, specify a larger ring size: <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 48</code> or <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 64</code>. Higher ring sizes increase anonymity but slightly increase transaction size and fees.</p></div>
 
-<div style="padding:1.75rem 0;">
+<div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
       <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Is HIDERING open source?</h3>
       <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Yes. HIDERING is fully open source, forked from Monero v0.18.1. The complete source code, commit history, and genesis block are publicly verifiable on GitHub. Transparency is a core principle — anyone can audit the code, the supply, and every transaction on the network.</p>
+    </div>
+
+    <div style="padding:1.75rem 0;">
+      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Why a v2.0.0? What happened?</h3>
+      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Shortly after the v1.x launch, on 16 May 2026, the HIDERING network suffered a 51% attack — an external miner with greater hashing power than the rest of the network dominated the chain (then at height ~3577) and caused a major reorganisation, orphaning every block mined up to that point. v2.0.0 responds on two fronts. First, a network-level hard fork: the Network ID changes, immediately isolating v2.0.0 from the malicious miner and giving us time to consolidate hashrate in a private network before public re-opening. Second, a pre-public mining phase: before the network is opened to all miners, founder nodes mine on a private network for three reasons — to harden v2.0.0 from day one by accumulating enough hashrate that another 51% attack becomes economically prohibitive at launch; to fund development by generating the real on-chain transactions needed to test the GUI wallet and the 2027 post-quantum signature upgrade (Dilithium3 + Kyber768); and to build a community reserve that will be either redistributed to miners and participating DEXs at launch, or partially burned to reduce circulating supply. The fair-launch principle remains our core commitment — pre-mining is not value capture, it is a shield against attackers and a lever for a healthy public launch.</p>
     </div>
 
   </div>
@@ -1274,7 +1279,7 @@
     <li><a href="https://hrgexplorer.app.runonflux.io">Block Explorer</a></li>
     <li><a href="#mine">Mining Guide</a></li>
   </ul>
-  <div class="footer-copy">© 2026 HIDERING. Fair launch. Zero premine. Open source.</div>
+  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
 </footer>
 
 <script>

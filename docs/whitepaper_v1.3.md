@@ -1,6 +1,6 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
-**FAIR LAUNCH 100% MINING — ZÉRO PREMINE**  
+**FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
 **Version 1.3 (révisée 16 Mai 2026 — hard fork v2.0.0)**  
 **Mai 2026**
 
@@ -27,7 +27,7 @@
 
 HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero v0.18.1, combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
 
-**FAIR LAUNCH 100% MINING** : Zéro premine, 100% distribution via PoW équitable. Supply cap irrévocable **18 millions HRG**.
+**FAIR LAUNCH** : émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. v2.0.0 introduit une courte phase de pré-minage en réseau privé (réponse à l'attaque 51% du 16 mai 2026 sur la chaîne v1.x à h≈3577) — voir §7 pour la justification complète.
 
 **INNOVATIONS CLÉS** :
 - Ring size dynamique 32–64 (vs Monero 16)
@@ -56,7 +56,7 @@ HIDERING vise la confidentialité maximale par construction :
 
 ### 2.3 Modèle économique sain
 
-HIDERING adopte le modèle Bitcoin (supply fixe, halving, zéro premine) pour garantir la confiance et l'équité dès le premier bloc miné.
+HIDERING adopte le modèle Bitcoin (supply fixe, halving, émission PoW pure) pour garantir la prédictibilité monétaire et l'équité à long terme.
 
 ---
 
@@ -92,7 +92,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|--------|
 | Ticker | HRG |
 | Supply maximum | **18,000,000 HRG (hard cap irrévocable)** |
-| Premine | **0 HRG (100% mining fair launch)** |
+| Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~2.66 ans) |
 | Difficulty adjustment | Chaque bloc (RandomX) |
@@ -120,7 +120,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
                = 18,000,000 HRG exactement
 ```
 
-La série géométrique converge vers le cap de **18M HRG**. Zéro premine, zéro inflation, cap irrévocable.
+La série géométrique converge vers le cap de **18M HRG**. Émission 100% PoW, zéro inflation, cap irrévocable.
 
 ### 4.4 Note technique — Choix du cap 18M
 
@@ -135,7 +135,7 @@ Le cap original de 33M HRG provoquait un **overflow uint64** (33 × 10¹⁹ > UI
 | Aspect | Bitcoin | **HIDERING** |
 |--------|---------|--------------|
 | Supply cap | 21M BTC | **18M HRG** |
-| Premine | 0% | **0% (fair launch)** |
+| Émission | 100% PoW (fair launch) | **100% PoW (fair launch)** |
 | Mécanisme | Halving q/4 ans | Halving q/2.66 ans |
 | PoW | SHA-256 (ASIC) | RandomX (CPU-only) |
 
@@ -175,17 +175,26 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 
 ## 7. DISTRIBUTION FAIR LAUNCH
 
-**100% MINING PUBLIC** :
-- Aucun premine, aucune vente privée, aucun seed round.
-- Bloc 0 : genesis avec 157.14 HRG verrouillés sous clé NUMS (unspendable, héritage chaîne).
-- Bloc 1 : **premier miner public** reçoit 42.86 HRG.
-- Équipe mine publiquement comme tous les participants.
+**Principe** : émission 100% via PoW RandomX, aucune vente privée, aucun seed round, pas de token allocation à l'équipe. Bloc 0 est un genesis avec 157.14 HRG verrouillés sous clé NUMS (cryptographiquement unspendable, héritage chaîne — voir `GENESIS_PROOF.md`). Bloc 1 onwards : récompense distribuée par compétition PoW pure.
 
-**Avantages** :
-- ✓ Distribution pure PoW (RandomX CPU-friendly)
-- ✓ Zéro avantage équipe (fair depuis jour 1)
-- ✓ Transparence absolue (genesis vérifiable on-chain)
-- ✓ Confiance maximale (pas de « dev wallet »)
+### 7.1 Phase pré-publique v2.0.0 (post-attaque 16 mai 2026)
+
+Peu après le lancement v1.x, le réseau HIDERING a subi une attaque 51% (16 mai 2026, chaîne v1.x à h≈3577) : un mineur externe disposant d'une puissance supérieure à l'ensemble du réseau a dominé la chaîne et causé une réorganisation majeure, rendant orphelins tous les blocs minés. La réponse v2.0.0 est duale :
+
+- **Hard fork réseau** : le Network ID passe de `HRG\x01HIDERINGMAIN` à `HRG\x02HIDERINGMAIN` (magic `0x48524701` → `0x48524702`), isolant immédiatement v2.0.0 du mineur malveillant et permettant la consolidation du hashrate sur réseau privé avant ré-ouverture publique.
+- **Phase de pré-minage** : avant l'ouverture publique, les nœuds fondateurs minent en réseau privé pour trois raisons :
+  1. **Durcir le réseau dès le premier jour public** — accumuler suffisamment de hashrate pour rendre une nouvelle attaque 51% économiquement prohibitive dès le launch.
+  2. **Financer le développement** — les tests du wallet GUI et l'implémentation des signatures post-quantiques (Dilithium3 + Kyber768, prévues 2027) requièrent des transactions on-chain réelles.
+  3. **Constituer une réserve communautaire** — qui sera soit redistribuée aux mineurs et DEX participants au lancement public, soit partiellement brûlée pour réduire la supply en circulation.
+
+Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'agit d'un bouclier défensif et d'un levier de financement développement. Une fois le réseau ouvert publiquement, tous les mineurs concourent sous les mêmes règles RandomX, sans avantage insider sur des coins inaccessibles au public.
+
+### 7.2 Engagements
+
+- ✓ Algorithme PoW RandomX (CPU-only, ASIC-resistant)
+- ✓ Aucune vente privée, aucun seed round, aucun token allocation équipe
+- ✓ Genesis vérifiable on-chain (`GENESIS_PROOF.md`)
+- ✓ Transparence sur la phase pré-publique v2.0.0 : durée, hashrate, destination des coins minés (communiqués au launch public)
 
 ---
 
@@ -265,7 +274,7 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 | Supply | 18,000,000 HRG |
 | Reward initial | 42.857142857143 HRG/bloc |
 | Halving | 210,000 blocs (~2.66 ans) |
-| Premine | 0% |
+| Émission | 100% PoW (voir §7) |
 | Repo | github.com/AB-lab113/hidering |
 
 ---
@@ -289,9 +298,9 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 ## 13. CONCLUSION
 
-HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, zéro premine) et des améliorations privacy substantielles (ring size 32–64, padding fixe, mixnet 3-hops), HIDERING offre une confidentialité maximale par construction.
+HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, padding fixe, mixnet 3-hops), HIDERING offre une confidentialité maximale par construction.
 
-Le fair launch garantit une distribution équitable depuis le bloc 1. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
+Le fair launch garantit une distribution équitable par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
 **HIDERING — Privacy by design. Fair by launch.** 🚀
 
