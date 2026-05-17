@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HIDERING (HRG) — Réseau suspendu</title>
-<meta name="description" content="Le réseau Hidering est temporairement suspendu suite à une attaque 51%. Hard fork v2.0.0 en préparation.">
+<meta name="description" content="Le réseau Hidering est temporairement suspendu suite à une attaque 51%. Bifurcation v2.0.0 en préparation.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -324,9 +324,9 @@
   <h1>Le réseau Hidering<br>est <span class="accent">temporairement suspendu</span></h1>
 
   <p class="lead">
-    Une attaque 51% a été détectée sur la chaîne v1.x. Le mainnet public est gelé,
-    et un hard fork coordonné <strong>v2.0.0</strong> est en cours de préparation pour
-    réinitialiser le réseau sur des bases sécurisées.
+    Une attaque 51% a été détectée sur la chaîne v1.x. Le réseau principal public est
+    gelé, et une <strong>bifurcation coordonnée v2.0.0</strong> est en cours de
+    préparation pour réinitialiser le réseau sur des bases sécurisées.
   </p>
 
   <section class="report">
@@ -341,54 +341,54 @@
     </p>
 
     <p>
-      La faible diffusion du hashrate à ce stade pré-public — Hidering n'avait pas
-      encore atteint son lancement officiel — a rendu cette attaque économiquement
-      viable pour un acteur isolé. <strong>Aucun fonds détenu par des utilisateurs
-      publics n'a été affecté</strong>, le réseau étant encore en phase
-      pré-lancement contrôlé.
+      La faible diffusion de la puissance de hachage à ce stade pré-public —
+      Hidering n'avait pas encore atteint son lancement officiel — a rendu cette
+      attaque économiquement viable pour un acteur isolé. <strong>Aucun fonds
+      détenu par des utilisateurs publics n'a été affecté</strong>, le réseau
+      étant encore en phase de pré-lancement contrôlé.
     </p>
 
     <p>
       La décision a été prise <strong>d'abandonner la chaîne v1.x</strong> et de
-      réaliser un <strong>hard fork coordonné v2.0.0</strong> :
+      réaliser une <strong>bifurcation coordonnée v2.0.0</strong> :
     </p>
 
     <ul>
-      <li><span class="label">NETWORK&nbsp;ID</span> <span class="value">HRG\x01 → HRG\x02</span></li>
-      <li><span class="label">Magic bytes</span> <span class="value">0x48524701 → 0x48524702</span></li>
+      <li><span class="label">ID&nbsp;réseau</span> <span class="value">HRG\x01 → HRG\x02</span></li>
+      <li><span class="label">Octets magiques</span> <span class="value">0x48524701 → 0x48524702</span></li>
       <li><span class="label">Version</span> <span class="value">1.0.2 → 2.0.0</span></li>
-      <li><span class="label">Genesis</span> <span class="value">inchangé (NUMS préservé)</span></li>
+      <li><span class="label">Bloc d'origine</span> <span class="value">inchangé (NUMS préservé)</span></li>
       <li><span class="label">Chaîne v1.x</span> <span class="value">abandonnée à h ≈ 3 577</span></li>
     </ul>
 
     <p>
-      Cette séparation cryptographique au niveau du handshake P2P garantit
-      qu'<strong>aucun peer v1.x ne peut interagir avec le réseau v2.0.0</strong>.
+      Cette séparation cryptographique au niveau de la négociation P2P garantit
+      qu'<strong>aucun nœud v1.x ne peut interagir avec le réseau v2.0.0</strong>.
       Une phase de minage privé contrôlé par les nœuds fondateurs précède la
-      ré-ouverture publique, le temps de consolider la diffusion du hashrate et
-      d'éviter la répétition de l'incident.
+      ré-ouverture publique, le temps de consolider la diffusion de la puissance
+      de hachage et d'éviter la répétition de l'incident.
     </p>
 
     <p style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid rgba(201,168,76,0.15); font-size:0.9rem; color: var(--text-dim);">
       <strong style="color:var(--gold);">Note de transparence :</strong> la
-      communication publique initiale du projet annonçait « zero premine ». Cette
-      promesse était attachée à la chaîne v1.x désormais abandonnée. La phase de
-      minage privé v2.0.0 sera documentée publiquement au moment du re-lancement
-      (volume miné, durée, distribution).
+      communication publique initiale du projet annonçait « aucun pré-minage »
+      (« zero premine »). Cette promesse était attachée à la chaîne v1.x désormais
+      abandonnée. La phase de minage privé v2.0.0 sera documentée publiquement au
+      moment du re-lancement (volume miné, durée, distribution).
     </p>
   </section>
 
   <div class="status">
     <div class="status-item suspended">
-      <div class="k">▸ Mainnet v1.x</div>
+      <div class="k">▸ Réseau principal v1.x</div>
       <div class="v">SUSPENDU</div>
     </div>
     <div class="status-item prep">
-      <div class="k">▸ Hard fork v2.0.0</div>
+      <div class="k">▸ Bifurcation v2.0.0</div>
       <div class="v">EN PRÉPARATION</div>
     </div>
     <div class="status-item">
-      <div class="k">▸ Re-lancement</div>
+      <div class="k">▸ Ré-ouverture publique</div>
       <div class="v">À VENIR</div>
     </div>
   </div>
@@ -401,7 +401,7 @@
 </main>
 
 <footer>
-  HIDERING — Privacy Cryptocurrency &nbsp;·&nbsp;
+  HIDERING — Cryptomonnaie privée et confidentielle &nbsp;·&nbsp;
   Code source : <a href="https://github.com/AB-lab113/hidering" target="_blank" rel="noopener">github.com/AB-lab113/hidering</a>
 </footer>
 
