@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HIDERING (HRG) — Réseau suspendu</title>
-<meta name="description" content="Le réseau Hidering est temporairement suspendu suite à une attaque 51%. Bifurcation v2.0.0 en préparation.">
+<title>HIDERING (HRG) — Network suspended</title>
+<meta name="description" content="The Hidering network is temporarily suspended following a 51% attack. Hard fork v2.0.0 in preparation.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -307,10 +307,10 @@
 
 <div class="marquee" role="alert" aria-live="polite">
   <div class="marquee-track">
-    <span>Réseau suspendu — Attaque 51% — v2.0.0 en préparation</span>
-    <span>Réseau suspendu — Attaque 51% — v2.0.0 en préparation</span>
-    <span>Réseau suspendu — Attaque 51% — v2.0.0 en préparation</span>
-    <span>Réseau suspendu — Attaque 51% — v2.0.0 en préparation</span>
+    <span>Network suspended — 51% attack — v2.0.0 in preparation</span>
+    <span>Network suspended — 51% attack — v2.0.0 in preparation</span>
+    <span>Network suspended — 51% attack — v2.0.0 in preparation</span>
+    <span>Network suspended — 51% attack — v2.0.0 in preparation</span>
   </div>
 </div>
 
@@ -319,90 +319,90 @@
     <img src="assets/hrg_logo.png" alt="Hidering HRG">
   </div>
 
-  <div class="badge">⏸ Maintenance d'urgence</div>
+  <div class="badge">⏸ Emergency maintenance</div>
 
-  <h1>Le réseau Hidering<br>est <span class="accent">temporairement suspendu</span></h1>
+  <h1>The Hidering network<br>is <span class="accent">temporarily suspended</span></h1>
 
   <p class="lead">
-    Une attaque 51% a été détectée sur la chaîne v1.x. Le réseau principal public est
-    gelé, et une <strong>bifurcation coordonnée v2.0.0</strong> est en cours de
-    préparation pour réinitialiser le réseau sur des bases sécurisées.
+    A 51% attack has been detected on the v1.x chain. The public mainnet is
+    frozen, and a coordinated <strong>hard fork v2.0.0</strong> is being prepared
+    to reset the network on secure foundations.
   </p>
 
   <section class="report">
-    <div class="report-title">▸ Rapport d'incident — 16 Mai 2026</div>
+    <div class="report-title">▸ Incident report — 16 May 2026</div>
 
     <p>
-      Le <strong>16 mai 2026</strong>, aux alentours de la hauteur de bloc
-      <span class="value">≈ 3 577</span>, une <strong>attaque 51%</strong> a été
-      observée sur la chaîne v1.x du réseau Hidering. Un attaquant disposant
-      temporairement de la majorité de la puissance de hachage RandomX a été en
-      mesure de réorganiser des blocs récents.
+      On <strong>16 May 2026</strong>, at approximately block height
+      <span class="value">≈ 3,577</span>, a <strong>51% attack</strong> was
+      observed on the v1.x chain of the Hidering network. An attacker who
+      temporarily held a majority of the RandomX hashrate was able to reorganise
+      recent blocks.
     </p>
 
     <p>
-      La faible diffusion de la puissance de hachage à ce stade pré-public —
-      Hidering n'avait pas encore atteint son lancement officiel — a rendu cette
-      attaque économiquement viable pour un acteur isolé. <strong>Aucun fonds
-      détenu par des utilisateurs publics n'a été affecté</strong>, le réseau
-      étant encore en phase de pré-lancement contrôlé.
+      The limited hashrate distribution at this pre-public stage — Hidering had
+      not yet reached its official launch — made this attack economically viable
+      for a lone actor. <strong>No funds held by public users were
+      affected</strong>, as the network was still in a controlled pre-launch
+      phase.
     </p>
 
     <p>
-      La décision a été prise <strong>d'abandonner la chaîne v1.x</strong> et de
-      réaliser une <strong>bifurcation coordonnée v2.0.0</strong> :
+      The decision was made to <strong>abandon the v1.x chain</strong> and carry
+      out a <strong>coordinated hard fork v2.0.0</strong>:
     </p>
 
     <ul>
-      <li><span class="label">ID&nbsp;réseau</span> <span class="value">HRG\x01 → HRG\x02</span></li>
-      <li><span class="label">Octets magiques</span> <span class="value">0x48524701 → 0x48524702</span></li>
+      <li><span class="label">Network&nbsp;ID</span> <span class="value">HRG\x01 → HRG\x02</span></li>
+      <li><span class="label">Magic bytes</span> <span class="value">0x48524701 → 0x48524702</span></li>
       <li><span class="label">Version</span> <span class="value">1.0.2 → 2.0.0</span></li>
-      <li><span class="label">Bloc d'origine</span> <span class="value">inchangé (NUMS préservé)</span></li>
-      <li><span class="label">Chaîne v1.x</span> <span class="value">abandonnée à h ≈ 3 577</span></li>
+      <li><span class="label">Genesis</span> <span class="value">unchanged (NUMS preserved)</span></li>
+      <li><span class="label">v1.x chain</span> <span class="value">abandoned at h ≈ 3,577</span></li>
     </ul>
 
     <p>
-      Cette séparation cryptographique au niveau de la négociation P2P garantit
-      qu'<strong>aucun nœud v1.x ne peut interagir avec le réseau v2.0.0</strong>.
-      Une phase de minage privé contrôlé par les nœuds fondateurs précède la
-      ré-ouverture publique, le temps de consolider la diffusion de la puissance
-      de hachage et d'éviter la répétition de l'incident.
+      This cryptographic separation at the P2P handshake level guarantees that
+      <strong>no v1.x peer can interact with the v2.0.0 network</strong>. A
+      private mining phase controlled by the founding nodes precedes the public
+      reopening, allowing time to consolidate hashrate distribution and prevent
+      the incident from recurring.
     </p>
 
     <p style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid rgba(201,168,76,0.15); font-size:0.9rem; color: var(--text-dim);">
-      <strong style="color:var(--gold);">Note de transparence :</strong> la
-      communication publique initiale du projet annonçait « aucun pré-minage »
-      (« zero premine »). Cette promesse était attachée à la chaîne v1.x désormais
-      abandonnée. La phase de minage privé v2.0.0 sera documentée publiquement au
-      moment du re-lancement (volume miné, durée, distribution).
+      <strong style="color:var(--gold);">Transparency note:</strong> the
+      project's initial public communication advertised "zero premine." That
+      promise was tied to the v1.x chain, which is now abandoned. The v2.0.0
+      private mining phase will be publicly documented at relaunch (volume
+      mined, duration, distribution).
     </p>
   </section>
 
   <div class="status">
     <div class="status-item suspended">
-      <div class="k">▸ Réseau principal v1.x</div>
-      <div class="v">SUSPENDU</div>
+      <div class="k">▸ Mainnet v1.x</div>
+      <div class="v">SUSPENDED</div>
     </div>
     <div class="status-item prep">
-      <div class="k">▸ Bifurcation v2.0.0</div>
-      <div class="v">EN PRÉPARATION</div>
+      <div class="k">▸ Hard fork v2.0.0</div>
+      <div class="v">IN PREPARATION</div>
     </div>
     <div class="status-item">
-      <div class="k">▸ Ré-ouverture publique</div>
-      <div class="v">À VENIR</div>
+      <div class="k">▸ Public relaunch</div>
+      <div class="v">UPCOMING</div>
     </div>
   </div>
 
   <p style="font-size: 0.88rem; color: var(--text-dim); max-width: 560px; line-height: 1.8;">
-    Les mises à jour techniques sont publiées sur le dépôt GitHub du projet.<br>
-    Aucune action n'est requise de la part de mineurs ou d'observateurs externes
-    à ce stade — le réseau public sera ré-annoncé lorsque v2.0.0 sera prêt.
+    Technical updates are published on the project's GitHub repository.<br>
+    No action is required from miners or external observers at this stage —
+    the public network will be re-announced once v2.0.0 is ready.
   </p>
 </main>
 
 <footer>
-  HIDERING — Cryptomonnaie privée et confidentielle &nbsp;·&nbsp;
-  Code source : <a href="https://github.com/AB-lab113/hidering" target="_blank" rel="noopener">github.com/AB-lab113/hidering</a>
+  HIDERING — Privacy Cryptocurrency &nbsp;·&nbsp;
+  Source code: <a href="https://github.com/AB-lab113/hidering" target="_blank" rel="noopener">github.com/AB-lab113/hidering</a>
 </footer>
 
 </body>
