@@ -256,20 +256,23 @@ Mémoires persistantes associées :
 - Committer des clés privées ou tokens GitHub
 
 ## DOCKER ET DEPLOIEMENT
-- **Statut post-HF v2.0.0 (17 mai 2026) :** image `:v2.0.0` **pushed** sur DockerHub, **Flux pas encore redeployé** — l'app `hideringseed1` sur Flux sert toujours `:v1.0.2` (chaîne v1.x abandonnée). Punch list v2.0.0 #6-7 = delete + register avec spec `flux-hideringseed1.v2.0.0.json` (volume wipe au passage). Demande signature ZelCore.
-- Image courante (post-HF, pushed) : `ab113hrg/hidering-seed:v2.0.0` — push DockerHub 17 mai 2026, build local depuis `build/release/bin/hideringd` (commit `ff02d1f80` = tag v2.0.0)
-- Image déployée Flux (pré-HF, à remplacer) : `ab113hrg/hidering-seed:v1.0.2` (push DockerHub 13 mai 2026 ; live tant que Flux delete pas signé)
+- **Statut post-HF v2.0.0 (17 mai 2026, soirée) :** image `:v2.0.0` **pushed** sur DockerHub + **Flux redéployé** avec succès — l'app `hideringseed1` sert maintenant le binaire v2.0.0, vérifié par probe P2P (handshake `COMMAND_HANDSHAKE INVOKED OK` depuis un daemon v2.0.0 local). Volume wipe confirmé via height 1 + top_block_hash genesis. Punch list v2.0.0 items #5 (Docker) et #6-7 (Flux redeploy) closés.
+- Image courante (live Flux) : `ab113hrg/hidering-seed:v2.0.0` — push DockerHub 17 mai 2026, build local depuis `build/release/bin/hideringd` (commit `ff02d1f80` = tag v2.0.0)
+- Note historique : avant le 17 mai 2026 soir, Flux servait `:v1.0.2` (push DockerHub 13 mai 2026) — chaîne v1.x abandonnée post-attaque 51%. Plus reachable depuis le delete.
 - Digest v2.0.0 pushé : `sha256:bb9bfc6ffcb5a0456e1ed3453e17b1071ecb09284c36c0cc7c5ada33bb6ce9d6` (manifest list, multi-arch) — amd64-specific manifest : `sha256:74cf7031aa589b5cf3d9d2a94ef788b46cde02fddb0f44dae3756829ba80ff39`. `:latest` aliasé sur le même digest.
 - Digest v1.0.2 pushé : `sha256:2ec8eb28cfe7c80d8c24e00032a227995583f3659026c0bc01b6464e586e32b0`
 - Digest historique v1.0.1 (build b43a29862) : `sha256:0a92296ce842edc690c72f2eecae32f737628381f4e9de58c556984119557c5e`
 - Flux app : `hideringseed1`
   - Ports : P2P 19740, RPC 19741
-  - IP courante : **ne pas hard-coder** — Flux re-schedule sur d'autres nodes à chaque delete/recreate (vu 3 IPs différentes en une session). Source de vérité : `curl https://api.runonflux.io/apps/location/hideringseed1`
+  - IP courante : **ne pas hard-coder** — Flux re-schedule sur d'autres nodes à chaque delete/recreate (vu plusieurs IPs en une session : `.197` pré-redeploy, `.112` post-redeploy 17 mai soir). Source de vérité : `curl https://api.runonflux.io/apps/location/hideringseed1`
+  - Spec live (17 mai 2026 soir) : hash `e81f32fdde3f6ae2a83ba7aded83c6e25e83f7b9e74b383226163496bb9875a9`, registration height `2605818`, `repotag` pinned `ab113hrg/hidering-seed:v2.0.0`
   - Spec déployée (vérif) : `curl https://api.runonflux.io/apps/appspecifications/hideringseed1`
 - Dockerfile : `Dockerfile.flux` à la racine (binaire copié depuis `build/release/bin/hideringd`)
-- Spec Flux v1.x (live) : `flux-hideringseed1.json` à la racine — `:latest` → v1.0.2
-- Spec Flux v2.0.0 (à enregistrer) : `flux-hideringseed1.v2.0.0.json` à la racine — `:v2.0.0` pinned, descriptions mises à jour, `hash`/`height` stripped (Flux les remplit au register)
-- Gotcha : tout changement qui modifie le hash genesis (ex. NUMS migration `073f70af1`) nécessite un **wipe du volume persistant** au redeploy, sinon l'app reste sur l'ancien fork. Pour v2.0.0 : NETWORK_ID a changé mais pas le genesis ; wipe **toujours requis** parce que la LMDB sur disque contient la chaîne v1.x abandonnée — un daemon v2.0.0 la chargerait sans erreur (mêmes règles consensus) mais resterait stuck à h≈3577 sans peers v2.0.0 partageant cette histoire.
+- Spec Flux v2.0.0 (live, registered) : `flux-hideringseed1.v2.0.0.json` à la racine — `:v2.0.0` pinned, descriptions mises à jour, `hash`/`height` stripped (Flux les remplit au register)
+- Spec Flux v1.x (historique) : `flux-hideringseed1.json` à la racine — référence du déploiement v1.0.2 supprimé le 17 mai 2026
+- **Gotcha redeploy validé** : Update App via ZelCore peut sembler "signé" mais le tx ne broadcast pas toujours sur le réseau Flux (vécu 2 fois en cette session sur Update App). **Toujours vérifier** côté API Flux registry (`curl …/apps/appspecifications/hideringseed1` → `.data.hash` doit changer) avant de considérer le redeploy fait. Si le hash bouge pas après 10 min, c'est que le tx n'a pas atteint le réseau — fallback canonique : **Delete + Register fresh** (a fonctionné, ~17:22 → 18:56 timeline). Plus de Soft Update tant qu'on n'a pas compris pourquoi le broadcast échoue.
+- **Probe P2P pour confirmer le binaire actif** : `hideringd --add-priority-node <IP>:19740 --out-peers 1 --log-level 2` pendant 45s. Si log dit `COMMAND_HANDSHAKE INVOKED OK` → image v2.0.0 active. Si `LEVIN_ERROR_CONNECTION_DESTROYED` → toujours v1.0.2 (NETWORK_ID mismatch). RPC `get_info`/`get_version` **ne disambigue pas** (RPC protocol version identique entre v1.0.2 et v2.0.0, `version` field stripped par `--restricted-rpc`).
+- Gotcha genesis : tout changement qui modifie le hash genesis (ex. NUMS migration `073f70af1`) nécessite un **wipe du volume persistant** au redeploy, sinon l'app reste sur l'ancien fork. Pour v2.0.0 : NETWORK_ID a changé mais pas le genesis ; wipe **toujours requis** parce que la LMDB sur disque contient la chaîne v1.x abandonnée — un daemon v2.0.0 la chargerait sans erreur (mêmes règles consensus) mais resterait stuck à h≈3577 sans peers v2.0.0 partageant cette histoire.
 
 ## POOL MINING (Phase 4E — VALIDÉ LOCAL 14 Mai 2026)
 Stack retenue : **monero-pool** (https://github.com/jtgrassie/monero-pool) — C, single binary ~2.6 MB, link statique aux libs HRG, config plain text. Alternatives écartées : MoneroOcean nodejs-pool (multi-coin/MySQL, 206 default config rows, ~4-8h adapt + cryptonote-util native binding à patcher) ; p2pool (sidechain hardcoded Monero — prefix 18, reward formula, network ID — fork sidechain + bootstrap 1-2 semaines).
