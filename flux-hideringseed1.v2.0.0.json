@@ -1,0 +1,30 @@
+{
+  "version": 8,
+  "name": "hideringseed1",
+  "description": "HIDERING HRG seed node (v2.0.0 post-hard-fork mainnet)",
+  "owner": "0xb4a7d8a91f80cce5c4b7c9e16a1315101c89a12d",
+  "compose": [
+    {
+      "name": "hideringseed",
+      "description": "HIDERING HRG seed node — image pinned to v2.0.0 (commit ff02d1f80, post-fork NETWORK_ID HRG\\x02HIDERINGMAIN, magic 0x48524702). Fresh deployment — volume wiped at registration to drop the orphan v1.x LMDB.",
+      "repotag": "ab113hrg/hidering-seed:v2.0.0",
+      "ports": [19740, 19741],
+      "domains": ["", ""],
+      "environmentParameters": [],
+      "commands": [],
+      "containerPorts": [19740, 19741],
+      "containerData": "/home/hidering/.hidering",
+      "cpu": 0.1,
+      "ram": 1000,
+      "hdd": 30,
+      "repoauth": ""
+    }
+  ],
+  "instances": 1,
+  "contacts": ["F_S_CONTACTS=https://storage.runonflux.io/v1/contacts/358081332282971"],
+  "geolocation": [],
+  "expire": 67640,
+  "nodes": [],
+  "staticip": true,
+  "enterprise": ""
+}
