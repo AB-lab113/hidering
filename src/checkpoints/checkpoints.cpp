@@ -216,10 +216,9 @@ namespace cryptonote
       ADD_CHECKPOINT2(550000,  "409f68cddd8e74b37469b41c1e61250d81c5776b42264f416d5d27c4626383ed", "0x5f3d4d03e");
       return true;
     }
-    // HIDERING: Monero mainnet checkpoints purged. Their hashes do not exist
-    // on the HRG chain and would either reject legitimate HRG blocks at those
-    // heights or block reorgs across them. Re-introduce HRG-specific
-    // checkpoints once the mainnet has accumulated enough history to anchor.
+    // HIDERING mainnet checkpoints. Anchors prevent deep reorgs on the v2.0.0 chain
+    // after the 16 May 2026 hard fork.
+    ADD_CHECKPOINT2(2939, "5155f6f679e60773331175024910019f0db9d30db8953d9227313ba563126592", "0x2e096dbbf");
     return true;
   }
 
