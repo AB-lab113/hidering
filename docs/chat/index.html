@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIDERING — Flash Chat</title>
+<script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --gold: #c9a227;
+    --gold-light: #f0c040;
+    --gold-dim: #7a5f10;
+    --bg: #06060a;
+    --bg2: #0e0e16;
+    --bg3: #141420;
+    --text: #e8e8f0;
+    --text-dim: #888899;
+    --border: #1e1e30;
+    --danger: #e05555;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ── 64 GOLDEN RINGS BACKGROUND ── */
+  .rings-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(201, 162, 39, 0.12);
+    animation: ringPulse linear infinite;
+  }
+
+  @keyframes ringPulse {
+    0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
+    50%  { transform: translate(-50%, -50%) scale(1.04); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(6,6,10,0.85);
+    backdrop-filter: blur(8px);
+  }
+
+  .logo-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--gold);
+  }
+
+  .logo-link img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .logo-link span {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--gold);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .badge {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 2px;
+  }
+
+  .tg-link {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    text-decoration: none;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 1px;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .tg-link:hover {
+    color: var(--gold);
+    border-color: var(--gold-dim);
+  }
+
+  .tg-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    position: relative;
+    z-index: 10;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .chat-title {
+    text-align: center;
+  }
+
+  .chat-title h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 5px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+
+  .chat-title p {
+    margin-top: 6px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+  }
+
+  /* ── PSEUDO FORM ── */
+  .pseudo-section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 20px;
+    border-radius: 4px;
+  }
+
+  .pseudo-section label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .pseudo-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .pseudo-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .pseudo-input:focus { border-color: var(--gold-dim); }
+  .pseudo-input:disabled { opacity: 0.4; }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    background: rgba(201,162,39,0.08);
+    border-color: var(--gold);
+  }
+
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  .active-pseudo {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .active-pseudo .nick {
+    color: var(--gold);
+    font-weight: bold;
+  }
+
+  .change-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  .change-btn:hover { color: var(--gold); }
+
+  /* ── MESSAGES ── */
+  .messages-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    height: 420px;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+
+  .messages-box::-webkit-scrollbar { width: 4px; }
+  .messages-box::-webkit-scrollbar-track { background: transparent; }
+  .messages-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .msg-nick {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .msg-expires {
+    font-size: 9px;
+    color: var(--gold-dim);
+    margin-left: auto;
+  }
+
+  .msg-body {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+    padding-left: 2px;
+    border-left: 2px solid var(--border);
+    padding-left: 10px;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 2px;
+    opacity: 0.5;
+  }
+
+  .empty-state div { margin-top: 8px; font-size: 10px; }
+
+  /* ── INPUT ── */
+  .input-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .msg-input {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 12px 16px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .msg-input:focus { border-color: var(--gold-dim); }
+  .msg-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+  .msg-input:disabled { opacity: 0.4; }
+
+  .send-btn {
+    background: rgba(201,162,39,0.12);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .send-btn:hover {
+    background: rgba(201,162,39,0.22);
+    border-color: var(--gold);
+  }
+
+  .send-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    padding: 0 2px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-right: 7px;
+    transition: background 0.3s;
+  }
+
+  .status-dot.connected { background: #4caf86; }
+  .status-dot.error { background: var(--danger); }
+
+  @media (max-width: 600px) {
+    header { padding: 12px 16px; }
+    .logo-link span { font-size: 14px; }
+    .messages-box { height: 320px; }
+    .header-right { gap: 10px; }
+    .badge { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 64 RINGS BACKGROUND -->
+<div class="rings-bg" id="ringsBg"></div>
+
+<!-- HEADER -->
+<header>
+  <a class="logo-link" href="/">
+    <img src="/assets/hrg_logo.png" onerror="this.style.display='none'" alt="HRG">
+    <span>HIDERING</span>
+  </a>
+  <div class="header-right">
+    <span class="badge">FLASH CHAT</span>
+    <a class="tg-link" href="https://t.me/hidering" target="_blank" rel="noopener">
+      <svg class="tg-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/>
+      </svg>
+      TELEGRAM
+    </a>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <div class="chat-title">
+    <h1>⬡ FLASH CHAT</h1>
+    <p>MESSAGES DISAPPEAR AFTER 1 HOUR · ANONYMOUS · DECENTRALIZED</p>
+  </div>
+
+  <!-- PSEUDO -->
+  <div class="pseudo-section">
+    <label>Choose your handle</label>
+    <div class="pseudo-row" id="pseudoForm">
+      <input class="pseudo-input" id="pseudoInput" type="text" maxlength="20"
+             placeholder="anonymous_miner_42" autocomplete="off">
+      <button class="btn" id="pseudoBtn" onclick="setPseudo()">ENTER</button>
+    </div>
+    <div class="active-pseudo" id="activePseudo">
+      <span>LOGGED IN AS</span>
+      <span class="nick" id="activeName"></span>
+      <button class="change-btn" onclick="changePseudo()">change</button>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-bar">
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">CONNECTING...</span>
+    </div>
+    <div id="msgCount">0 MESSAGES</div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div class="messages-box" id="messagesBox">
+    <div class="empty-state" id="emptyState">
+      ◎ NO MESSAGES YET
+      <div>Be the first to speak</div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-row">
+    <input class="msg-input" id="msgInput" type="text" maxlength="500"
+           placeholder="Message..." disabled autocomplete="off"
+           onkeydown="if(event.key==='Enter')sendMsg()">
+    <button class="send-btn" id="sendBtn" onclick="sendMsg()" disabled>SEND</button>
+  </div>
+
+</div>
+
+<script>
+  /* ── 64 RINGS GENERATION ── */
+  (function() {
+    var bg = document.getElementById('ringsBg');
+    var cols = ['rgba(201,162,39,', 'rgba(240,192,64,', 'rgba(150,110,20,'];
+    for (var i = 0; i < 64; i++) {
+      var el = document.createElement('div');
+      el.className = 'ring';
+      var size = 40 + Math.random() * 280;
+      var x = Math.random() * 110 - 5;
+      var y = Math.random() * 110 - 5;
+      var dur = 3 + Math.random() * 8;
+      var delay = -Math.random() * 8;
+      var opacity = 0.04 + Math.random() * 0.18;
+      var col = cols[Math.floor(Math.random() * cols.length)];
+      el.style.cssText = [
+        'width:' + size + 'px',
+        'height:' + size + 'px',
+        'left:' + x + '%',
+        'top:' + y + '%',
+        'border-color:' + col + opacity + ')',
+        'animation-duration:' + dur + 's',
+        'animation-delay:' + delay + 's',
+      ].join(';');
+      bg.appendChild(el);
+    }
+  })();
+
+  /* ── GUN.JS FLASH CHAT ── */
+  var GUN_RELAY = 'wss://gun-relay-blabla_38270.app.runonflux.io/gun';
+  var NAMESPACE = 'hidering-flashchat';
+  var MSG_TTL = 60 * 60 * 1000; // 1 hour
+
+  var gun = null;
+  var pseudo = localStorage.getItem('hrg-chat-pseudo') || '';
+  var messages = {};
+  var statusDot = document.getElementById('statusDot');
+  var statusText = document.getElementById('statusText');
+  var msgCount = document.getElementById('msgCount');
+
+  function initGun() {
+    try {
+      gun = Gun({ peers: [GUN_RELAY], localStorage: false });
+      setStatus('connected', 'CONNECTED · P2P');
+      loadMessages();
+    } catch(e) {
+      setStatus('error', 'CONNECTION ERROR');
+    }
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = 'status-dot ' + state;
+    statusText.textContent = text;
+  }
+
+  function setPseudo() {
+    var val = document.getElementById('pseudoInput').value.trim();
+    if (!val) return;
+    pseudo = val.substring(0, 20);
+    localStorage.setItem('hrg-chat-pseudo', pseudo);
+    showActivePseudo();
+    document.getElementById('msgInput').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('msgInput').focus();
+  }
+
+  function showActivePseudo() {
+    document.getElementById('pseudoForm').style.display = 'none';
+    var ap = document.getElementById('activePseudo');
+    ap.style.display = 'flex';
+    document.getElementById('activeName').textContent = pseudo;
+  }
+
+  function changePseudo() {
+    document.getElementById('pseudoForm').style.display = 'flex';
+    document.getElementById('activePseudo').style.display = 'none';
+    document.getElementById('pseudoInput').value = pseudo;
+    document.getElementById('msgInput').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+  }
+
+  function sendMsg() {
+    var input = document.getElementById('msgInput');
+    var text = input.value.trim();
+    if (!text || !pseudo || !gun) return;
+    var now = Date.now();
+    var id = 'msg_' + now + '_' + Math.random().toString(36).substr(2, 6);
+    var msg = { id: id, nick: pseudo, text: text, ts: now };
+    gun.get(NAMESPACE).get(id).put(msg);
+    input.value = '';
+  }
+
+  function loadMessages() {
+    gun.get(NAMESPACE).map().on(function(data) {
+      if (!data || !data.id || !data.nick || !data.text || !data.ts) return;
+      var now = Date.now();
+      if (now - data.ts > MSG_TTL) {
+        gun.get(NAMESPACE).get(data.id).put(null);
+        return;
+      }
+      if (!messages[data.id]) {
+        messages[data.id] = data;
+        renderMessage(data);
+        updateCount();
+        purgeExpired();
+      }
+    });
+  }
+
+  function renderMessage(msg) {
+    var box = document.getElementById('messagesBox');
+    var empty = document.getElementById('emptyState');
+    if (empty) empty.style.display = 'none';
+
+    var el = document.createElement('div');
+    el.className = 'msg';
+    el.id = 'msg-' + msg.id;
+
+    var d = new Date(msg.ts);
+    var timeStr = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    var expireMin = Math.max(0, Math.round((MSG_TTL - (Date.now() - msg.ts)) / 60000));
+
+    el.innerHTML = [
+      '<div class="msg-header">',
+      '  <span class="msg-nick">' + escHtml(msg.nick) + '</span>',
+      '  <span class="msg-time">' + timeStr + '</span>',
+      '  <span class="msg-expires">expires ~' + expireMin + 'min</span>',
+      '</div>',
+      '<div class="msg-body">' + escHtml(msg.text) + '</div>',
+    ].join('');
+
+    // Insert sorted by ts
+    var items = box.querySelectorAll('.msg');
+    var inserted = false;
+    for (var i = 0; i < items.length; i++) {
+      var id = items[i].id.replace('msg-', '');
+      if (messages[id] && messages[id].ts > msg.ts) {
+        box.insertBefore(el, items[i]);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+
+    // Auto-remove after TTL
+    var remaining = MSG_TTL - (Date.now() - msg.ts);
+    setTimeout(function() { removeMessage(msg.id); }, Math.max(0, remaining));
+  }
+
+  function removeMessage(id) {
+    delete messages[id];
+    var el = document.getElementById('msg-' + id);
+    if (el) {
+      el.style.transition = 'opacity 0.5s';
+      el.style.opacity = '0';
+      setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); updateCount(); }, 500);
+    }
+    try { gun.get(NAMESPACE).get(id).put(null); } catch(e) {}
+  }
+
+  function purgeExpired() {
+    var now = Date.now();
+    for (var id in messages) {
+      if (now - messages[id].ts > MSG_TTL) removeMessage(id);
+    }
+  }
+
+  function updateCount() {
+    var n = Object.keys(messages).length;
+    msgCount.textContent = n + ' MESSAGE' + (n !== 1 ? 'S' : '');
+    var box = document.getElementById('messagesBox');
+    var empty = document.getElementById('emptyState');
+    if (n === 0 && empty) empty.style.display = 'flex';
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Init
+  if (pseudo) {
+    showActivePseudo();
+    document.getElementById('msgInput').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+  initGun();
+  setInterval(purgeExpired, 60000);
+</script>
+</body>
+</html>
