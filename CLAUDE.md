@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 19 Mai 2026 (MIGRATION INFRA Flux → VPS dédiés — seed1.hidering.org pointe désormais sur OVH 135.125.243.137 (systemd hideringd.service, restart auto), seed2.hidering.org sur Contabo 207.180.211.96 (nouveau), block explorer migré sur http://135.125.243.137:8080. Flux `hideringseed1` en cours d'expiration, infrastructure désormais sur VPS propres avec IPs invariantes.)**
+**Dernière MAJ : 19 Mai 2026 (MIGRATION INFRA Flux → VPS dédiés — seed1.hidering.org pointe désormais sur OVH 135.125.243.137 (systemd hideringd.service, restart auto), seed2.hidering.org sur Contabo 207.180.211.96 (nouveau), block explorer migré sur http://explorer.hidering.org:8080. Flux `hideringseed1` en cours d'expiration, infrastructure désormais sur VPS propres avec IPs invariantes.)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -158,7 +158,7 @@ Mémoires persistantes associées :
 6. ~~Rebuild Docker image `ab113hrg/hidering-seed:v2.0.0`~~ — **FAIT** 17 mai 2026 (utile uniquement pour Flux, désormais déprécié).
 7. ~~Redéployer Flux seed node `hideringseed1`~~ — **OBSOLÈTE** (Flux abandonné 19 mai 2026, migration sur VPS dédiés).
 8. ~~DNS seed nodes — vérifier que seed1/seed2.hidering.org pointent vers les nouveaux IPs~~ — **FAIT** 19 mai 2026 : `seed1` → OVH `135.125.243.137`, `seed2` → Contabo `207.180.211.96`.
-9. ~~Block explorer — reset DB ou nouvelle instance~~ — **FAIT** 19 mai 2026 : nouvelle instance sur OVH (http://135.125.243.137:8080), remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io`.
+9. ~~Block explorer — reset DB ou nouvelle instance~~ — **FAIT** 19 mai 2026 : nouvelle instance sur OVH (http://explorer.hidering.org:8080), remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io`.
 10. Binaires publics v2.0.0 (Linux/Windows/Mac) — débloquer billing GH Actions sinon Linux-only via build local + `gh release create v2.0.0`
 11. Pool mining — relink monero-pool contre les libs v2.0.0, pointer un daemon v2.0.0 sync mainnet
 12. Site web public — mettre à jour docs/ (network ID, magic, version) pour redeploy Vercel auto
@@ -214,7 +214,7 @@ Mémoires persistantes associées :
 4. **Binaires macOS + Windows v2.0.0** — débloquer billing GH Actions (item récurrent depuis v1.0.1), sinon Linux-only via `gh release upload v2.0.0 ...`. Tant que le billing reste bloqué, chaque release reste Linux-only.
 5. ~~**Docker `ab113hrg/hidering-seed:v2.0.0`**~~ → **FAIT** 17 mai 2026 (push DockerHub, digest manifest `sha256:bb9bfc6ffcb5a0…`). NB : image utile uniquement pour Flux, désormais déprécié — VPS dédiés tournent un binaire natif via systemd, pas via Docker.
 6. ~~**Flux `hideringseed1` redeploy avec volume wipe**~~ → **OBSOLÈTE** 19 mai 2026 : migration complète sur VPS dédiés (`seed1.hidering.org` → OVH `135.125.243.137`, `seed2.hidering.org` → Contabo `207.180.211.96`). Flux `hideringseed1` en cours d'expiration. Voir nouvelle section INFRASTRUCTURE VPS ci-dessous.
-7. ~~**Block explorer reset**~~ → **FAIT** 19 mai 2026 : nouvelle instance déployée sur OVH (http://135.125.243.137:8080), indexant la chaîne v2.0.0 depuis genesis. Ancienne instance Flux `hrgexplorer.app.runonflux.io` retirée.
+7. ~~**Block explorer reset**~~ → **FAIT** 19 mai 2026 : nouvelle instance déployée sur OVH (http://explorer.hidering.org:8080), indexant la chaîne v2.0.0 depuis genesis. Ancienne instance Flux `hrgexplorer.app.runonflux.io` retirée.
 8. ~~**Docs CLAUDE.md + whitepaper**~~ → harmonisés 16 mai 2026 dans cette même session (CLAUDE.md SPECS RÉSEAU + Tags + Releases + RELEASE v2.0.0 section ; `docs/whitepaper_v1.3.md` lignes 257-258 + roadmap Phase 4).
 9. **GENESIS_PROOF.md** — à vérifier : pas d'impact direct (genesis inchangé) mais ajouter mention que v2.0.0 hard fork n'altère pas le genesis ; le NUMS reste sous l'ancien hash bloc même si plus jamais activé en mainnet.
 10. **Announce hard fork** — Twitter, Reddit, BitcoinTalk + email aux miners connus. Préciser activation flag-day et abandon chaîne v1.x.
@@ -259,8 +259,12 @@ Mémoires persistantes associées :
 - **Décision 19 mai 2026 :** abandon de Flux pour les seed nodes et le block explorer. Containers éphémères + IPs variables (vu 3 IPs en une session sur `hideringseed1`) = mauvais fit pour des entry points DNS stables. Migration vers VPS dédiés avec IPs invariantes et systemd pour restart auto.
 - **seed1.hidering.org → OVH `135.125.243.137`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par `hideringd.service` (systemd, `Restart=on-failure`). Sert aussi le block explorer sur le port 8080.
 - **seed2.hidering.org → Contabo `207.180.211.96`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par systemd, redondance avec seed1.
-- **Block explorer public : http://135.125.243.137:8080** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
-- **DNS (records A) :** déjà à jour côté registrar (vérifié 19 mai 2026). Les binaires v2.0.0 publiés et `docs/index.html` pointent directement vers `seed1.hidering.org` / `seed2.hidering.org`.
+- **Block explorer public : http://explorer.hidering.org:8080** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
+- **DNS (records A) :** à jour côté registrar (vérifié 19 mai 2026) :
+  - `seed1.hidering.org` → `135.125.243.137` (OVH)
+  - `seed2.hidering.org` → `207.180.211.96` (Contabo)
+  - `explorer.hidering.org` → `135.125.243.137` (OVH — même VPS que seed1, sert l'UI block explorer sur le port 8080)
+  Les binaires v2.0.0 publiés et `docs/index.html` pointent directement vers ces noms DNS, plus jamais vers les IPs nues.
 - **Source de vérité pour les IPs :** les IPs sont fixes, **on peut les hard-coder**. (À l'inverse, Flux exigeait `curl https://api.runonflux.io/apps/location/hideringseed1` à chaque fois — plus jamais nécessaire post-migration.)
 
 ## DOCKER ET DEPLOIEMENT (Flux — déprécié 19 Mai 2026)
