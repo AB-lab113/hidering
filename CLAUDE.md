@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 16 Mai 2026 (HARD FORK v2.0.0 — NETWORK_ID bumpé HRG\x01 → HRG\x02, magic 0x48524701 → 0x48524702, daemon source recompilé. Chaîne v1.x à h≈3577 abandonnée par décision explicite. Tag/release/Docker/Flux redeploy/announce restent à faire.)**
+**Dernière MAJ : 19 Mai 2026 (MIGRATION INFRA Flux → VPS dédiés — seed1.hidering.org pointe désormais sur OVH 135.125.243.137 (systemd hideringd.service, restart auto), seed2.hidering.org sur Contabo 207.180.211.96 (nouveau), block explorer migré sur http://135.125.243.137:8080. Flux `hideringseed1` en cours d'expiration, infrastructure désormais sur VPS propres avec IPs invariantes.)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -143,7 +143,7 @@ Mémoires persistantes associées :
 - Phase 2 : Privacy enhancements (5 patches) — COMPLETE
 - Phase 3A : Rebranding complet — COMPLETE
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
-- Phase 3C : Infrastructure seed nodes — **RESET v2.0.0** (Flux `hideringseed1` sert encore l'ancienne chaîne v1.x — redeploy avec volume wipe requis avant d'être reachable par les peers v2.0.0)
+- Phase 3C : Infrastructure seed nodes — **COMPLETE (v2.0.0 sur VPS dédiés, 19 mai 2026)** : `seed1.hidering.org` → OVH `135.125.243.137` (systemd `hideringd.service`, restart auto) ; `seed2.hidering.org` → Contabo `207.180.211.96`. Flux `hideringseed1` en cours d'expiration (containers éphémères + IPs variables = mauvais fit, écarté définitivement).
 - Phase 4A-C : Mainnet public launch — **RESET v2.0.0** (chaîne v1.x à h≈3577 abandonnée par décision 16 mai 2026 ; nouveau mainnet v2.0.0 démarre vierge dès activation. Launch *officiel public* toujours cible T2 2026.)
 - Phase 4D : Binaires publics — **À REFAIRE** (v1.0.2 Linux publié 13 mai obsolète post-HF ; v2.0.0 source rebuilt local, binaires publics + tag à produire — CI GitHub Actions toujours bloquée par billing depuis 12 mai 2026)
 - Phase 4E : Pool mining — **VALIDÉ LOCAL** (14 mai 2026, voir section POOL MINING ci-dessous). Stack : monero-pool jtgrassie. Pool doit linker contre les libs v2.0.0 et pointer un daemon v2.0.0 ; rebuild requis après HF.
@@ -155,10 +155,10 @@ Mémoires persistantes associées :
 3. Wipe ~/.hidering + smoke test genesis NUMS sur le nouveau réseau
 4. Daemon --offline valider genesis hash (inchangé — NETWORK_ID hors hash bloc)
 5. Tag `v2.0.0` + release notes
-6. Rebuild Docker image `ab113hrg/hidering-seed:v2.0.0`
-7. Redéployer Flux seed node `hideringseed1` **avec volume wipe** (la chaîne v1.x sur disque est orpheline pour un peer v2.0.0)
-8. DNS seed nodes — vérifier que seed1/seed2.hidering.org pointent vers les nouveaux IPs Flux
-9. Block explorer — reset DB ou nouvelle instance (chaîne v1.x indexée invalide)
+6. ~~Rebuild Docker image `ab113hrg/hidering-seed:v2.0.0`~~ — **FAIT** 17 mai 2026 (utile uniquement pour Flux, désormais déprécié).
+7. ~~Redéployer Flux seed node `hideringseed1`~~ — **OBSOLÈTE** (Flux abandonné 19 mai 2026, migration sur VPS dédiés).
+8. ~~DNS seed nodes — vérifier que seed1/seed2.hidering.org pointent vers les nouveaux IPs~~ — **FAIT** 19 mai 2026 : `seed1` → OVH `135.125.243.137`, `seed2` → Contabo `207.180.211.96`.
+9. ~~Block explorer — reset DB ou nouvelle instance~~ — **FAIT** 19 mai 2026 : nouvelle instance sur OVH (http://135.125.243.137:8080), remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io`.
 10. Binaires publics v2.0.0 (Linux/Windows/Mac) — débloquer billing GH Actions sinon Linux-only via build local + `gh release create v2.0.0`
 11. Pool mining — relink monero-pool contre les libs v2.0.0, pointer un daemon v2.0.0 sync mainnet
 12. Site web public — mettre à jour docs/ (network ID, magic, version) pour redeploy Vercel auto
@@ -212,9 +212,9 @@ Mémoires persistantes associées :
 2. **Rebuild complet** — `cd build/release && make -j$(nproc)` pour régénérer `hidering-wallet-cli` + `hidering-wallet-rpc` (le 16 mai seul `daemon` a été rebuilt).
 3. **Tag v2.0.0 + release notes** — `git tag -a v2.0.0 -m "..."` puis `gh release create v2.0.0` avec asset Linux + `RELEASE_NOTES_v2.0.0.md` à la racine.
 4. **Binaires macOS + Windows v2.0.0** — débloquer billing GH Actions (item récurrent depuis v1.0.1), sinon Linux-only via `gh release upload v2.0.0 ...`. Tant que le billing reste bloqué, chaque release reste Linux-only.
-5. **Docker `ab113hrg/hidering-seed:v2.0.0`** — rebuild depuis `Dockerfile.flux`, push DockerHub.
-6. **Flux `hideringseed1` redeploy avec volume wipe** — same gotcha que la migration NUMS dans CLAUDE.md, l'état LMDB sur disque est orphelin pour un peer v2.0.0. Vérifier nouvelle IP via `curl https://api.runonflux.io/apps/location/hideringseed1` après redeploy.
-7. **Block explorer reset** — DB indexée sur la chaîne v1.x est invalide. Reset ou nouvelle instance.
+5. ~~**Docker `ab113hrg/hidering-seed:v2.0.0`**~~ → **FAIT** 17 mai 2026 (push DockerHub, digest manifest `sha256:bb9bfc6ffcb5a0…`). NB : image utile uniquement pour Flux, désormais déprécié — VPS dédiés tournent un binaire natif via systemd, pas via Docker.
+6. ~~**Flux `hideringseed1` redeploy avec volume wipe**~~ → **OBSOLÈTE** 19 mai 2026 : migration complète sur VPS dédiés (`seed1.hidering.org` → OVH `135.125.243.137`, `seed2.hidering.org` → Contabo `207.180.211.96`). Flux `hideringseed1` en cours d'expiration. Voir nouvelle section INFRASTRUCTURE VPS ci-dessous.
+7. ~~**Block explorer reset**~~ → **FAIT** 19 mai 2026 : nouvelle instance déployée sur OVH (http://135.125.243.137:8080), indexant la chaîne v2.0.0 depuis genesis. Ancienne instance Flux `hrgexplorer.app.runonflux.io` retirée.
 8. ~~**Docs CLAUDE.md + whitepaper**~~ → harmonisés 16 mai 2026 dans cette même session (CLAUDE.md SPECS RÉSEAU + Tags + Releases + RELEASE v2.0.0 section ; `docs/whitepaper_v1.3.md` lignes 257-258 + roadmap Phase 4).
 9. **GENESIS_PROOF.md** — à vérifier : pas d'impact direct (genesis inchangé) mais ajouter mention que v2.0.0 hard fork n'altère pas le genesis ; le NUMS reste sous l'ancien hash bloc même si plus jamais activé en mainnet.
 10. **Announce hard fork** — Twitter, Reddit, BitcoinTalk + email aux miners connus. Préciser activation flag-day et abandon chaîne v1.x.
@@ -255,7 +255,16 @@ Mémoires persistantes associées :
 - Supprimer backup_wallets/ ou GENESIS_PROOF.md
 - Committer des clés privées ou tokens GitHub
 
-## DOCKER ET DEPLOIEMENT
+## INFRASTRUCTURE VPS (19 Mai 2026 — REMPLACE Flux)
+- **Décision 19 mai 2026 :** abandon de Flux pour les seed nodes et le block explorer. Containers éphémères + IPs variables (vu 3 IPs en une session sur `hideringseed1`) = mauvais fit pour des entry points DNS stables. Migration vers VPS dédiés avec IPs invariantes et systemd pour restart auto.
+- **seed1.hidering.org → OVH `135.125.243.137`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par `hideringd.service` (systemd, `Restart=on-failure`). Sert aussi le block explorer sur le port 8080.
+- **seed2.hidering.org → Contabo `207.180.211.96`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par systemd, redondance avec seed1.
+- **Block explorer public : http://135.125.243.137:8080** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
+- **DNS (records A) :** déjà à jour côté registrar (vérifié 19 mai 2026). Les binaires v2.0.0 publiés et `docs/index.html` pointent directement vers `seed1.hidering.org` / `seed2.hidering.org`.
+- **Source de vérité pour les IPs :** les IPs sont fixes, **on peut les hard-coder**. (À l'inverse, Flux exigeait `curl https://api.runonflux.io/apps/location/hideringseed1` à chaque fois — plus jamais nécessaire post-migration.)
+
+## DOCKER ET DEPLOIEMENT (Flux — déprécié 19 Mai 2026)
+- **Statut 19 mai 2026 :** Flux `hideringseed1` en cours d'expiration. Infrastructure migrée sur VPS (voir section INFRASTRUCTURE VPS ci-dessus). Les sections ci-dessous restent comme référence historique du déploiement Flux jusqu'au 19 mai. Plus de redeploy Flux prévu.
 - **Statut post-HF v2.0.0 (17 mai 2026, soirée) :** image `:v2.0.0` **pushed** sur DockerHub + **Flux redéployé** avec succès — l'app `hideringseed1` sert maintenant le binaire v2.0.0, vérifié par probe P2P (handshake `COMMAND_HANDSHAKE INVOKED OK` depuis un daemon v2.0.0 local). Volume wipe confirmé via height 1 + top_block_hash genesis. Punch list v2.0.0 items #5 (Docker) et #6-7 (Flux redeploy) closés.
 - Image courante (live Flux) : `ab113hrg/hidering-seed:v2.0.0` — push DockerHub 17 mai 2026, build local depuis `build/release/bin/hideringd` (commit `ff02d1f80` = tag v2.0.0)
 - Note historique : avant le 17 mai 2026 soir, Flux servait `:v1.0.2` (push DockerHub 13 mai 2026) — chaîne v1.x abandonnée post-attaque 51%. Plus reachable depuis le delete.

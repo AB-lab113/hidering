@@ -1035,9 +1035,9 @@
       <div>
         <h3>Launch the daemon &amp; sync</h3>
         <p>Still inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-v2.0.0-linux-x64/</code> from step 01, start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
-        <div class="code-block"><span class="cmd"># Run from the hidering-v2.0.0-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740</div>
+        <div class="code-block"><span class="cmd"># Run from the hidering-v2.0.0-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740 \<br>&nbsp;&nbsp;--add-priority-node seed2.hidering.org:19740</div>
         <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
-        <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">If <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1.hidering.org</code> is unreachable, query the live Flux endpoint for the current IP:<br><code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">curl https://api.runonflux.io/apps/location/hideringseed1</code> &nbsp;→ use the returned IP with <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">--add-priority-node &lt;IP&gt;:19740</code></p>
+        <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Both seed nodes run on dedicated VPS infrastructure with fixed IPs (<code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">135.125.243.137</code>, <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed2</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">207.180.211.96</code>) and are managed by systemd for automatic restart on failure.</p>
       </div>
     </div>
     <div class="step">
@@ -1161,9 +1161,9 @@
       </div>
       <div class="roadmap-content">
         <h3>Pre-Launch Infrastructure</h3>
-        <p>Redundant seed nodes on Flux, block explorer, public binaries for all platforms, and RandomX-compatible mining pool.</p>
+        <p>Redundant seed nodes on dedicated VPS (OVH + Contabo) with fixed IPs and systemd-managed restart, public block explorer, public binaries, and RandomX-compatible mining pool.</p>
         <div class="roadmap-tags">
-          <span class="rtag">seed2/seed3</span><span class="rtag">Block Explorer</span><span class="rtag">Binaries</span><span class="rtag">Mining Pool</span>
+          <span class="rtag">seed1 (OVH)</span><span class="rtag">seed2 (Contabo)</span><span class="rtag">systemd</span><span class="rtag">Block Explorer</span><span class="rtag">Binaries</span><span class="rtag">Mining Pool</span>
         </div>
       </div>
     </div>
@@ -1278,7 +1278,7 @@
     <li><a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.3.md">Whitepaper</a></li>
     <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
     <li><a href="https://github.com/AB-lab113/hidering/releases/latest">Latest Release</a></li>
-    <li><a href="https://hrgexplorer.app.runonflux.io">Block Explorer</a></li>
+    <li><a href="http://135.125.243.137:8080">Block Explorer</a></li>
     <li><a href="#mine">Mining Guide</a></li>
   </ul>
   <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
