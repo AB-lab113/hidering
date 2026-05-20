@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 19 Mai 2026 (MIGRATION INFRA Flux → VPS dédiés — seed1.hidering.org pointe désormais sur OVH 135.125.243.137 (systemd hideringd.service, restart auto), seed2.hidering.org sur Contabo 207.180.211.96 (nouveau), block explorer migré sur http://explorer.hidering.org:8080. Flux `hideringseed1` en cours d'expiration, infrastructure désormais sur VPS propres avec IPs invariantes.)**
+**Dernière MAJ : 20 Mai 2026 (harmonisation RPC restreinte sur tous les nœuds publics — `--restricted-rpc` ajouté à seed1 OVH 20 mai 2026, déjà actif sur Contabo 1 depuis son déploiement initial. État réseau vérifié 20 mai : OVH + Contabo 1 alignés sur height 4648, même top_block_hash, `restricted: true` partout, version/peer counts/free_space masqués côté RPC publique. Hier (19 mai) : MIGRATION INFRA Flux → VPS dédiés (seed1 → OVH 135.125.243.137, seed2 → Contabo 207.180.211.96, block explorer sur http://explorer.hidering.org:8080).)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -257,8 +257,9 @@ Mémoires persistantes associées :
 
 ## INFRASTRUCTURE VPS (19 Mai 2026 — REMPLACE Flux)
 - **Décision 19 mai 2026 :** abandon de Flux pour les seed nodes et le block explorer. Containers éphémères + IPs variables (vu 3 IPs en une session sur `hideringseed1`) = mauvais fit pour des entry points DNS stables. Migration vers VPS dédiés avec IPs invariantes et systemd pour restart auto.
-- **seed1.hidering.org → OVH `135.125.243.137`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par `hideringd.service` (systemd, `Restart=on-failure`). Sert aussi le block explorer sur le port 8080.
+- **seed1.hidering.org → OVH `135.125.243.137`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par `hideringd.service` (systemd, `Restart=always RestartSec=10`). Sert aussi le block explorer sur le port 8080.
 - **seed2.hidering.org → Contabo `207.180.211.96`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par systemd, redondance avec seed1.
+- **Unit file systemd canonique (vérifié 20 mai 2026)** : `/etc/systemd/system/hideringd.service`, `Type=simple` (pas de `--detach`), `Restart=always RestartSec=10`. Flags daemon harmonisés sur tous les nœuds publics : `--non-interactive --log-level 0 --p2p-bind-ip 0.0.0.0 --p2p-bind-port 19740 --rpc-bind-ip 0.0.0.0 --rpc-bind-port 19741 --confirm-external-bind --restricted-rpc`. User : `ubuntu` sur OVH (binaire `/home/ubuntu/hidering/build/bin/hideringd`), `root` sur Contabo (binaire `/root/hidering/build/bin/hideringd`). `--restricted-rpc` ajouté à seed1 OVH le 20 mai 2026 (avant : RPC complète exposée publiquement, leak version/peers/free_space) ; après restart le daemon a repris sa sync immédiatement, peers reconnectés en <30s. Backup pré-modif conservé en `/etc/systemd/system/hideringd.service.bak.20260520-*` sur OVH.
 - **Block explorer public : http://explorer.hidering.org:8080** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
 - **DNS (records A) :** à jour côté registrar (vérifié 19 mai 2026) :
   - `seed1.hidering.org` → `135.125.243.137` (OVH)
