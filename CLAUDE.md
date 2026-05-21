@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 20 Mai 2026 (harmonisation RPC restreinte sur tous les nœuds publics — `--restricted-rpc` ajouté à seed1 OVH 20 mai 2026, déjà actif sur Contabo 1 depuis son déploiement initial. État réseau vérifié 20 mai : OVH + Contabo 1 alignés sur height 4648, même top_block_hash, `restricted: true` partout, version/peer counts/free_space masqués côté RPC publique. Hier (19 mai) : MIGRATION INFRA Flux → VPS dédiés (seed1 → OVH 135.125.243.137, seed2 → Contabo 207.180.211.96, block explorer sur http://explorer.hidering.org:8080).)**
+**Dernière MAJ : 20 Mai 2026 (harmonisation RPC restreinte sur tous les nœuds publics — `--restricted-rpc` ajouté à seed1 OVH 20 mai 2026, déjà actif sur Contabo 1 depuis son déploiement initial. État réseau vérifié 20 mai : OVH + Contabo 1 alignés sur height 4648, même top_block_hash, `restricted: true` partout, version/peer counts/free_space masqués côté RPC publique. Hier (19 mai) : MIGRATION INFRA Flux → VPS dédiés (seed1 → OVH 135.125.243.137, seed2 → Contabo 207.180.211.96, block explorer sur https://explorer.hidering.org).)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -158,7 +158,7 @@ Mémoires persistantes associées :
 6. ~~Rebuild Docker image `ab113hrg/hidering-seed:v2.0.0`~~ — **FAIT** 17 mai 2026 (utile uniquement pour Flux, désormais déprécié).
 7. ~~Redéployer Flux seed node `hideringseed1`~~ — **OBSOLÈTE** (Flux abandonné 19 mai 2026, migration sur VPS dédiés).
 8. ~~DNS seed nodes — vérifier que seed1/seed2.hidering.org pointent vers les nouveaux IPs~~ — **FAIT** 19 mai 2026 : `seed1` → OVH `135.125.243.137`, `seed2` → Contabo `207.180.211.96`.
-9. ~~Block explorer — reset DB ou nouvelle instance~~ — **FAIT** 19 mai 2026 : nouvelle instance sur OVH (http://explorer.hidering.org:8080), remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io`.
+9. ~~Block explorer — reset DB ou nouvelle instance~~ — **FAIT** 19 mai 2026 : nouvelle instance sur OVH (https://explorer.hidering.org), remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io`.
 10. Binaires publics v2.0.0 (Linux/Windows/Mac) — débloquer billing GH Actions sinon Linux-only via build local + `gh release create v2.0.0`
 11. Pool mining — relink monero-pool contre les libs v2.0.0, pointer un daemon v2.0.0 sync mainnet
 12. Site web public — mettre à jour docs/ (network ID, magic, version) pour redeploy Vercel auto
@@ -214,7 +214,7 @@ Mémoires persistantes associées :
 4. **Binaires macOS + Windows v2.0.0** — débloquer billing GH Actions (item récurrent depuis v1.0.1), sinon Linux-only via `gh release upload v2.0.0 ...`. Tant que le billing reste bloqué, chaque release reste Linux-only.
 5. ~~**Docker `ab113hrg/hidering-seed:v2.0.0`**~~ → **FAIT** 17 mai 2026 (push DockerHub, digest manifest `sha256:bb9bfc6ffcb5a0…`). NB : image utile uniquement pour Flux, désormais déprécié — VPS dédiés tournent un binaire natif via systemd, pas via Docker.
 6. ~~**Flux `hideringseed1` redeploy avec volume wipe**~~ → **OBSOLÈTE** 19 mai 2026 : migration complète sur VPS dédiés (`seed1.hidering.org` → OVH `135.125.243.137`, `seed2.hidering.org` → Contabo `207.180.211.96`). Flux `hideringseed1` en cours d'expiration. Voir nouvelle section INFRASTRUCTURE VPS ci-dessous.
-7. ~~**Block explorer reset**~~ → **FAIT** 19 mai 2026 : nouvelle instance déployée sur OVH (http://explorer.hidering.org:8080), indexant la chaîne v2.0.0 depuis genesis. Ancienne instance Flux `hrgexplorer.app.runonflux.io` retirée.
+7. ~~**Block explorer reset**~~ → **FAIT** 19 mai 2026 : nouvelle instance déployée sur OVH (https://explorer.hidering.org), indexant la chaîne v2.0.0 depuis genesis. Ancienne instance Flux `hrgexplorer.app.runonflux.io` retirée.
 8. ~~**Docs CLAUDE.md + whitepaper**~~ → harmonisés 16 mai 2026 dans cette même session (CLAUDE.md SPECS RÉSEAU + Tags + Releases + RELEASE v2.0.0 section ; `docs/whitepaper_v1.3.md` lignes 257-258 + roadmap Phase 4).
 9. **GENESIS_PROOF.md** — à vérifier : pas d'impact direct (genesis inchangé) mais ajouter mention que v2.0.0 hard fork n'altère pas le genesis ; le NUMS reste sous l'ancien hash bloc même si plus jamais activé en mainnet.
 10. **Announce hard fork** — Twitter, Reddit, BitcoinTalk + email aux miners connus. Préciser activation flag-day et abandon chaîne v1.x.
@@ -260,7 +260,7 @@ Mémoires persistantes associées :
 - **seed1.hidering.org → OVH `135.125.243.137`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par `hideringd.service` (systemd, `Restart=always RestartSec=10`). Sert aussi le block explorer sur le port 8080.
 - **seed2.hidering.org → Contabo `207.180.211.96`** (P2P 19740, RPC 19741) — daemon HRG v2.0.0 managé par systemd, redondance avec seed1.
 - **Unit file systemd canonique (vérifié 20 mai 2026)** : `/etc/systemd/system/hideringd.service`, `Type=simple` (pas de `--detach`), `Restart=always RestartSec=10`. Flags daemon harmonisés sur tous les nœuds publics : `--non-interactive --log-level 0 --p2p-bind-ip 0.0.0.0 --p2p-bind-port 19740 --rpc-bind-ip 0.0.0.0 --rpc-bind-port 19741 --confirm-external-bind --restricted-rpc`. User : `ubuntu` sur OVH (binaire `/home/ubuntu/hidering/build/bin/hideringd`), `root` sur Contabo (binaire `/root/hidering/build/bin/hideringd`). `--restricted-rpc` ajouté à seed1 OVH le 20 mai 2026 (avant : RPC complète exposée publiquement, leak version/peers/free_space) ; après restart le daemon a repris sa sync immédiatement, peers reconnectés en <30s. Backup pré-modif conservé en `/etc/systemd/system/hideringd.service.bak.20260520-*` sur OVH.
-- **Block explorer public : http://explorer.hidering.org:8080** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
+- **Block explorer public : https://explorer.hidering.org** — instance fraîche indexant la chaîne v2.0.0 depuis genesis. Remplace l'ancienne instance Flux `hrgexplorer.app.runonflux.io` (retirée).
 - **DNS (records A) :** à jour côté registrar (vérifié 19 mai 2026) :
   - `seed1.hidering.org` → `135.125.243.137` (OVH)
   - `seed2.hidering.org` → `207.180.211.96` (Contabo)
