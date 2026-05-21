@@ -219,6 +219,7 @@ namespace cryptonote
     // HIDERING mainnet checkpoints. Anchors prevent deep reorgs on the v2.0.0 chain
     // after the 16 May 2026 hard fork.
     ADD_CHECKPOINT2(2939, "5155f6f679e60773331175024910019f0db9d30db8953d9227313ba563126592", "0x2e096dbbf");
+    ADD_CHECKPOINT2(5000, "b835c46b10bebf119ad4d22ae0db70265629b117d4acdaeb1466cc6214274640", "0x88748a6ee");
     return true;
   }
 
