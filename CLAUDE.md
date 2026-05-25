@@ -1,6 +1,6 @@
 # HIDERING (HRG) — Claude Code Project Memory
 **Version synchronisée : Whitepaper v1.3 + Roadmap v2.0 — 30 Avril 2026**
-**Dernière MAJ : 21 Mai 2026 (checkpoint mainnet h=5000 — `ADD_CHECKPOINT2(5000, "b835c46b…4274640", "0x88748a6ee")` ajouté à `src/checkpoints/checkpoints.cpp` et déployé sur les 4 VPS de prod : seed1 OVH + Contabo-1/-2/-3, commit `618a17882`. État réseau post-restart vérifié 21 mai : OVH + Contabo-1 alignés à height 5387 avec top_block_hash identique `1ba609ae…22d28e8` ; Contabo-2 + Contabo-3 daemons up (P2P 19740 reachable) mais RPC bindée localhost (relay/mining privés, pas seeds publics). Inventory complète des 4 hôtes documentée ci-dessous + memory `infra_vps_inventory_4hosts.md`. Hier (20 mai) : harmonisation `--restricted-rpc` sur tous les nœuds publics. 19 mai : MIGRATION INFRA Flux → VPS dédiés.)**
+**Dernière MAJ : 23 Mai 2026 — soirée (Release Linux v2.0.0-gui du Hidering Wallet GUI publiée sur github.com/AB-lab113/hidering-gui/releases/tag/v2.0.0-gui : AppImage 54 MB self-contained + tar.gz 11 MB binaire dyn. Build reproductible via `scripts/build-appimage.sh` committé à HEAD `9c737436`. Voir section HIDERING WALLET GUI ci-dessous. — Plus tôt 23 mai : fork + rebrand + push initial. 21 mai : checkpoint mainnet h=5000 + 4-VPS inventory. 20 mai : harmonisation `--restricted-rpc`. 19 mai : MIGRATION INFRA Flux → VPS dédiés.)**
 
 ## IDENTITÉ DU PROJET
 Fork de Monero v0.18.1 rebrandé en HIDERING.
@@ -145,8 +145,8 @@ Mémoires persistantes associées :
 - Phase 3B : Validation, sécurité, purge git — COMPLETE
 - Phase 3C : Infrastructure seed nodes — **COMPLETE (v2.0.0 sur VPS dédiés, 19 mai 2026)** : `seed1.hidering.org` → OVH `135.125.243.137` (systemd `hideringd.service`, restart auto) ; `seed2.hidering.org` → Contabo `207.180.211.96`. Flux `hideringseed1` en cours d'expiration (containers éphémères + IPs variables = mauvais fit, écarté définitivement).
 - Phase 4A-C : Mainnet public launch — **RESET v2.0.0** (chaîne v1.x à h≈3577 abandonnée par décision 16 mai 2026 ; nouveau mainnet v2.0.0 démarre vierge dès activation. Launch *officiel public* toujours cible T2 2026.)
-- Phase 4D : Binaires publics — **À REFAIRE** (v1.0.2 Linux publié 13 mai obsolète post-HF ; v2.0.0 source rebuilt local, binaires publics + tag à produire — CI GitHub Actions toujours bloquée par billing depuis 12 mai 2026)
-- Phase 4E : Pool mining — **VALIDÉ LOCAL** (14 mai 2026, voir section POOL MINING ci-dessous). Stack : monero-pool jtgrassie. Pool doit linker contre les libs v2.0.0 et pointer un daemon v2.0.0 ; rebuild requis après HF.
+- Phase 4D : Binaires publics — **À REFAIRE** (v1.0.2 Linux publié 13 mai obsolète post-HF ; v2.0.0 source rebuilt local, binaires publics + tag à produire — CI GitHub Actions toujours bloquée par billing depuis 12 mai 2026). **Sous-projet GUI démarré 23 mai** : repo `AB-lab113/hidering-gui` forké de monero-gui, debug build clean, smoke test alive 15s sous WSLg — packaging (AppImage/.deb/.exe/.dmg) reste à faire. Voir section HIDERING WALLET GUI.
+- Phase 4E : Pool mining — **EN PRODUCTION** (25 mai 2026) : pool publique `pool.hidering.org:3333` live sur Contabo-2, stack **cryptonote-nodejs-pool** (et non monero-pool finalement retenu) ; minage validé end-to-end (16 shares, wallet-rpc `ok`). Voir sous-section « Déploiement cryptonote-nodejs-pool — Contabo-2 » dans POOL MINING. NB historique : prototype validé en local 14 mai 2026 avec monero-pool jtgrassie.
 - Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
@@ -330,6 +330,45 @@ Workspace test : `~/hidering-pool/` (hors repo, non versionné) — daemon dédi
 - Daemon HRG dédié pool, RPC `--rpc-bind-ip 127.0.0.1`, sync mainnet via `--add-priority-node <IP-courante-Flux>:19740` + `--block-notified` pour template refresh instantané.
 - TLS sur stratum (`pool-ssl-port`) + frontend CDN sur webui:4243.
 - Monitoring : pool hashrate, orphan rate, payout queue.
+
+### Déploiement cryptonote-nodejs-pool — Contabo-2 (25 Mai 2026 — OPÉRATIONNELLE)
+Stack alternatif au monero-pool validé : **cryptonote-nodejs-pool (dvandal)** + Redis + Nginx + PM2, sur Contabo-2 (`root@207.180.214.164`, daemon RPC localhost:19741). Repo cloné dans `/opt/hrg-pool`. Choix utilisateur (Redis-only, plus léger que MoneroOcean nodejs-pool). Artefacts de déploiement hors repo : `~/hrg-pool-deploy/` (deploy script, `config.json` validée, NOTES.md, `ovh-add-pool-dns.py`). **NB : SSH password-only sur Contabo-2 → Claude ne peut pas déployer lui-même, génère des commandes copier-coller (cf. [[infra_vps_inventory_4hosts]]).**
+- **GOTCHA redis (brûlé 25 mai) : `package.json` upstream épingle `"redis": "*"`** → `npm install` tire node_redis v4/v5 (`@redis/client`), incompatible avec le code qui suppose l'API v3 (callback : `redisClient.info(cb)`, `createClient(port, host, {auth_pass})`, `.multi().exec(cb)` partout dans `lib/*.js`). Symptôme : `Error: The client is closed` dans `checkRedisVersion` (`init.js:147`). **Fix : pin v3 →** `cd /opt/hrg-pool && npm install redis@3.1.2 --save`. Patcher `init.js` seul (ajouter `await client.connect()`) est un **piège** : l'API callback v3 est utilisée dans api.js/pool.js/paymentProcessor.js/blockUnlocker.js/charts.js — ça casserait ailleurs aussitôt.
+- **Gotcha config.json** : `poolAddress` est imbriqué sous `config.poolServer` (pas à la racine). `lib/configReader.js` lit aussi `config.blockUnlocker.devDonation` + `config.symbol` AVANT `init.js:27`, donc tout manque de bloc remonte une erreur `Cannot read properties of undefined`. Structure de référence = `config_examples/monero.json` du repo (coin RandomX). Valeurs HRG : `cnAlgorithm:"randomx"`, `isRandomX:true`, `coinUnits:1e12`, `coinDifficultyTarget:120`, `blockUnlocker.depth:60` (= `CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW`, **pas 10** comme indiqué à tort dans SPECS RÉSEAU), `intAddressPrefix:61`, prefix adresse 60.
+- **Bloqueurs runtime — TOUS LEVÉS (validé 25 mai)** : (1) le daemon local servant le pool tourne **sans** `--restricted-rpc` → `getblocktemplate` OK (sinon le pool ne minerait pas ; cf. [[project_restricted_rpc_zeroes_peer_counts]]) ; (2) `hidering-wallet-rpc` up sur 127.0.0.1:19743 — confirmé via le health-monitor du pool (`/stats` → `health.HIDERING.wallet:"ok"`, le `getbalance` passe → wallet opérateur ouvert) ; (3) `payments.mixin:31` (ring 32) car HRG impose ring 32-64, pas le défaut Monero (7) — **un vrai `transfer` de payout n'a pas encore été exercé**, à reconfirmer au 1er payout réel ≥1 HRG.
+- DNS : `pool.hidering.org` → `207.180.214.164` — record A **ajouté côté OVH**, résout (1.1.1.1 / 8.8.8.8). Site : section « Mining Pool » publiée sur hidering.org (commit `36b6acaf6` + fix layout flex `b3720eb41`, redeploy Vercel auto depuis v2-privacy). Script DNS de secours si à refaire : `~/hrg-pool-deploy/ovh-add-pool-dns.py` (besoin de creds OVH).
+- **Validation minage end-to-end (25 mai)** : xmrig 6.22.0 2 threads → **16 shares acceptées / 0 rejetée**, varDiff a grimpé 1000→2000→4000, ~304 H/s ; `/stats` a reflété `miners:1, workers:1, hashrate:107` en live. Stratum public `:3333`, API publique `:8117/stats`. `lastblock` reward = `42857142857143` atomes = **42.857 HRG** (émission v1.0.1 confirmée live sur la chaîne v2.0.0). Commande mineur : `xmrig -o pool.hidering.org:3333 -u <B-address> -p x -a rx/0`. État au test : `totalBlocks:0` (diff réseau ~13,4 M, aucun bloc réel attendu à ce hashrate).
+
+## HIDERING WALLET GUI (Phase 4D — 23 Mai 2026 — démarré)
+Sister repo : **github.com/AB-lab113/hidering-gui** (public, créé 23 mai). Fork de `monero-project/monero-gui` @4b94d7e + rebrand complet HRG. Local : `~/hidering-gui` master @`9c737436` (commits : `c32f380` initial fork + rebrand, `79b12384` `scripts/build-appimage.sh` + .gitignore initial, `9c737436` .gitignore étendu pour artefacts AppImage). **Recipe AppImage reproductible : `./scripts/build-appimage.sh v2.0.0`** depuis une base glibc 2.39 (Ubuntu 24.04+).
+- Backend : `monero/` submodule pointe vers `AB-lab113/hidering@v2-privacy` (gitlink 160000, commit `93d7d3b46`). Localement `~/hidering-gui/monero` est un **symlink vers `~/hidering`** pour build incrémental rapide ; git ignore le symlink car l'index contient un gitlink. **Ne JAMAIS `git add monero`** dans hidering-gui — `git add -A` écrase le gitlink par un symlink 120000 (absolute path → cassé pour tout clone). Si ça arrive : `git rm --cached monero && git update-index --add --cacheinfo 160000,<backend-HEAD>,monero`.
+- Build recipe (WSL2 7.4 GB RAM) :
+  ```bash
+  cd ~/hidering-gui/build
+  cmake .. -DCMAKE_BUILD_TYPE=Debug -DMANUAL_SUBMODULES=ON   # MANUAL_SUBMODULES=ON requis
+  make -j2   # NOT -j$(nproc) — -j8 OOM-kill à 58% (cc1plus ~1 GB/job × 8 > 7.4 GB)
+  export LD_LIBRARY_PATH=$(find . -name "*.so" -exec dirname {} \; | sort -u | tr '\n' ':')
+  ./bin/hidering-wallet-gui
+  ```
+- **Ne PAS passer `-DDEV_MODE=ON`** : ça force C++17 (utile) mais déclenche `git checkout -f origin/master` dans `monero/` (catastrophique sur notre fork). Pour C++17 ciblé, patch `src/openpgp/CMakeLists.txt` avec `target_compile_features(openpgp PUBLIC cxx_std_17)` (déjà committé) — requis car epee/span.h utilise `std::is_standard_layout_v` ; si un autre target GUI pull span.h, ajouter la même ligne.
+- Rebrand mécanique : sed perl boundary-safe `\bMonero\b(?!::) → Hidering` + variantes lower/UPPER/XMR/xmr sur 97 QML/JS + 246 .cpp/.h + 48 translations/*.ts. **0 résidu Monero/XMR**. Préservés à dessein : `namespace Monero::` (backend ABI), `MoneroComponents` (namespace QML, 1435 refs), `MoneroSettings` (classe interne GUI).
+- **Sed trap brûlé une fois** : `\bMonero\b(?!::)` NE protège PAS `namespace Monero { ... }` (le caractère suivant ` {`, pas `::`). 5 headers ont eu leur forward-decl cassée (TransactionHistory/Wallet/AddressBook/WalletManager/PendingTransaction). Restaurés manuellement. Pour tout futur sed sur ce repo : protéger aussi `namespace Monero\b` et `using namespace Monero\b`.
+- Réseau : daemon RPC port défaut `18081 → 19741` mainnet (`+stagenet 39741, testnet 29741`). Backend submodule fournit prefix 60, NETWORK_ID `HRG\x02HIDERINGMAIN`.
+- Visuel : palette gold #FFD700 sur noir/dark, app icons (8 tailles + .ico multi-size) générés depuis `~/hidering/assets/hrg_logo.png` via ImageMagick, splash SVG `hidering-vector.svg` HRG cercle gold.
+- Build verifié 23 mai : `bin/hidering-wallet-gui` 35 MB + 18 binaires CLI HRG (hideringd, hidering-wallet-cli/rpc, blockchain-tools…), smoke test 15s alive sous WSLg, Qt 5.15.13, aucun warning d'asset manquant.
+- **Release Linux v2.0.0-gui publiée 23 mai 2026** : https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.0-gui — deux assets :
+  - `Hidering_Wallet-v2.0.0-x86_64.AppImage` (54 MB) — **recommandé**, self-contained (Qt5 + plugins + QML modules + libs système bundlées). `chmod +x` + run. Sha256 `423904575e9235d5c158109580b6caeb1a8d0609ac6be32d45cf295919df8a87`.
+  - `hidering-wallet-gui-v2.0.0-linux-x64.tar.gz` (11 MB) — binaire stripped, dynamically linked, nécessite Qt5.15+boost1.83+openssl3+libsodium côté host. Sha256 `0defa8ab45285de46d98bf5828dbe86c797a6df593198458e984d0f52fc7460b`.
+  - Build sur Ubuntu 24.04 glibc 2.39 avec `-unsupported-allow-new-glibc` → target distros doivent avoir glibc ≥ 2.39 (Ubuntu 24.04+, Debian 13+, Fedora 39+). Pour broader compat il faudrait rebuilt sur une base distro plus ancienne.
+  - **Surprise Release build** : les libs HRG (libwallet_api, libepee, libopenpgp, libcommon, libnet, libversion, libtranslations, libeasylogging) sont **statically linked** dans `hidering-wallet-gui` en mode Release (find . -name "*.so" sort uniquement Qt5 + system libs). Debug build les laisse dynamic. Mécanisme cmake exact pas identifié — possiblement cmake target type default ou interaction `-fPIC`.
+  - **Gotcha AppImage** : `-extra-plugins=platforms/libqxcb.so` (format avec slash dans le nom) crash linuxdeployqt silencieusement exit 1. Le download appimagetool du runtime-x86_64 timeout/502 souvent depuis github — workaround : `gh release download continuous --repo AppImage/type2-runtime --pattern runtime-x86_64` + `appimagetool --runtime-file ./runtime-x86_64 AppDir <output>.AppImage`.
+- **TODO Phase 4D GUI restantes** :
+  1. macOS .dmg + Windows .exe — toujours bloqué par billing GH Actions (même blocage que backend depuis 12 mai 2026)
+  2. Vraie wordmark SVG vectorielle (actuellement raster ImageMagick `convert -annotate text`)
+  3. `appicon.icns` macOS
+  4. Retirer ou remplacer le module `qt/updater` (inerte : pointe vers `:/hidering/utils/gpg_keys/` qui n'existe pas, devkeys Monero retirées)
+  5. QA traduction multilingue (sed touche 48 `.ts` mais pas de pass native-speaker)
+- Mémoire associée : `~/.claude/projects/-home-shark-hidering/memory/project_hidering_gui_fork.md`
 
 ## POST-QUANTIQUE (PHASE 5 — 2027)
 Hard fork additif (n'altère pas la blockchain existante) :
