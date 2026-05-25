@@ -1007,7 +1007,7 @@
 <section id="mine">
   <div class="section-label reveal">Mining</div>
   <h2 class="section-title reveal">Start Mining HRG</h2>
-  <p class="section-sub reveal">RandomX is CPU-optimised. Any modern processor can mine HIDERING. No ASICs, no GPU farms — just your CPU. Solo mining works today; public pool mining is coming soon.</p>
+  <p class="section-sub reveal">RandomX is CPU-optimised. Any modern processor can mine HIDERING. No ASICs, no GPU farms — just your CPU. Solo mining and the public pool both work today — pick whichever you prefer.</p>
 
   <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
     <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Requirements</div>
@@ -1018,6 +1018,23 @@
       <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
     </ul>
     <p style="font-size:0.78rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;">Optional: enable Linux huge pages for higher hashrate — <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">echo 1280 | sudo tee /proc/sys/vm/nr_hugepages</code></p>
+  </div>
+
+  <!-- MINING POOL -->
+  <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
+    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Mining Pool</div>
+    <p style="font-size:0.85rem;color:var(--text);line-height:1.7;margin:0 0 1.25rem;">Prefer pooled mining? Point any RandomX miner (e.g. <a href="https://github.com/xmrig/xmrig" style="color:var(--gold);">XMRig</a>) at the HIDERING public pool for steady PPLNS payouts instead of waiting on a solo block. You still need a B-address to receive payouts — create one with steps 01 &amp; 03 below.</p>
+    <ul style="list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem 1.5rem;font-size:0.85rem;color:var(--text);padding:0;margin:0 0 1.25rem;">
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">STRATUM</span> &nbsp; <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.8rem;">stratum+tcp://pool.hidering.org:3333</code></li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">STATS API</span> &nbsp; <a href="http://pool.hidering.org:8117/stats" style="color:var(--gold);font-family:'Fira Mono',monospace;font-size:0.8rem;">pool.hidering.org:8117/stats</a></li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">FEE</span> &nbsp; 1%</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">MIN PAYOUT</span> &nbsp; 1 HRG</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">ALGO</span> &nbsp; RandomX (rx/0)</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PAYOUTS</span> &nbsp; PPLNS</li>
+    </ul>
+    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:0.6rem;">XMRig config example</div>
+    <div class="code-block"><span class="cmd">// pools[] entry in your XMRig config.json</span><br>{<br>&nbsp;&nbsp;"url": "pool.hidering.org:3333",<br>&nbsp;&nbsp;"user": "VOTRE_ADRESSE_HRG",<br>&nbsp;&nbsp;"pass": "x"<br>}</div>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Replace <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">VOTRE_ADRESSE_HRG</code> with your own B-address. From the command line that is: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">xmrig -o pool.hidering.org:3333 -u VOTRE_ADRESSE_HRG -p x -a rx/0</code></p>
   </div>
 
   <div class="steps reveal">
