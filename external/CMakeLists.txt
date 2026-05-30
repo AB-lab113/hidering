@@ -67,3 +67,28 @@ add_subdirectory(db_drivers)
 add_subdirectory(easylogging++)
 add_subdirectory(qrcodegen)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
+
+# Phase 5: Post-Quantum Cryptography (Open Quantum Safe / liboqs).
+# Provides Dilithium3 (signatures) and Kyber768 (KEM), NIST PQC standards.
+#
+# liboqs is built standalone, static, OpenSSL-backed, library-only:
+#   cmake -S external/liboqs -B external/liboqs/build \
+#         -DBUILD_SHARED_LIBS=OFF -DOQS_USE_OPENSSL=ON -DOQS_BUILD_ONLY_LIB=ON
+#   cmake --build external/liboqs/build -j$(nproc)
+#
+# We expose it as the IMPORTED `oqs` target rather than add_subdirectory():
+# liboqs' in-tree CMake defines a helper target named `common`, which collides
+# with HIDERING's own `common` target (CMP0002). An imported target pulls in
+# only the prebuilt archive + headers, so there is no name clash and liboqs is
+# not rebuilt as part of the daemon build. See src/crypto/pqc_test.cpp.
+set(LIBOQS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/liboqs/build")
+if(EXISTS "${LIBOQS_BUILD_DIR}/lib/liboqs.a")
+  add_library(oqs STATIC IMPORTED GLOBAL)
+  set_target_properties(oqs PROPERTIES
+    IMPORTED_LOCATION "${LIBOQS_BUILD_DIR}/lib/liboqs.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${LIBOQS_BUILD_DIR}/include"
+    INTERFACE_LINK_LIBRARIES "${OPENSSL_CRYPTO_LIBRARY}")
+  message(STATUS "Phase 5 PQC: liboqs enabled (imported target: oqs)")
+else()
+  message(STATUS "Phase 5 PQC: liboqs not built (run the external/liboqs build); oqs target unavailable")
+endif()
