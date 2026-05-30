@@ -147,7 +147,7 @@ Mémoires persistantes associées :
 - Phase 4A-C : Mainnet public launch — **RESET v2.0.0** (chaîne v1.x à h≈3577 abandonnée par décision 16 mai 2026 ; nouveau mainnet v2.0.0 démarre vierge dès activation. Launch *officiel public* toujours cible T2 2026.)
 - Phase 4D : Binaires publics — **À REFAIRE** (v1.0.2 Linux publié 13 mai obsolète post-HF ; v2.0.0 source rebuilt local, binaires publics + tag à produire — CI GitHub Actions toujours bloquée par billing depuis 12 mai 2026). **Sous-projet GUI démarré 23 mai** : repo `AB-lab113/hidering-gui` forké de monero-gui, debug build clean, smoke test alive 15s sous WSLg — packaging (AppImage/.deb/.exe/.dmg) reste à faire. Voir section HIDERING WALLET GUI.
 - Phase 4E : Pool mining — **EN PRODUCTION** (25 mai 2026) : pool publique `pool.hidering.org:3333` live sur Contabo-2, stack **cryptonote-nodejs-pool** (et non monero-pool finalement retenu) ; minage validé end-to-end (16 shares, wallet-rpc `ok`). Voir sous-section « Déploiement cryptonote-nodejs-pool — Contabo-2 » dans POOL MINING. NB historique : prototype validé en local 14 mai 2026 avec monero-pool jtgrassie.
-- Phase 5 : Post-quantique (Dilithium3 + Kyber768) — A FAIRE (Cible T2 2027)
+- Phase 5 : Post-quantique (Dilithium3 + Kyber768) — **EN COURS** (étape 1 ✅ liboqs intégré le 30 mai 2026, voir section POST-QUANTIQUE ; cible hard fork mainnet T2 2027)
 
 ## PROCHAINES ETAPES (PAR ORDRE)
 1. Commit v2.0.0 source patches (`src/cryptonote_config.h` + `src/version.cpp.in`)
@@ -378,3 +378,12 @@ Hard fork additif (n'altère pas la blockchain existante) :
 - Dilithium3 (CRYSTALS) — signatures
 - Kyber768 — échange de clés
 - Calendrier : spec 2026 → impl+audit T1 2027 → hard fork mainnet T2 2027
+
+### Étape 1 — liboqs intégré ✅ (30 Mai 2026, commit `2842e364e` sur v2-privacy)
+- **Dépendance** : Open Quantum Safe **liboqs 0.10.1** (submodule `external/liboqs`, pinné `5dd87dca`, URL dans `.gitmodules`). Buildé static/OpenSSL-only :
+  `cmake -S external/liboqs -B external/liboqs/build -DBUILD_SHARED_LIBS=OFF -DOQS_USE_OPENSSL=ON -DOQS_BUILD_ONLY_LIB=ON && cmake --build external/liboqs/build -j$(nproc)`
+  → `external/liboqs/build/lib/liboqs.a` (9.7 MB), adossé à OpenSSL 3.0.13. Dilithium3 + Kyber768 activés (vérifié dans `oqsconfig.h`).
+- **CMake** : `external/CMakeLists.txt` expose la cible **IMPORTED `oqs`** (PAS `add_subdirectory(liboqs)`). **GOTCHA brûlé** : `add_subdirectory(liboqs)` casse la config full-tree — liboqs définit en interne une cible `common` qui entre en collision avec la cible `common` de HIDERING (CMP0002 : « another target with the same name already exists »). La cible imported ne tire que l'archive prébuildée + headers → 0 collision, et liboqs n'est pas rebuildé par le build daemon. Config full-tree re-vérifiée rc=0, 0 erreur.
+- **Smoke test** : `src/crypto/pqc_test.cpp` — Dilithium3 keygen/sign/verify de `"HIDERING_PQC_TEST"` (+ rejet signature altérée) et round-trip Kyber768 encaps/decaps. Compile standalone (`g++ -std=c++17 -I external/liboqs/build/include ... external/liboqs/build/lib/liboqs.a -lcrypto`) → **RESULT: PASS**. Tailles : Dilithium3 pk 1952 / sk 4000 / sig 3293 B ; Kyber768 pk 1184 / sk 2400 / ct 1088 / ss 32 B.
+- **NB** : l'archive `.a` est un artefact de build non versionné — un clone doit lancer le build liboqs une fois (recette ci-dessus, documentée dans le commentaire `external/CMakeLists.txt`).
+- **Reste à faire (Phase 5)** : design du format tx PQ (signatures Dilithium3 dans le miner_tx / ring), schedule hard fork additif HFvNN, impl+audit T1 2027, hard fork mainnet T2 2027.
