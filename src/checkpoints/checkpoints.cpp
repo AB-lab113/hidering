@@ -220,6 +220,7 @@ namespace cryptonote
     // after the 16 May 2026 hard fork.
     ADD_CHECKPOINT2(2939, "5155f6f679e60773331175024910019f0db9d30db8953d9227313ba563126592", "0x2e096dbbf");
     ADD_CHECKPOINT2(5000, "b835c46b10bebf119ad4d22ae0db70265629b117d4acdaeb1466cc6214274640", "0x88748a6ee");
+    ADD_CHECKPOINT2(11000, "dcb632a807f8e5f92bc4d31eefb011fe720ad8d0c53afd6c4dc1b992a05d94a1", "0x253b1965c4");
     return true;
   }
 
