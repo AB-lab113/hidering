@@ -214,6 +214,13 @@
 #define HF_VERSION_VIEW_TAGS                    15
 #define HF_VERSION_2021_SCALING                 15
 
+// HIDERING Phase 5 — Post-Quantum additive hard fork (Dilithium3 + Kyber768).
+// HFv16 introduces the external Dilithium3 signature carried in tx `extra` and
+// the Kyber768-based BQ... addresses. HF_HEIGHT_PQ is a placeholder height: the
+// fork is registered in the schedule but inactive until mainnet reaches it.
+#define HF_VERSION_PQ                           16
+#define HF_HEIGHT_PQ                            1000000ULL
+
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 #define CRYPTONOTE_SCALING_2021_FEE_ROUNDING_PLACES 2
 
@@ -248,6 +255,9 @@ namespace config
   uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 60;
   uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 61;
   uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 62;
+  // Phase 5 (HFv16): post-quantum BQ... addresses carrying a Dilithium3 + Kyber768
+  // public key. Two-byte base58 prefix (0x3C11) so the encoded address begins "BQ".
+  uint64_t const CRYPTONOTE_PQ_ADDRESS_PREFIX = 0x3C11;
   uint16_t const P2P_DEFAULT_PORT = 19740;
   uint16_t const RPC_DEFAULT_PORT = 19741;
   uint16_t const ZMQ_RPC_DEFAULT_PORT = 19742;

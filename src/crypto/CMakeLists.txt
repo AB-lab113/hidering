@@ -50,7 +50,8 @@ set(crypto_sources
   slow-hash.c
   rx-slow-hash.c
   CryptonightR_JIT.c
-  tree-hash.c)
+  tree-hash.c
+  pqc.cpp)
 
 if(ARCH_ID STREQUAL "i386" OR ARCH_ID STREQUAL "x86_64" OR ARCH_ID STREQUAL "x86-64" OR ARCH_ID STREQUAL "amd64")
 list(APPEND crypto_sources CryptonightR_template.S)
@@ -76,6 +77,22 @@ target_link_libraries(cncrypto
     ${sodium_LIBRARIES}
   PRIVATE
     ${EXTRA_LIBRARIES})
+
+# Phase 5 PQC: link the imported liboqs (oqs) target so pqc.cpp resolves the
+# Dilithium3 / Kyber768 symbols and picks up the liboqs include dir. The target
+# is only defined when external/liboqs has been built (see external/CMakeLists.txt);
+# guard so a tree without it still configures.
+if(TARGET oqs)
+  target_link_libraries(cncrypto PUBLIC oqs)
+  # monero_add_library compiles the sources in an object library (obj_cncrypto)
+  # that inherits only INTERFACE_COMPILE_DEFINITIONS from cncrypto, NOT the
+  # include dirs of its link deps. So propagate liboqs' include dir to the object
+  # target explicitly, otherwise pqc.cpp cannot find <oqs/oqs.h>.
+  target_include_directories(obj_cncrypto PRIVATE
+    $<TARGET_PROPERTY:oqs,INTERFACE_INCLUDE_DIRECTORIES>)
+else()
+  message(WARNING "Phase 5 PQC: oqs target missing — build external/liboqs; pqc.cpp will fail to compile")
+endif()
 
 if (ARM)
   option(NO_OPTIMIZED_MULTIPLY_ON_ARM

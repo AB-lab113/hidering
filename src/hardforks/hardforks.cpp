@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "hardforks.h"
+#include "cryptonote_config.h"
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "blockchain.hardforks"
@@ -43,6 +44,11 @@ const hardfork_t mainnet_hard_forks[] = {
   // height, time) tuples, hence the t=…000 / t=…001 spacing.
   { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
+  // Phase 5 — Post-Quantum additive hard fork (Dilithium3 + Kyber768).
+  // Registered but INACTIVE: HF_HEIGHT_PQ (1,000,000) is a placeholder far above
+  // the current mainnet tip (~h11000), so no block requires major_version 16 yet.
+  // The activation height is finalised before the T2 2027 mainnet fork.
+  { HF_VERSION_PQ, HF_HEIGHT_PQ, 0, 1713700002 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);
 const uint64_t mainnet_hard_fork_version_1_till = 0;
