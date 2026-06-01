@@ -51,19 +51,19 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build external/liboqs/build -j"${JOBS}"
 
-      - name: build daemon
+      - name: build daemon + wallet
         run: |
           mkdir -p build && cd build
           cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF
-          make -j"${JOBS}" daemon
+          make -j"${JOBS}" daemon simplewallet wallet_rpc_server
 
       - name: package
         run: |
-          PKG="hideringd-linux-x64"
+          PKG="hidering-linux-x64"
           mkdir -p "dist/${PKG}"
-          cp build/bin/hideringd "dist/${PKG}/"
-          strip "dist/${PKG}/hideringd" || true
+          cp build/bin/hideringd build/bin/hidering-wallet-cli build/bin/hidering-wallet-rpc "dist/${PKG}/"
+          strip "dist/${PKG}/hideringd" "dist/${PKG}/hidering-wallet-cli" "dist/${PKG}/hidering-wallet-rpc" || true
           cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
           cd dist
           tar -czf "${PKG}.tar.gz" "${PKG}"
@@ -71,8 +71,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hideringd-linux-x64
-          path: dist/hideringd-linux-*
+          name: hidering-linux-x64
+          path: dist/hidering-linux-*
 
   release:
     name: Attach Linux asset to release
@@ -89,7 +89,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: hideringd-linux-x64
+          name: hidering-linux-x64
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
@@ -99,4 +99,4 @@ jobs:
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: dist/hideringd-linux-*
+          files: dist/hidering-linux-*

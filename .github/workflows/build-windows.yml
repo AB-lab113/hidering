@@ -84,13 +84,13 @@ jobs:
             -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON \
             -DCMAKE_C_STANDARD_LIBRARIES="${WIN_SYS_LIBS}" \
             -DCMAKE_CXX_STANDARD_LIBRARIES="${WIN_SYS_LIBS}"
-          make -C build -j"${JOBS}" daemon
+          make -C build -j"${JOBS}" daemon simplewallet wallet_rpc_server
 
       - name: package
         run: |
-          PKG="hideringd-windows-x64"
+          PKG="hidering-windows-x64"
           mkdir -p "dist/${PKG}"
-          cp build/bin/hideringd.exe "dist/${PKG}/"
+          cp build/bin/hideringd.exe build/bin/hidering-wallet-cli.exe build/bin/hidering-wallet-rpc.exe "dist/${PKG}/"
           cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
           cd dist
           zip -r "${PKG}.zip" "${PKG}"
@@ -98,8 +98,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hideringd-windows-x64
-          path: dist/hideringd-windows-*
+          name: hidering-windows-x64
+          path: dist/hidering-windows-*
 
   release:
     name: Attach Windows asset to release
@@ -116,7 +116,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: hideringd-windows-x64
+          name: hidering-windows-x64
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
@@ -126,4 +126,4 @@ jobs:
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: dist/hideringd-windows-*
+          files: dist/hidering-windows-*

@@ -61,14 +61,14 @@ jobs:
           mkdir -p build && cd build
           cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT}"
-          make -j"${JOBS}" daemon
+          make -j"${JOBS}" daemon simplewallet wallet_rpc_server
 
       - name: package
         run: |
-          PKG="hideringd-macos-${{ env.ARCH }}"
+          PKG="hidering-macos-${{ env.ARCH }}"
           mkdir -p "dist/${PKG}"
-          cp build/bin/hideringd "dist/${PKG}/"
-          strip "dist/${PKG}/hideringd" || true
+          cp build/bin/hideringd build/bin/hidering-wallet-cli build/bin/hidering-wallet-rpc "dist/${PKG}/"
+          strip "dist/${PKG}/hideringd" "dist/${PKG}/hidering-wallet-cli" "dist/${PKG}/hidering-wallet-rpc" || true
           cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
           cd dist
           tar -czf "${PKG}.tar.gz" "${PKG}"
@@ -76,8 +76,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hideringd-macos-${{ env.ARCH }}
-          path: dist/hideringd-macos-*
+          name: hidering-macos-${{ env.ARCH }}
+          path: dist/hidering-macos-*
 
   release:
     name: Attach macOS asset to release
@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: hideringd-macos-arm64
+          name: hidering-macos-arm64
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
@@ -104,4 +104,4 @@ jobs:
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: dist/hideringd-macos-*
+          files: dist/hidering-macos-*
