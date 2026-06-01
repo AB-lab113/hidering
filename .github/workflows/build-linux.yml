@@ -73,3 +73,30 @@ jobs:
         with:
           name: hideringd-linux-x64
           path: dist/hideringd-linux-*
+
+  release:
+    name: Attach Linux asset to release
+    needs: build-linux
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Shared across all three build-* workflows so their release jobs serialize
+    # and softprops create-or-updates the same release without a create race.
+    concurrency:
+      group: hidering-release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: hideringd-linux-x64
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: HIDERING ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/hideringd-linux-*

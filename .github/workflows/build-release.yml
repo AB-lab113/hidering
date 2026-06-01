@@ -1,9 +1,13 @@
 name: build-release
 
+# SUPERSEDED (2026-06-01): the v* tag trigger is disabled. Tag releases are now
+# produced by build-linux.yml / build-macos.yml / build-windows.yml, each of
+# which attaches its own daemon asset to the release on a v* tag. This workflow
+# is kept (manual-dispatch only) because its build steps additionally package
+# the wallet binaries (hidering-wallet-cli / -rpc); it still needs the same
+# fixes the per-OS workflows got (build liboqs first, add unbound+zeromq on
+# mac/win, append ws2_32/crypt32 on the Windows link) before it will compile.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
