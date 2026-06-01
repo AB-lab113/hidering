@@ -1,9 +1,11 @@
 name: build-macos
 
-# Builds the HIDERING daemon (hideringd) for macOS, both Intel (macos-13)
-# and Apple Silicon / M1 (macos-14). Linked dynamically: -DSTATIC=ON cannot
-# produce a fully static binary on macOS (no static libc) and breaks the
-# libunbound link, so deps come from Homebrew at runtime.
+# Builds the HIDERING daemon (hideringd) for macOS Apple Silicon / M1
+# (macos-14, arm64 only). Intel (macos-13) was dropped: that runner never got
+# scheduled on this account across many runs while arm64 built reliably.
+# Linked dynamically: -DSTATIC=ON cannot produce a fully static binary on macOS
+# (no static libc) and breaks the libunbound link, so deps come from Homebrew
+# at runtime.
 #
 # NOTE on liboqs (Phase 5 PQC): the CMake `EXISTS` guard in external/CMakeLists.txt
 # only makes *linking* the `oqs` target optional. src/crypto/pqc.cpp still
@@ -28,16 +30,10 @@ permissions:
 
 jobs:
   build-macos:
-    name: macOS ${{ matrix.arch }} build
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-13
-            arch: intel
-          - runner: macos-14
-            arch: arm64
+    name: macOS arm64 build
+    runs-on: macos-14
+    env:
+      ARCH: arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,7 +65,7 @@ jobs:
 
       - name: package
         run: |
-          PKG="hideringd-macos-${{ matrix.arch }}"
+          PKG="hideringd-macos-${{ env.ARCH }}"
           mkdir -p "dist/${PKG}"
           cp build/bin/hideringd "dist/${PKG}/"
           strip "dist/${PKG}/hideringd" || true
@@ -80,12 +76,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hideringd-macos-${{ matrix.arch }}
+          name: hideringd-macos-${{ env.ARCH }}
           path: dist/hideringd-macos-*
 
   release:
-    name: Attach macOS assets to release
-    # Waits for the whole matrix (intel + arm64) before publishing both assets.
+    name: Attach macOS asset to release
     needs: build-macos
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -99,8 +94,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: hideringd-macos-*
-          merge-multiple: true
+          name: hideringd-macos-arm64
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
