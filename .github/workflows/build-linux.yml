@@ -1,6 +1,9 @@
 name: build-linux
 
 # Builds the HIDERING daemon (hideringd) for Linux x64 on Ubuntu 22.04.
+# Linked dynamically: -DSTATIC=ON fails because the mandatory static
+# libunbound.a needs nettle/gmp/hogweed symbols that Monero's CMake never
+# adds to the link line.
 #
 # NOTE on liboqs (Phase 5 PQC): the CMake `EXISTS` guard only makes *linking*
 # the `oqs` target optional. src/crypto/pqc.cpp still `#include <oqs/oqs.h>`
@@ -47,7 +50,7 @@ jobs:
       - name: build daemon
         run: |
           mkdir -p build && cd build
-          cmake .. -DSTATIC=ON -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+          cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF
           make -j"${JOBS}" daemon
 

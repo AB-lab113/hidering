@@ -8,10 +8,15 @@ name: build-windows
 # unconditionally (compiled into cncrypto, which the daemon links), so liboqs
 # must be built before the daemon or compilation fails.
 #
-# NOTE on generator: the task asked for `-G "MinGW Makefiles"`, but that
+# NOTE on generator: the spec asked for `-G "MinGW Makefiles"`, but that
 # generator drives mingw32-make and breaks when sh.exe is on PATH (always true
-# inside the MSYS2 shell). The repo's proven combo is `-G "MSYS Makefiles"` +
-# GNU make under the mingw64 environment, which is what we use here.
+# inside the MSYS2 shell). We use `-G "MSYS Makefiles"` + GNU make under the
+# mingw64 environment instead.
+#
+# NOTE on STATIC: the spec asked for -DSTATIC=ON, but linking the mandatory
+# libunbound statically pulls in unresolved nettle/gmp/hogweed symbols that
+# Monero's CMake does not add to the link line. We link dynamically; the
+# resulting hideringd.exe needs the mingw64 runtime DLLs alongside it.
 
 on:
   push:
@@ -47,6 +52,8 @@ jobs:
             mingw-w64-x86_64-openssl
             mingw-w64-x86_64-libsodium
             mingw-w64-x86_64-miniupnpc
+            mingw-w64-x86_64-unbound
+            mingw-w64-x86_64-zeromq
             git
             pkg-config
             zip
@@ -63,7 +70,7 @@ jobs:
 
       - name: build daemon
         run: |
-          cmake -S . -B build -G "MSYS Makefiles" -DSTATIC=ON \
+          cmake -S . -B build -G "MSYS Makefiles" \
             -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON
           make -C build -j"${JOBS}" daemon

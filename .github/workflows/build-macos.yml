@@ -1,7 +1,9 @@
 name: build-macos
 
 # Builds the HIDERING daemon (hideringd) for macOS, both Intel (macos-13)
-# and Apple Silicon / M1 (macos-14).
+# and Apple Silicon / M1 (macos-14). Linked dynamically: -DSTATIC=ON cannot
+# produce a fully static binary on macOS (no static libc) and breaks the
+# libunbound link, so deps come from Homebrew at runtime.
 #
 # NOTE on liboqs (Phase 5 PQC): the CMake `EXISTS` guard in external/CMakeLists.txt
 # only makes *linking* the `oqs` target optional. src/crypto/pqc.cpp still
@@ -40,7 +42,7 @@ jobs:
       - name: install dependencies
         run: |
           brew update
-          brew install --quiet cmake boost openssl libsodium miniupnpc expat libunwind-headers
+          brew install --quiet cmake boost openssl libsodium miniupnpc expat libunwind-headers unbound zeromq
 
       - name: compute job count
         run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
@@ -57,7 +59,7 @@ jobs:
         run: |
           OPENSSL_ROOT="$(brew --prefix openssl)"
           mkdir -p build && cd build
-          cmake .. -DSTATIC=ON -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+          cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT}"
           make -j"${JOBS}" daemon
 
