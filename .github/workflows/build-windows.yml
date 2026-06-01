@@ -26,6 +26,10 @@ on:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -70,9 +74,16 @@ jobs:
 
       - name: build daemon
         run: |
+          # mingw's static OpenSSL 3 (libcrypto.a) references Win32 socket and
+          # cert-store symbols (ws2_32 / crypt32 / bcrypt) that Monero's CMake
+          # does not append. CMAKE_*_STANDARD_LIBRARIES are emitted at the very
+          # END of the link line, after libcrypto.a, so ld resolves them.
+          WIN_SYS_LIBS="-lws2_32 -lcrypt32 -lbcrypt -lgdi32 -liphlpapi"
           cmake -S . -B build -G "MSYS Makefiles" \
             -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
-            -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON
+            -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON \
+            -DCMAKE_C_STANDARD_LIBRARIES="${WIN_SYS_LIBS}" \
+            -DCMAKE_CXX_STANDARD_LIBRARIES="${WIN_SYS_LIBS}"
           make -C build -j"${JOBS}" daemon
 
       - name: package
