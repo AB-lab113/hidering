@@ -1,0 +1,68 @@
+name: build-linux
+
+# Builds the HIDERING daemon (hideringd) for Linux x64 on Ubuntu 22.04.
+#
+# NOTE on liboqs (Phase 5 PQC): the CMake `EXISTS` guard only makes *linking*
+# the `oqs` target optional. src/crypto/pqc.cpp still `#include <oqs/oqs.h>`
+# unconditionally (compiled into cncrypto, which the daemon links), so liboqs
+# must be built before the daemon or compilation fails.
+
+on:
+  push:
+    branches:
+      - v2-privacy
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    name: Linux x64 build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config \
+            libboost-all-dev libssl-dev libsodium-dev libminiupnpc-dev \
+            libunbound-dev libexpat1-dev libunwind8-dev libzmq3-dev git
+
+      - name: compute job count
+        run: echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+
+      - name: build liboqs (Phase 5 PQC dependency)
+        run: |
+          cmake -S external/liboqs -B external/liboqs/build \
+            -DBUILD_SHARED_LIBS=OFF -DOQS_USE_OPENSSL=ON -DOQS_BUILD_ONLY_LIB=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build external/liboqs/build -j"${JOBS}"
+
+      - name: build daemon
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DSTATIC=ON -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_DEVICE_TREZOR=OFF
+          make -j"${JOBS}" daemon
+
+      - name: package
+        run: |
+          PKG="hideringd-linux-x64"
+          mkdir -p "dist/${PKG}"
+          cp build/bin/hideringd "dist/${PKG}/"
+          strip "dist/${PKG}/hideringd" || true
+          cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
+          cd dist
+          tar -czf "${PKG}.tar.gz" "${PKG}"
+          sha256sum "${PKG}.tar.gz" > "${PKG}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hideringd-linux-x64
+          path: dist/hideringd-linux-*

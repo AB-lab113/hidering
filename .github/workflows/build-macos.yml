@@ -1,0 +1,78 @@
+name: build-macos
+
+# Builds the HIDERING daemon (hideringd) for macOS, both Intel (macos-13)
+# and Apple Silicon / M1 (macos-14).
+#
+# NOTE on liboqs (Phase 5 PQC): the CMake `EXISTS` guard in external/CMakeLists.txt
+# only makes *linking* the `oqs` target optional. src/crypto/pqc.cpp still
+# `#include <oqs/oqs.h>` unconditionally and is compiled into cncrypto, which the
+# daemon links — so the daemon will NOT compile unless liboqs has been built first.
+# We therefore build liboqs (static, OpenSSL-backed, lib-only) before the daemon.
+
+on:
+  push:
+    branches:
+      - v2-privacy
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: macOS ${{ matrix.arch }} build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: intel
+          - runner: macos-14
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        run: |
+          brew update
+          brew install --quiet cmake boost openssl libsodium miniupnpc expat libunwind-headers
+
+      - name: compute job count
+        run: echo "JOBS=$(sysctl -n hw.logicalcpu)" >> "$GITHUB_ENV"
+
+      - name: build liboqs (Phase 5 PQC dependency)
+        run: |
+          OPENSSL_ROOT="$(brew --prefix openssl)"
+          cmake -S external/liboqs -B external/liboqs/build \
+            -DBUILD_SHARED_LIBS=OFF -DOQS_USE_OPENSSL=ON -DOQS_BUILD_ONLY_LIB=ON \
+            -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT}" -DCMAKE_BUILD_TYPE=Release
+          cmake --build external/liboqs/build -j"${JOBS}"
+
+      - name: build daemon
+        run: |
+          OPENSSL_ROOT="$(brew --prefix openssl)"
+          mkdir -p build && cd build
+          cmake .. -DSTATIC=ON -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_DEVICE_TREZOR=OFF -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT}"
+          make -j"${JOBS}" daemon
+
+      - name: package
+        run: |
+          PKG="hideringd-macos-${{ matrix.arch }}"
+          mkdir -p "dist/${PKG}"
+          cp build/bin/hideringd "dist/${PKG}/"
+          strip "dist/${PKG}/hideringd" || true
+          cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
+          cd dist
+          tar -czf "${PKG}.tar.gz" "${PKG}"
+          shasum -a 256 "${PKG}.tar.gz" > "${PKG}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hideringd-macos-${{ matrix.arch }}
+          path: dist/hideringd-macos-*
