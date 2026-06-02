@@ -1,7 +1,7 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
-**Version 1.3 (révisée 16 Mai 2026 — hard fork v2.0.0)**  
+**Version 1.3 (révisée 1 Juin 2026 — release v2.0.2)**  
 **Mai 2026**
 
 ---
@@ -228,9 +228,9 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 **PHASE 4 : MAINNET LAUNCH (En cours)**
 - ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
 - ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (pré-launch, ~h≈3577) retirée au profit du nouveau réseau v2.0.0.
-- ⏳ Tag v2.0.0 + release Linux v2.0.0
-- ⏳ Binaires macOS/Windows v2.0.0
-- ⏳ Pool mining RandomX/HRG (relink v2.0.0)
+- ✅ **Release v2.0.2 (1 juin 2026)** — dernière publique, bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
+- ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256
+- ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333`)
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
@@ -306,6 +306,9 @@ Le fair launch garantit une distribution équitable par compétition PoW pure. L
 
 ---
 
-*Whitepaper v1.3 — Mai 2026 (révisé 16 mai 2026 pour hard fork v2.0.0)*  
-*SHA256 release v2.0.0 : à publier — voir https://github.com/AB-lab113/hidering/releases*  
+*Whitepaper v1.3 — Mai 2026 (révisé 1 juin 2026 pour release v2.0.2)*  
+*SHA256 release v2.0.2 (dernière publique) :*  
+*  Linux x64 : `844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30`*  
+*  macOS ARM64 : `5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22`*  
+*  Windows x64 : `0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3`*  
 *SHA256 release v1.0.2 (historique, pré-HF) : `da92781f5e0d085a08a656b48ea49be3d54201b3db32b736204266ea89fd2b8b`*
