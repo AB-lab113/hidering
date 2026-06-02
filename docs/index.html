@@ -1042,17 +1042,17 @@
       <div class="step-num">01</div>
       <div>
         <h3>Download, verify, and extract</h3>
-        <p>Grab the latest HIDERING release from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Download both the <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.tar.gz</code> and the matching <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.sha256</code> file into the same folder, then run the three commands below in order. Linux x86_64 binaries are available now; Windows and macOS coming soon.</p>
-        <div class="code-block"><span class="cmd"># 1. Verify the archive (must print: OK)</span><br>sha256sum -c hidering-v2.0.0-linux-x64.tar.gz.sha256<br><br><span class="cmd"># 2. Extract the archive</span><br>tar -xzf hidering-v2.0.0-linux-x64.tar.gz<br><br><span class="cmd"># 3. Move into the extracted folder</span><br>cd hidering-v2.0.0-linux-x64/</div>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">You are now inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">hidering-v2.0.0-linux-x64/</code>, which contains the two binaries you will use in the next steps: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hideringd</code> (full node daemon) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hidering-wallet-cli</code> (wallet CLI). Stay in this folder.</p>
+        <p>Grab the latest HIDERING release from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Download both the <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.tar.gz</code> and the matching <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.sha256</code> file into the same folder, then run the three commands below in order. Binaries available for Linux x86_64, macOS ARM64, and Windows x64.</p>
+        <div class="code-block"><span class="cmd"># 1. Verify the archive (must print: OK)</span><br>sha256sum -c hidering-linux-x64.tar.gz.sha256<br><br><span class="cmd"># 2. Extract the archive</span><br>tar -xzf hidering-linux-x64.tar.gz<br><br><span class="cmd"># 3. Move into the extracted folder</span><br>cd hidering-linux-x64/</div>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">You are now inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">hidering-linux-x64/</code>, which contains the two binaries you will use in the next steps: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hideringd</code> (full node daemon) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hidering-wallet-cli</code> (wallet CLI). Stay in this folder.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-num">02</div>
       <div>
         <h3>Launch the daemon &amp; sync</h3>
-        <p>Still inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-v2.0.0-linux-x64/</code> from step 01, start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
-        <div class="code-block"><span class="cmd"># Run from the hidering-v2.0.0-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740 \<br>&nbsp;&nbsp;--add-priority-node seed2.hidering.org:19740</div>
+        <p>Still inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-linux-x64/</code> from step 01, start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
+        <div class="code-block"><span class="cmd"># Run from the hidering-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740 \<br>&nbsp;&nbsp;--add-priority-node seed2.hidering.org:19740</div>
         <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
         <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Both seed nodes run on dedicated VPS infrastructure with fixed IPs (<code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">135.125.243.137</code>, <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed2</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">207.180.211.96</code>) and are managed by systemd for automatic restart on failure.</p>
       </div>
@@ -1061,8 +1061,8 @@
       <div class="step-num">03</div>
       <div>
         <h3>Create your wallet</h3>
-        <p>Open a <strong>second terminal</strong> (leave the daemon running in the first one) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">cd</code> into the same <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-v2.0.0-linux-x64/</code> folder from step 01. Your address will start with <strong style="color:var(--gold)">B</strong>. Write down your 25-word seed phrase and keep it offline — without it your HRG cannot be recovered.</p>
-        <div class="code-block"><span class="cmd"># In the second terminal, move into the extracted folder</span><br>cd hidering-v2.0.0-linux-x64/<br><br><span class="cmd"># Create a new wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --generate-new-wallet my-wallet<br><br><span class="cmd"># Or open an existing wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --wallet-file my-wallet</div>
+        <p>Open a <strong>second terminal</strong> (leave the daemon running in the first one) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">cd</code> into the same <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-linux-x64/</code> folder from step 01. Your address will start with <strong style="color:var(--gold)">B</strong>. Write down your 25-word seed phrase and keep it offline — without it your HRG cannot be recovered.</p>
+        <div class="code-block"><span class="cmd"># In the second terminal, move into the extracted folder</span><br>cd hidering-linux-x64/<br><br><span class="cmd"># Create a new wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --generate-new-wallet my-wallet<br><br><span class="cmd"># Or open an existing wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --wallet-file my-wallet</div>
       </div>
     </div>
     <div class="step">
@@ -1098,16 +1098,16 @@
 <!-- RELEASES -->
 <section id="releases">
   <div class="section-label reveal">Downloads</div>
-  <h2 class="section-title reveal">Latest Release · v2.0.0</h2>
+  <h2 class="section-title reveal">Latest Release · v2.0.2</h2>
   <p class="section-sub reveal">Verified binaries for the HIDERING full node and wallet, published on GitHub. Every asset ships with a SHA256 sidecar so you can confirm the file you downloaded is the one we built.</p>
 
   <div class="release-card reveal">
     <div class="release-header">
       <div>
-        <h3>HIDERING v2.0.0 — Coordinated Hard Fork</h3>
-        <p class="release-tagline">Linux x86_64 · stripped · 14.35 MB · published 17 May 2026</p>
+        <h3>HIDERING v2.0.2 — Multi-Platform Release</h3>
+        <p class="release-tagline">Linux x86_64 · macOS ARM64 · Windows x64 · published 2 Jun 2026</p>
       </div>
-      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.0" class="btn btn-outline">View on GitHub</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-outline">View on GitHub</a>
     </div>
 
     <ul class="release-contents">
@@ -1118,21 +1118,26 @@
 
     <div class="release-meta">
       <div>
-        <div class="meta-label">Filename</div>
-        <div class="meta-value">hidering-v2.0.0-linux-x64.tar.gz</div>
+        <div class="meta-label">Linux x64 · hidering-linux-x64.tar.gz · 13.1 MB</div>
+        <div class="meta-value sha">844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30</div>
       </div>
       <div>
-        <div class="meta-label">SHA256</div>
-        <div class="meta-value sha">7a44dd6f56fd0f30bb40c8d9e879b17576b6b682d99399de97eef79342537858</div>
+        <div class="meta-label">macOS ARM64 · hidering-macos-arm64.tar.gz · 10.2 MB</div>
+        <div class="meta-value sha">5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22</div>
+      </div>
+      <div>
+        <div class="meta-label">Windows x64 · hidering-windows-x64.zip · 29.3 MB</div>
+        <div class="meta-value sha">0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3</div>
       </div>
     </div>
 
     <div class="release-actions">
-      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.0/hidering-v2.0.0-linux-x64.tar.gz" class="btn btn-primary">Download Linux x64</a>
-      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.0/hidering-v2.0.0-linux-x64.tar.gz.sha256" class="btn btn-outline">SHA256 sidecar</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-primary">Download Linux x64</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-outline">Download macOS ARM64</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-outline">Download Windows x64</a>
     </div>
 
-    <p class="release-note">Windows and macOS builds are coming in a future release. Verify your download before extracting with <code>sha256sum -c hidering-v2.0.0-linux-x64.tar.gz.sha256</code> — it should print <code>OK</code>.</p>
+    <p class="release-note">Native binaries for Linux x86_64, macOS ARM64, and Windows x64. Every asset ships with a matching <code>.sha256</code> sidecar — verify your download before extracting with <code>sha256sum -c &lt;file&gt;.sha256</code> (it should print <code>OK</code>).</p>
   </div>
 
   <div class="release-card reveal">
@@ -1234,11 +1239,11 @@
     <div class="roadmap-item">
       <div>
         <div class="roadmap-phase">Phase 4H</div>
-        <div class="roadmap-status status-upcoming">Upcoming</div>
+        <div class="roadmap-status status-active">In Progress</div>
       </div>
       <div class="roadmap-content">
         <h3>Wallet GUI Desktop</h3>
-        <p>Fork of monero-gui rebranded for HIDERING (ports, addresses, logo). Cross-platform builds for Windows, macOS, and Linux. Interface covers Send, Receive, Mine, and History.</p>
+        <p>Fork of monero-gui rebranded for HIDERING (ports, addresses, logo). The Linux AppImage (v2.0.1) is available now; Windows and macOS builds are still to come. Interface covers Send, Receive, Mine, and History.</p>
         <div class="roadmap-tags">
           <span class="rtag">Fork monero-gui</span><span class="rtag">Rebrand</span><span class="rtag">Win/macOS/Linux</span><span class="rtag">Send/Receive/Mine</span>
         </div>
