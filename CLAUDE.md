@@ -7,16 +7,20 @@ Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Ticker : HRG
 - Binaires : hideringd, hidering-wallet-cli, hidering-wallet-rpc
 - Branche active : v2-privacy (HEAD : 41f899049 au 16 mai 2026 + 2 fichiers uncommitted pour v2.0.0 : `src/cryptonote_config.h` NETWORK_ID byte[3] et `src/version.cpp.in` version string)
-- Source courante : v2.0.0 (non tagué) — daemon local rebuilt 16 mai 2026, reporte `Hidering 'Privacy Enhanced' (v2.0.0-41f899049)`
-- Dernière release publique : v1.0.2 → commit 9d0e593a6 (binaire incompatible avec source v2.0.0 — NETWORK_ID different)
+- Source courante : v2.0.2 (tag `c37d5e285`) — `DEF_MONERO_VERSION "2.0.2"`, binaires publics multi-plateformes CI-publiés (cf. RELEASE v2.0.2)
+- Dernière release publique : **v2.0.2** → commit c37d5e285 (Linux x64 + macOS ARM64 + Windows x64, bundles complets daemon+wallet)
 - Tags publiés :
-  - **v2.0.0** → *non tagué* — hard fork NETWORK_ID (HRG\x02HIDERINGMAIN, magic 0x48524702) + version 2.0.0 ; abandon volontaire chaîne v1.x à h≈3577 (16 mai 2026)
+  - **v2.0.2** → commit c37d5e285 — bundles complets (hideringd + wallet-cli + -rpc) Linux/macOS-arm64/Windows, CI-auto-publiés ; version bump 2.0.1→2.0.2
+  - **v2.0.1** → daemon-only multi-plateformes (1ère release CI verte) ; version bump 2.0.0→2.0.1
+  - **v2.0.0** → commit ff02d1f80 — hard fork NETWORK_ID (HRG\x02HIDERINGMAIN, magic 0x48524702) + version 2.0.0 ; abandon volontaire chaîne v1.x à h≈3577 (16 mai 2026)
   - **v1.0.2** → commit 9d0e593a6 — fix RandomX/huge-pages bad_alloc au boot + version bump 1.0.2
   - **v1.0.1** → commit 47795728f — MONEY_SUPPLY corrigé (18M cap + 42.86 reward) + rebrand strings + version bump
   - **v1.0.0** → commit eb8ad1ee9 — rebrand banner initial + workflow CI (porte encore l'overflow MONEY_SUPPLY)
 - Releases :
-  - v2.0.0 — *non publié* (tag + binaires + Docker à faire, cf. punch list v2.0.0)
-  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.2 (Linux x64, stripped, 14.35 MB) — dernière publique, **NE PLUS UTILISER pour mainnet** post-HF
+  - **https://github.com/AB-lab113/hidering/releases/tag/v2.0.2 — dernière publique** (Linux x64 13.1 MB + macOS ARM64 10.2 MB + Windows x64 29.3 MB, chaque asset + sidecar `.sha256`)
+  - https://github.com/AB-lab113/hidering/releases/tag/v2.0.1 (daemon-only, multi-plateformes) — historique
+  - https://github.com/AB-lab113/hidering/releases/tag/v2.0.0 (Linux x64) — hard fork, historique
+  - https://github.com/AB-lab113/hidering/releases/tag/v1.0.2 (Linux x64, stripped, 14.35 MB) — **NE PLUS UTILISER pour mainnet** post-HF
   - https://github.com/AB-lab113/hidering/releases/tag/v1.0.1 (Linux x64, stripped, 14.3 MB) — historique
   - https://github.com/AB-lab113/hidering/releases/tag/v1.0.0 (Linux x64) — historique
 - Repo : https://github.com/AB-lab113/hidering
@@ -164,6 +168,19 @@ Mémoires persistantes associées :
 12. Site web public — mettre à jour docs/ (network ID, magic, version) pour redeploy Vercel auto
 13. Announce hard fork (Twitter, Reddit, BitcoinTalk) — communiquer activation + abandon chaîne v1.x
 14. Phase 4 Launch (public officiel)
+
+## RELEASE v2.0.2 (1 Juin 2026 — dernière publique, multi-plateformes CI)
+- Tag : **v2.0.2** → commit `c37d5e285` ([HRG] chore(release): bump DEF_MONERO_VERSION 2.0.1 → 2.0.2)
+- `src/version.cpp.in:2` : `DEF_MONERO_VERSION "2.0.2"`, release name `Privacy Enhanced` inchangé.
+- **Type : 1ère release publique multi-plateformes à bundles complets** (daemon + wallet). v2.0.1 (publiée plus tôt le 1er juin) était daemon-only ; v2.0.2 ajoute `hidering-wallet-cli` + `hidering-wallet-rpc` dans chaque archive.
+- Assets publiés (CI-auto-publiés, billing GH Actions débloqué — cf. mémoire `project_ci_build_workflows.md`) :
+  - `hidering-linux-x64.tar.gz` — 13.1 MB — sha256 `844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30`
+  - `hidering-macos-arm64.tar.gz` — 10.2 MB — sha256 `5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22`
+  - `hidering-windows-x64.zip` — 29.3 MB — sha256 `0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3`
+  - Chaque asset accompagné de son sidecar `.sha256`. macOS = **ARM64 uniquement** (runner macos-13 Intel jamais dispo sur ce compte). Noms d'archives **sans préfixe de version** (ex-`hidering-v2.0.0-linux-x64.tar.gz` → `hidering-linux-x64.tar.gz`).
+- CI : workflows `build-{linux,macos,windows}.yml` (ajoutés 1er juin, commit `5de0bc27e`) + job release-publish par workflow avec concurrency group partagé. Recette build : link dynamique (PAS STATIC — casse libunbound), unbound+zeromq requis, liboqs buildé en premier (pqc.cpp inclut oqs.h inconditionnellement), Windows `CMAKE_*_STANDARD_LIBRARIES="-lws2_32 -lcrypt32 -lbcrypt -lgdi32 -liphlpapi"`.
+- Site : `docs/index.html` MAJ vers v2.0.2 (section Downloads multi-plateformes + liens directs vers les assets + Mining step 01 dossier `hidering-linux-x64/`) — déployé sur hidering.org via Vercel.
+- Mémoire associée : `~/.claude/projects/-home-shark-hidering/memory/project_ci_build_workflows.md`
 
 ## RELEASE v2.0.0 (16 Mai 2026 — source patché, non tagué/publié)
 - Tag : **non tagué** — source HEAD `41f899049` + 2 fichiers uncommitted
