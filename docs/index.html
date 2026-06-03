@@ -1012,7 +1012,7 @@
   <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
     <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Requirements</div>
     <ul style="list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem 1.5rem;font-size:0.85rem;color:var(--text);padding:0;">
-      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">OS</span> &nbsp; Linux x86_64 (glibc ≥ 2.39 — Ubuntu 24.04 build)</li>
+      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">OS</span> &nbsp; Linux x86_64 · macOS ARM64 · Windows x64 (see Releases below)</li>
       <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">RAM</span> &nbsp; ≥ 2 GB free per mining thread (RandomX dataset)</li>
       <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
       <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
@@ -1258,11 +1258,11 @@
     <div class="roadmap-item">
       <div>
         <div class="roadmap-phase">Phase 5</div>
-        <div class="roadmap-status status-upcoming">Q2 2027</div>
+        <div class="roadmap-status status-active">In Progress</div>
       </div>
       <div class="roadmap-content">
         <h3>Post-Quantum Upgrade</h3>
-        <p>Hard fork introducing Dilithium3 + Kyber768 signatures. Non-destructive — existing blockchain history is fully preserved. Only transactions beyond fork height use new scheme.</p>
+        <p>Hard fork introducing Dilithium3 + Kyber768 signatures. Non-destructive — existing blockchain history is fully preserved. Only transactions beyond fork height use new scheme. Steps 1–2 complete: liboqs integrated, PQ key types + HFv16 placeholder committed (May 2026). Mainnet hard fork targeted for Q2 2027.</p>
         <div class="roadmap-tags">
           <span class="rtag">Dilithium3</span><span class="rtag">Kyber768</span><span class="rtag">Hard Fork</span>
         </div>
