@@ -1143,35 +1143,41 @@
   <div class="release-card reveal">
     <div class="release-header">
       <div>
-        <h3>HIDERING Wallet GUI v2.0.1-gui — Desktop Qt5</h3>
-        <p class="release-tagline">Linux x86_64 · AppImage self-contained 53 MB · published 25 May 2026</p>
+        <h3>HIDERING Wallet GUI v2.0.2-gui — Desktop Qt5</h3>
+        <p class="release-tagline">macOS ARM64 · Windows x64 · Linux x86_64 · published 3 Jun 2026</p>
       </div>
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.1-gui" class="btn btn-outline">View on GitHub</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.2-gui" class="btn btn-outline">View on GitHub</a>
     </div>
 
     <ul class="release-contents">
+      <li><code>Hidering_Wallet-macos-arm64.tar.gz</code> — Apple Silicon <code>.app</code> bundle, Qt5 bundled (macOS 11+)</li>
+      <li><code>Hidering_Wallet-windows-x64.zip</code> — portable folder, Qt5 + runtime DLLs bundled (Windows 10/11)</li>
       <li><code>Hidering_Wallet-v2.0.1-x86_64.AppImage</code> — one-file launch, bundles Qt5 + every system dep</li>
-      <li><code>hidering-wallet-gui-v2.0.1-linux-x64.tar.gz</code> — raw stripped binary, needs Qt 5.15 on the host</li>
       <li>Source repo: <a href="https://github.com/AB-lab113/hidering-gui" style="color:var(--gold);">github.com/AB-lab113/hidering-gui</a></li>
     </ul>
 
     <div class="release-meta">
       <div>
-        <div class="meta-label">AppImage SHA256</div>
-        <div class="meta-value sha">04f79f096a3c3791f07b70e31e197888f84b51d06e1d30e3c24d221c6376f45a</div>
+        <div class="meta-label">macOS ARM64 SHA256</div>
+        <div class="meta-value sha">63b96e4c1dfe343f1d591a12171eb98af6331ac0e7b6f4344b4e5e7e9947c9da</div>
       </div>
       <div>
-        <div class="meta-label">tar.gz SHA256</div>
-        <div class="meta-value sha">6fad0b79f3a124cc7b8ad3b191de75ac69a8fa019c8e12ce74f1cf648249280e</div>
+        <div class="meta-label">Windows x64 SHA256</div>
+        <div class="meta-value sha">9cb4f9c39bb5db070ab293656d1b24a2d59a2ef6f2726d598398e63217a5e0ca</div>
+      </div>
+      <div>
+        <div class="meta-label">Linux AppImage SHA256</div>
+        <div class="meta-value sha">04f79f096a3c3791f07b70e31e197888f84b51d06e1d30e3c24d221c6376f45a</div>
       </div>
     </div>
 
     <div class="release-actions">
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.1-gui/Hidering_Wallet-v2.0.1-x86_64.AppImage" class="btn btn-primary">Download AppImage (recommended)</a>
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.1-gui/hidering-wallet-gui-v2.0.1-linux-x64.tar.gz" class="btn btn-outline">Download tar.gz</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-macos-arm64.tar.gz" class="btn btn-primary">Download macOS (ARM64)</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-windows-x64.zip" class="btn btn-primary">Download Windows (x64)</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-v2.0.1-x86_64.AppImage" class="btn btn-outline">Download Linux AppImage</a>
     </div>
 
-    <p class="release-note">After download: <code>chmod +x Hidering_Wallet-v2.0.1-x86_64.AppImage</code> then <code>./Hidering_Wallet-v2.0.1-x86_64.AppImage</code>. Distros without <code>libfuse2</code> (Ubuntu 22.04+) can run it as <code>./Hidering_Wallet-v2.0.1-x86_64.AppImage --appimage-extract-and-run</code> instead. Requires glibc ≥ 2.39 (Ubuntu 24.04+, Debian 13+, Fedora 39+). Windows and macOS GUI builds coming in a future release.</p>
+    <p class="release-note"><strong>macOS:</strong> <code>tar -xzf Hidering_Wallet-macos-arm64.tar.gz</code>, then move <code>hidering-wallet-gui.app</code> to Applications. It's ad-hoc signed (no Apple Developer ID), so the first launch needs right-click → Open. <strong>Windows:</strong> unzip and run <code>hidering-wallet-gui.exe</code> from the extracted folder (keep the DLLs alongside it). <strong>Linux:</strong> the AppImage is carried over from <a href="https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.1-gui" style="color:var(--gold);">v2.0.1-gui</a> — feature-identical, not yet rebuilt for v2.0.2. <code>chmod +x</code> then run it; on distros without <code>libfuse2</code> use <code>--appimage-extract-and-run</code>. Requires glibc ≥ 2.39 (Ubuntu 24.04+, Debian 13+, Fedora 39+).</p>
   </div>
 </section>
 
@@ -1243,7 +1249,7 @@
       </div>
       <div class="roadmap-content">
         <h3>Wallet GUI Desktop</h3>
-        <p>Fork of monero-gui rebranded for HIDERING (ports, addresses, logo). The Linux AppImage (v2.0.1) is available now; Windows and macOS builds are still to come. Interface covers Send, Receive, Mine, and History.</p>
+        <p>Fork of monero-gui rebranded for HIDERING (ports, addresses, logo). Available now for macOS (ARM64), Windows (x64) and Linux (AppImage). Interface covers Send, Receive, Mine, and History.</p>
         <div class="roadmap-tags">
           <span class="rtag">Fork monero-gui</span><span class="rtag">Rebrand</span><span class="rtag">Win/macOS/Linux</span><span class="rtag">Send/Receive/Mine</span>
         </div>
