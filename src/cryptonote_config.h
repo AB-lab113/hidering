@@ -221,6 +221,12 @@
 #define HF_VERSION_PQ                           16
 #define HF_HEIGHT_PQ                            1000000ULL
 
+// Phase 5 (HFv16): tx_extra tag carrying the external Dilithium3 signature
+// (pk + sig). Distinct from the classic tx_extra tags in tx_extra.h
+// (0x00..0x04, 0xDE) — 0x06 is unused there. Only emitted/validated once
+// hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
+static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
+
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 #define CRYPTONOTE_SCALING_2021_FEE_ROUNDING_PLACES 2
 

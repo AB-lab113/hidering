@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <boost/asio/dispatch.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/range/adaptor/reversed.hpp>
@@ -51,6 +52,7 @@
 #include "common/threadpool.h"
 #include "warnings.h"
 #include "crypto/hash.h"
+#include "crypto/pqc.h"
 #include "cryptonote_core.h"
 #include "ringct/rctSigs.h"
 #include "common/perf_timer.h"
@@ -3255,6 +3257,40 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   crypto::hash tx_prefix_hash = get_transaction_prefix_hash(tx);
 
   const uint8_t hf_version = m_hardfork->get_current_version();
+
+  // HIDERING Phase 5 (HFv16): from HF_VERSION_PQ onward, every tx must carry a
+  // valid external Dilithium3 signature (tag TX_EXTRA_TAG_PQ_SIG) appended as the
+  // last field of tx.extra. The signature covers the prefix hash with the PQ field
+  // stripped — exactly what construct_tx_with_tx_key signed before appending it.
+  // Wholly skipped below HF_VERSION_PQ, so the live chain stays untouched.
+  if (hf_version >= HF_VERSION_PQ)
+  {
+    const std::vector<uint8_t> &ex = tx.extra;
+    const size_t pq_field_len = 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES;
+    // The PQ field is the last thing appended to extra: it occupies the trailing
+    // pq_field_len bytes and starts with TX_EXTRA_TAG_PQ_SIG.
+    if (ex.size() < pq_field_len || ex[ex.size() - pq_field_len] != TX_EXTRA_TAG_PQ_SIG)
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " missing required post-quantum (Dilithium3) signature at/after HFv16");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+    const size_t pos = ex.size() - pq_field_len;
+    crypto::pqc::pq_tx_sig pq_sig;
+    std::memcpy(pq_sig.pk, ex.data() + pos + 1, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
+    std::memcpy(pq_sig.sig, ex.data() + pos + 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES, crypto::pqc::DILITHIUM3_SIGNATURE_BYTES);
+    // Recompute the prefix hash with the trailing PQ field removed — the message
+    // that was signed at construction time.
+    transaction tx_pq_stripped = tx;
+    tx_pq_stripped.extra.resize(pos);
+    crypto::hash pq_prefix_hash = get_transaction_prefix_hash(tx_pq_stripped);
+    if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash), pq_sig))
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (Dilithium3) signature");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+  }
 
   if (hf_version >= HF_VERSION_MIN_2_OUTPUTS)
   {

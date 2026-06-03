@@ -42,12 +42,25 @@ using namespace epee;
 #include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
+#include "crypto/pqc.h"
 #include "ringct/rctSigs.h"
 
 using namespace crypto;
 
 namespace cryptonote
 {
+  //---------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16): serialise an external Dilithium3 signature into
+  // tx.extra as [ TX_EXTRA_TAG_PQ_SIG | pk(1952) | sig(3293) ]. Both fields are
+  // fixed length so no length prefix is needed; the parser in blockchain.cpp
+  // reads exactly that many bytes after the tag. Only emitted once the chain
+  // reaches HF_VERSION_PQ (inactive on the live chain).
+  void add_pq_sig_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::pq_tx_sig& sig)
+  {
+    extra.push_back(TX_EXTRA_TAG_PQ_SIG);
+    extra.insert(extra.end(), sig.pk, sig.pk + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
+    extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES);
+  }
   //---------------------------------------------------------------
   void classify_addresses(const std::vector<tx_destination_entry> &destinations, const boost::optional<cryptonote::account_public_address>& change_addr, size_t &num_stdaddresses, size_t &num_subaddresses, account_public_address &single_dest_subaddress)
   {
@@ -203,7 +216,7 @@ namespace cryptonote
     return addr.m_view_public_key;
   }
   //---------------------------------------------------------------
-  bool construct_tx_with_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const boost::optional<cryptonote::account_public_address>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys, bool rct, const rct::RCTConfig &rct_config, bool shuffle_outs, bool use_view_tags)
+  bool construct_tx_with_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const boost::optional<cryptonote::account_public_address>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys, bool rct, const rct::RCTConfig &rct_config, bool shuffle_outs, bool use_view_tags, uint8_t hf_version)
   {
     hw::device &hwdev = sender_account_keys.get_device();
 
@@ -461,6 +474,36 @@ namespace cryptonote
 
     CHECK_AND_ASSERT_MES(tx.extra.size() <= MAX_TX_EXTRA_SIZE, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << MAX_TX_EXTRA_SIZE << ")");
     }
+
+    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ ~h1,000,000): attach an
+    // external Dilithium3 signature over the tx prefix as the LAST field of
+    // tx.extra. Gated on hf_version, which defaults to 0 at every current call
+    // site, so the live chain (hf < HF_VERSION_PQ) is never touched. The signature
+    // covers the prefix hash as it stands here (after padding, before the PQ field
+    // itself), so the validator recovers the signed message by stripping the
+    // trailing PQ field; the ring/rct signatures generated below still commit to
+    // the full extra (PQ field included). The per-output BQ... post-quantum key
+    // plumbing lands later in Phase 5 — until then a self-contained throwaway
+    // keypair keeps this path compilable and exercisable without altering consensus.
+    if (hf_version >= HF_VERSION_PQ)
+    {
+      crypto::hash pq_prefix_hash;
+      get_transaction_prefix_hash(tx, pq_prefix_hash);
+      crypto::pqc::pq_public_key pq_pk;
+      crypto::pqc::pq_secret_key pq_sk;
+      crypto::pqc::pq_tx_sig pq_sig;
+      if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk)
+          || !crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
+                                       pq_sk.dilithium3_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES,
+                                       pq_pk.dilithium3_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES,
+                                       pq_sig))
+      {
+        LOG_ERROR("Failed to build post-quantum (Dilithium3) tx signature");
+        return false;
+      }
+      add_pq_sig_to_extra(tx.extra, pq_sig);
+    }
+
     //check money
     if(summary_outs_money > summary_inputs_money )
     {
@@ -628,7 +671,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const boost::optional<cryptonote::account_public_address>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys, bool rct, const rct::RCTConfig &rct_config, bool use_view_tags)
+  bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const boost::optional<cryptonote::account_public_address>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys, bool rct, const rct::RCTConfig &rct_config, bool use_view_tags, uint8_t hf_version)
   {
     hw::device &hwdev = sender_account_keys.get_device();
     hwdev.open_tx(tx_key);
@@ -652,7 +695,7 @@ namespace cryptonote
       }
 
       bool shuffle_outs = true;
-      bool r = construct_tx_with_tx_key(sender_account_keys, subaddresses, sources, destinations, change_addr, extra, tx, tx_key, additional_tx_keys, rct, rct_config, shuffle_outs, use_view_tags);
+      bool r = construct_tx_with_tx_key(sender_account_keys, subaddresses, sources, destinations, change_addr, extra, tx, tx_key, additional_tx_keys, rct, rct_config, shuffle_outs, use_view_tags, hf_version);
       return r;
     }
   }

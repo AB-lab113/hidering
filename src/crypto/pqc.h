@@ -92,5 +92,33 @@ namespace pqc
   // recover the receiver-side shared secret (matches the sender's on success).
   bool pqc_kem_decaps(const pq_secret_key &sk, const kyber_ciphertext &ct,
                       kyber_shared_secret &ss);
+
+  // Phase 5 (HFv16) — transaction-level Dilithium3 signature.
+  //
+  // The self-contained signature carried in a transaction's `extra` field: the
+  // Dilithium3 verification key plus the signature over the tx prefix hash. Both
+  // are fixed-length, so the on-wire layout (tag + pk + sig) is a simple blob and
+  // a verifier needs nothing beyond the transaction itself to check it.
+  struct pq_tx_sig
+  {
+    uint8_t pk[DILITHIUM3_PUBLIC_KEY_BYTES];
+    uint8_t sig[DILITHIUM3_SIGNATURE_BYTES];
+  };
+
+  // Sign a transaction prefix hash with a raw Dilithium3 secret key, filling the
+  // public key + signature into `out_sig`. `sk`/`sk_len` is the raw Dilithium3
+  // signing key (sk_len must equal DILITHIUM3_SECRET_KEY_BYTES); the matching
+  // public key must be supplied separately by the caller (out_sig.pk is filled
+  // from `pk`). Returns false if liboqs lacks the algorithm, a size mismatches,
+  // or signing fails.
+  bool pqc_tx_sign(const uint8_t *tx_prefix_hash, size_t hash_len,
+                   const uint8_t *sk, size_t sk_len,
+                   const uint8_t *pk, size_t pk_len,
+                   pq_tx_sig &out_sig);
+
+  // Verify the Dilithium3 signature in `sig` (carrying its own public key) over
+  // the given transaction prefix hash. Returns true iff valid.
+  bool pqc_tx_verify(const uint8_t *tx_prefix_hash, size_t hash_len,
+                     const pq_tx_sig &sig);
 }
 }
