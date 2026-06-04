@@ -10517,7 +10517,10 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       if (merge_destinations)
       {
         std::vector<cryptonote::tx_destination_entry>::iterator i;
-        i = std::find_if(dsts.begin(), dsts.end(), [&](const cryptonote::tx_destination_entry &d) { return !memcmp (&d.addr, &de.addr, sizeof(de.addr)); });
+        // HIDERING Phase 5: compare Ed25519 keys only (account_public_address::operator==).
+        // A raw memcmp would also compare the optional pq_kyber_pk bytes added in Step 5,
+        // so two identical B... addresses could spuriously mismatch.
+        i = std::find_if(dsts.begin(), dsts.end(), [&](const cryptonote::tx_destination_entry &d) { return d.addr == de.addr; });
         if (i == dsts.end())
         {
           if (dsts.size() >= max_dsts)
@@ -10541,7 +10544,9 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
           dsts.back().amount = 0;
           dsts_are_fee_subtractable.push_back(subtracting_fee);
         }
-        THROW_WALLET_EXCEPTION_IF(memcmp(&dsts[original_output_index].addr, &de.addr, sizeof(de.addr)), error::wallet_internal_error, "Mismatched destination address");
+        // HIDERING Phase 5: compare Ed25519 keys only (account_public_address::operator!=).
+        // A raw memcmp would also compare the optional pq_kyber_pk bytes added in Step 5.
+        THROW_WALLET_EXCEPTION_IF(dsts[original_output_index].addr != de.addr, error::wallet_internal_error, "Mismatched destination address");
         dsts[original_output_index].amount += amount;
       }
       return true;
@@ -10995,7 +11000,8 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
           LOG_PRINT_L2("Attempting to carve tx fee " << print_money(needed_fee) << " from partial payment (first pass)");
           std::vector<cryptonote::tx_destination_entry>::iterator i;
           i = std::find_if(tx.dsts.begin(), tx.dsts.end(),
-          [&](const cryptonote::tx_destination_entry &d) { return !memcmp (&d.addr, &dsts[0].addr, sizeof(dsts[0].addr)); });
+          // HIDERING Phase 5: compare Ed25519 keys only (see operator== note above).
+          [&](const cryptonote::tx_destination_entry &d) { return d.addr == dsts[0].addr; });
           THROW_WALLET_EXCEPTION_IF(i == tx.dsts.end(), error::wallet_internal_error, "paid address not found in outputs");
           if (i->amount > needed_fee)
           {
