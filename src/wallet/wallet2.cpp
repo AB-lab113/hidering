@@ -101,6 +101,7 @@ extern "C"
 #include "crypto/keccak.h"
 #include "crypto/crypto-ops.h"
 }
+#include "crypto/pqc.h"
 using namespace std;
 using namespace crypto;
 using namespace cryptonote;
@@ -2227,6 +2228,11 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
   {
     bool r = cryptonote::generate_key_image_helper_precomp(m_account.get_keys(), output_public_key, tx_scan_info.received->derivation, i, tx_scan_info.received->index, tx_scan_info.in_ephemeral, tx_scan_info.ki, m_account.get_device());
     THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
+    // HIDERING Phase 5 (HFv16): for a BQ... output the one-time key was tweaked by the
+    // sender's Kyber768 KEM; fold the recovered tweak into in_ephemeral so the secret
+    // matches the on-chain (tweaked) output key BEFORE the consistency check. No-op for
+    // wallets without a Kyber768 key (every wallet on the live chain).
+    apply_pq_output_tweak(tx, tx_scan_info);
     THROW_WALLET_EXCEPTION_IF(tx_scan_info.in_ephemeral.pub != output_public_key,
         error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
   }
@@ -2248,6 +2254,61 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
   tx_money_got_in_outs[tx_scan_info.received->index] += tx_scan_info.money_transfered;
   tx_scan_info.amount = tx_scan_info.money_transfered;
   ++num_vouts_received;
+}
+//----------------------------------------------------------------------------------------------------
+namespace
+{
+  // HIDERING Phase 5 (HFv16): extract the Kyber768 ciphertext appended to tx.extra under
+  // TX_EXTRA_TAG_KYBER_CT. cryptonote_tx_utils writes it as a raw [tag | ct(1088)] blob
+  // after sort_tx_extra and before the trailing Dilithium3 signature, so it is not a
+  // registered tx_extra field; we scan for the tag and read the fixed-length payload.
+  // Returns the first one found (single BQ... output per tx in this Phase-5 stage).
+  bool get_kyber_ct_from_tx_extra(const std::vector<uint8_t>& extra, crypto::pqc::kyber_ciphertext& ct)
+  {
+    constexpr size_t CT = crypto::pqc::KYBER768_CIPHERTEXT_BYTES;
+    for (size_t i = 0; i < extra.size(); )
+    {
+      if (extra[i] == TX_EXTRA_TAG_KYBER_CT && i + 1 + CT <= extra.size())
+      {
+        memcpy(ct.ct, extra.data() + i + 1, CT);
+        return true;
+      }
+      ++i;
+    }
+    return false;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::apply_pq_output_tweak(const cryptonote::transaction &tx, tx_scan_info_t &tx_scan_info) const
+{
+  // Gate on the wallet actually owning a Kyber768 decapsulation key. pq_keys is
+  // boost::none for every existing/classic wallet, so this returns immediately and the
+  // live-chain scan path is byte-for-byte unchanged (one boolean test). Multisig and
+  // background (view-only) syncing have no usable in_ephemeral secret, so skip them.
+  if (!m_account.get_keys().pq_keys || m_multisig || m_background_syncing)
+    return;
+
+  crypto::pqc::kyber_ciphertext ct;
+  if (!get_kyber_ct_from_tx_extra(tx.extra, ct))
+    return; // not a BQ... (post-quantum) output
+
+  crypto::pqc::kyber_shared_secret ss;
+  if (!crypto::pqc::pqc_stealth_decaps(*m_account.get_keys().pq_keys, ct, ss))
+  {
+    MWARNING("Kyber768 decapsulation failed for a candidate BQ... output; leaving key untweaked");
+    return;
+  }
+
+  // Recover the same tweak the sender mixed in: P' = P + H_s(ss)*G, so the matching
+  // one-time secret is x' = x + H_s(ss). Fold H_s(ss) into in_ephemeral.sec and
+  // recompute the public key / key image to match the on-chain output key.
+  crypto::secret_key kyber_tweak;
+  crypto::hash_to_scalar(ss.ss, sizeof(ss.ss), reinterpret_cast<crypto::ec_scalar&>(kyber_tweak));
+  sc_add(reinterpret_cast<unsigned char*>(&tx_scan_info.in_ephemeral.sec),
+         reinterpret_cast<const unsigned char*>(&tx_scan_info.in_ephemeral.sec),
+         reinterpret_cast<const unsigned char*>(&kyber_tweak));
+  crypto::secret_key_to_public_key(tx_scan_info.in_ephemeral.sec, tx_scan_info.in_ephemeral.pub);
+  crypto::generate_key_image(tx_scan_info.in_ephemeral.pub, tx_scan_info.in_ephemeral.sec, tx_scan_info.ki);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::hash &txid, tx_cache_data &tx_cache_data) const
@@ -7805,9 +7866,12 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
     rct::RCTConfig rct_config = sd.rct_config;
     crypto::secret_key tx_key;
     std::vector<crypto::secret_key> additional_tx_keys;
-    // TODO Phase 5 caveat 2: pass the real hf_version as the trailing argument so
-    // BQ.../Dilithium3 paths activate at HFv16. Omitted → defaults to 0 → all
-    // post-quantum logic stays inert (correct for the live chain pre-fork).
+    // HIDERING Phase 5 caveat 2: this is the cold-signing path (signing exported txs on
+    // an offline machine with no daemon), so we cannot query the hard-fork version —
+    // get_pq_hf_version() / use_fork_rules() require a daemon. hf_version therefore stays
+    // at its default 0, keeping the post-quantum paths inert. This is correct pre-fork;
+    // once HFv16 cold-signing is needed, the hf version must be threaded into the
+    // exported unsigned-tx set (tx_construction_data) rather than fetched live.
     bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sd.sources, sd.splitted_dsts, sd.change_dts.addr, sd.extra, ptx.tx, tx_key, additional_tx_keys, sd.use_rct, rct_config, sd.use_view_tags);
     THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sd.sources, sd.splitted_dsts, m_nettype);
     // we don't test tx size, because we don't know the current limit, due to not having a blockchain,
@@ -9803,10 +9867,10 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   crypto::secret_key tx_key;
   std::vector<crypto::secret_key> additional_tx_keys;
   LOG_PRINT_L2("constructing tx");
-  // TODO Phase 5 caveat 2: pass the real hf_version as the trailing argument so
-  // BQ.../Dilithium3 paths activate at HFv16. Omitted → defaults to 0 → all
-  // post-quantum logic stays inert (correct for the live chain pre-fork).
-  bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, false, {}, use_view_tags);
+  // HIDERING Phase 5 (caveat 2 resolved): pass the real hard-fork version so the
+  // BQ.../Dilithium3 paths activate exactly at HFv16. get_pq_hf_version() returns 0
+  // on the live chain (hf 15), keeping all post-quantum logic inert pre-fork.
+  bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, false, {}, use_view_tags, get_pq_hf_version());
   LOG_PRINT_L2("constructed tx, r="<<r);
   THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, splitted_dsts, m_nettype);
   THROW_WALLET_EXCEPTION_IF(upper_transaction_weight_limit <= get_transaction_weight(tx), error::tx_too_big, tx, upper_transaction_weight_limit);
@@ -10071,10 +10135,10 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   }
   else {
     // make a normal tx
-    // TODO Phase 5 caveat 2: pass the real hf_version as the trailing argument so
-    // BQ.../Dilithium3 paths activate at HFv16. Omitted → defaults to 0 → all
-    // post-quantum logic stays inert (correct for the live chain pre-fork).
-    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, true, rct_config, use_view_tags);
+    // HIDERING Phase 5 (caveat 2 resolved): pass the real hard-fork version so the
+    // BQ.../Dilithium3 paths activate exactly at HFv16. get_pq_hf_version() returns 0
+    // on the live chain (hf 15), keeping all post-quantum logic inert pre-fork.
+    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, true, rct_config, use_view_tags, get_pq_hf_version());
     LOG_PRINT_L2("constructed tx, r="<<r);
     THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, dsts, m_nettype);
   }
@@ -11583,6 +11647,16 @@ bool wallet2::use_fork_rules(uint8_t version, int64_t early_blocks)
   else
     LOG_PRINT_L2("Not using v" << (unsigned)version << " rules");
   return close_enough;
+}
+//----------------------------------------------------------------------------------------------------
+uint8_t wallet2::get_pq_hf_version()
+{
+  // HIDERING Phase 5: only report HF_VERSION_PQ once the daemon says HFv16 rules apply.
+  // On the live chain (hf 15) use_fork_rules(HF_VERSION_PQ) is false → returns 0 → the
+  // BQ.../Dilithium3 construction paths stay inert. Offline → 0 (no daemon to ask).
+  if (m_offline)
+    return 0;
+  return use_fork_rules(HF_VERSION_PQ, 0) ? HF_VERSION_PQ : 0;
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_upper_transaction_weight_limit()

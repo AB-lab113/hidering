@@ -1265,7 +1265,9 @@ void message_store::send_message(const multisig_wallet_state &state, uint32_t id
     public_key = me.auto_config_public_key;
     dm.destination_transport_address = me.auto_config_transport_address;
     // The destination Monero address is not yet known
-    memset(&dm.destination_monero_address, 0, sizeof(cryptonote::account_public_address));
+    // HIDERING Phase 5: account_public_address is no longer trivially copyable (it
+    // gained an optional Kyber768 key), so value-initialize instead of memset.
+    dm.destination_monero_address = cryptonote::account_public_address{};
   }
   else
   {

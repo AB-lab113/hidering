@@ -430,6 +430,14 @@ namespace cryptonote
     // here and appended to tx.extra after the classic fields are sorted (below).
     // Stays empty on the live chain (no destination is flagged is_pq pre-fork).
     std::vector<crypto::pqc::kyber_ciphertext> kyber_cts;
+
+    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): mark each post-quantum
+    // BQ... destination from its parsed address. is_pq() is false for every classic
+    // B... address, so this is a no-op on the live chain; combined with the HFv16
+    // height gate below, the Kyber768 output path stays doubly inert pre-fork.
+    for (tx_destination_entry& dst_entr : destinations)
+      dst_entr.is_pq = dst_entr.addr.is_pq();
+
     //fill outputs
     size_t output_index = 0;
     for(const tx_destination_entry& dst_entr: destinations)
@@ -454,18 +462,15 @@ namespace cryptonote
       // and is_pq is never set on the live chain, so this is doubly inert pre-fork.
       if (hf_version >= HF_VERSION_PQ && dst_entr.is_pq)
       {
-        // TODO Phase 5: the recipient's Kyber768 public key must come from the BQ...
-        // destination address. account_public_address cannot yet carry a 1184-byte
-        // Kyber key (only 32-byte spend/view keys), so until the BQ address format +
-        // wallet plumbing land we encapsulate against a throwaway recipient keypair.
-        // This keeps the path compilable/exercisable with zero consensus impact
-        // (no BQ output is constructible on the current chain).
-        crypto::pqc::pq_public_key recip_pk;
-        crypto::pqc::pq_secret_key recip_sk;
+        // Phase 5 Step 5: encapsulate against the recipient's REAL Kyber768 public key,
+        // now carried by the BQ... destination address (account_public_address::pq_kyber_pk,
+        // populated by get_account_address_from_str_pq()). is_pq is only ever set from
+        // addr.is_pq(), so the key is guaranteed present here.
+        CHECK_AND_ASSERT_MES(dst_entr.addr.pq_kyber_pk, false,
+            "BQ... destination flagged is_pq but carries no Kyber768 public key");
         crypto::pqc::kyber_ciphertext kct;
         crypto::pqc::kyber_shared_secret kss;
-        if (!crypto::pqc::pqc_keygen(recip_pk, recip_sk)
-            || !crypto::pqc::pqc_stealth_encaps(recip_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES, kct, kss))
+        if (!crypto::pqc::pqc_stealth_encaps(dst_entr.addr.pq_kyber_pk->data(), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES, kct, kss))
         {
           LOG_ERROR("Failed to build post-quantum (Kyber768) stealth encapsulation");
           return false;

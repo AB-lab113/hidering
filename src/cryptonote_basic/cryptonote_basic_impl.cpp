@@ -39,8 +39,10 @@ using namespace epee;
 #include "misc_language.h"
 #include "common/base58.h"
 #include "crypto/hash.h"
+#include "crypto/pqc.h"
 #include "int-util.h"
 #include "common/dns_utils.h"
+#include <array>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "cn"
@@ -314,6 +316,78 @@ namespace cryptonote {
       info.has_payment_id = false;
     }
 
+    return true;
+  }
+  //-----------------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16): post-quantum BQ... address payload layout.
+  // A BQ... address base58-encodes, under ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX
+  // (0x3C11 → the encoded string begins "BQ"):
+  //   m_spend_public_key (32) | m_view_public_key (32) | kyber768_pk (1184)
+  // The Kyber768 key is carried out-of-band of account_public_address's standard
+  // object serialization (which only covers the two Ed25519 keys), so classic B...
+  // addresses are entirely unaffected.
+  static constexpr size_t PQ_ADDRESS_PAYLOAD_SIZE =
+      2 * sizeof(crypto::public_key) + crypto::pqc::KYBER768_PUBLIC_KEY_BYTES;
+  //-----------------------------------------------------------------------
+  std::string get_account_address_as_str_pq(
+      network_type /*nettype*/
+    , account_public_address const & adr
+    )
+  {
+    // BQ... addresses are mainnet-only for now (single ::config prefix).
+    CHECK_AND_ASSERT_MES(adr.is_pq(), std::string(), "get_account_address_as_str_pq: address carries no Kyber768 key");
+
+    std::string blob;
+    blob.reserve(PQ_ADDRESS_PAYLOAD_SIZE);
+    blob.append(reinterpret_cast<const char*>(&adr.m_spend_public_key), sizeof(crypto::public_key));
+    blob.append(reinterpret_cast<const char*>(&adr.m_view_public_key), sizeof(crypto::public_key));
+    blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    return tools::base58::encode_addr(::config::CRYPTONOTE_PQ_ADDRESS_PREFIX, blob);
+  }
+  //-----------------------------------------------------------------------
+  bool get_account_address_from_str_pq(
+      account_public_address& addr
+    , std::string const & str
+    )
+  {
+    blobdata data;
+    uint64_t prefix;
+    if (!tools::base58::decode_addr(str, prefix, data))
+    {
+      LOG_PRINT_L2("Invalid BQ... address format");
+      return false;
+    }
+    if (prefix != ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX)
+    {
+      // Not a post-quantum address — caller should fall back to the classic parser.
+      LOG_PRINT_L2("Not a post-quantum BQ... address: prefix " << prefix
+        << ", expected " << ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX);
+      return false;
+    }
+    if (data.size() != PQ_ADDRESS_PAYLOAD_SIZE)
+    {
+      LOG_PRINT_L1("Wrong BQ... address payload size: " << data.size()
+        << ", expected " << PQ_ADDRESS_PAYLOAD_SIZE);
+      return false;
+    }
+
+    account_public_address out = AUTO_VAL_INIT(out);
+    const char* p = data.data();
+    memcpy(&out.m_spend_public_key, p, sizeof(crypto::public_key));
+    p += sizeof(crypto::public_key);
+    memcpy(&out.m_view_public_key, p, sizeof(crypto::public_key));
+    p += sizeof(crypto::public_key);
+    std::array<uint8_t, 1184> kpk;
+    memcpy(kpk.data(), p, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    out.pq_kyber_pk = kpk;
+
+    if (!crypto::check_key(out.m_spend_public_key) || !crypto::check_key(out.m_view_public_key))
+    {
+      LOG_PRINT_L1("Failed to validate BQ... address Ed25519 keys");
+      return false;
+    }
+
+    addr = out;
     return true;
   }
   //--------------------------------------------------------------------------------

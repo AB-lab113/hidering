@@ -170,7 +170,10 @@ namespace mms
     authorized_signer()
     {
       monero_address_known = false;
-      memset(&monero_address, 0, sizeof(cryptonote::account_public_address));
+      // HIDERING Phase 5: account_public_address is no longer trivially copyable
+      // (it gained an optional Kyber768 key), so value-initialize instead of memset:
+      // zeroes the two Ed25519 keys and leaves the post-quantum key as boost::none.
+      monero_address = cryptonote::account_public_address{};
       me = false;
       index = 0;
       auto_config_public_key = crypto::null_pkey;

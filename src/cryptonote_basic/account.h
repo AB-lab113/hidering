@@ -32,7 +32,9 @@
 
 #include "cryptonote_basic.h"
 #include "crypto/crypto.h"
+#include "crypto/pqc.h"
 #include "serialization/keyvalue_serialization.h"
+#include <boost/optional/optional.hpp>
 
 namespace cryptonote
 {
@@ -45,6 +47,13 @@ namespace cryptonote
     std::vector<crypto::secret_key> m_multisig_keys;
     hw::device *m_device = &hw::get_device("default");
     crypto::chacha_iv m_encryption_iv;
+
+    // HIDERING Phase 5 (HFv16): the wallet's Kyber768 decapsulation keypair, present
+    // only for accounts owning a BQ... address. Defaults to boost::none, so every
+    // existing account is unaffected and the field is NOT serialized (absent from the
+    // KV map below and from account_boost_serialization.h) — existing wallet files and
+    // their on-disk layout are byte-for-byte unchanged.
+    boost::optional<crypto::pqc::pq_stealth_keys> pq_keys;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_account_address)

@@ -1541,6 +1541,10 @@ private:
     uint8_t get_current_hard_fork();
     void get_hard_fork_info(uint8_t version, uint64_t &earliest_height);
     bool use_fork_rules(uint8_t version, int64_t early_blocks = 0);
+    // HIDERING Phase 5: HF_VERSION_PQ once the post-quantum fork (HFv16) is active per
+    // the connected daemon, else 0 (post-quantum tx paths stay inert). Returns 0 when
+    // offline — no daemon to consult — which is correct for the pre-fork live chain.
+    uint8_t get_pq_hf_version();
     fee_algorithm get_fee_algorithm();
 
     std::string get_wallet_file() const;
@@ -1860,6 +1864,14 @@ private:
     bool should_pick_a_second_output(bool use_rct, size_t n_transfers, const std::vector<size_t> &unused_transfers_indices, const std::vector<size_t> &unused_dust_indices) const;
     std::vector<size_t> get_only_rct(const std::vector<size_t> &unused_dust_indices, const std::vector<size_t> &unused_transfers_indices) const;
     void scan_output(const cryptonote::transaction &tx, bool miner_tx, const crypto::public_key &tx_pub_key, size_t i, tx_scan_info_t &tx_scan_info, int &num_vouts_received, std::unordered_map<cryptonote::subaddress_index, uint64_t> &tx_money_got_in_outs, std::vector<size_t> &outs, bool pool);
+    // HIDERING Phase 5 (HFv16): if this wallet holds a Kyber768 decapsulation key
+    // (account_keys::pq_keys) and `tx` carries a Kyber768 ciphertext, recover the
+    // post-quantum tweak and fold it into tx_scan_info.in_ephemeral so the spend
+    // secret / key image match the tweaked one-time output key of a BQ... output.
+    // No-op (returns immediately) for every wallet without pq_keys, i.e. all wallets
+    // on the live chain. Called from scan_output before the in_ephemeral/output-key
+    // consistency check.
+    void apply_pq_output_tweak(const cryptonote::transaction &tx, tx_scan_info_t &tx_scan_info) const;
     void trim_hashchain();
     crypto::key_image get_multisig_composite_key_image(size_t n) const;
     rct::multisig_kLRki get_multisig_composite_kLRki(size_t n,  const std::unordered_set<crypto::public_key> &ignore_set, std::unordered_set<rct::key> &used_L, std::unordered_set<rct::key> &new_used_L) const;

@@ -32,7 +32,10 @@
 
 #include <boost/variant.hpp>
 #include <boost/functional/hash/hash.hpp>
+#include <boost/optional/optional.hpp>
 #include <vector>
+#include <array>
+#include <cstdint>
 #include <cstring>  // memcmp
 #include <sstream>
 #include <atomic>
@@ -581,6 +584,18 @@ namespace cryptonote
   {
     crypto::public_key m_spend_public_key;
     crypto::public_key m_view_public_key;
+
+    // HIDERING Phase 5 (HFv16): post-quantum BQ... addresses additionally carry a
+    // Kyber768 encapsulation key (1184 bytes = crypto::pqc::KYBER768_PUBLIC_KEY_BYTES).
+    // It is present ONLY for BQ... addresses (is_pq() == true). Classic B... addresses
+    // leave it boost::none. The field is intentionally absent from BOTH serialization
+    // maps below (and from account_boost_serialization.h), so the on-wire / base58 /
+    // wallet-file encoding of classic B... addresses is byte-for-byte unchanged; the
+    // BQ... key is (de)serialized out-of-band by get_account_address_{as,from}_str_pq().
+    boost::optional<std::array<uint8_t, 1184>> pq_kyber_pk;
+
+    // True iff this is a post-quantum BQ... address (carries a Kyber768 key).
+    bool is_pq() const { return pq_kyber_pk.is_initialized(); }
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(m_spend_public_key)

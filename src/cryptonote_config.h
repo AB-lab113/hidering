@@ -279,8 +279,14 @@ namespace config
   uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 60;
   uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 61;
   uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 62;
-  // Phase 5 (HFv16): post-quantum BQ... addresses carrying a Dilithium3 + Kyber768
-  // public key. Two-byte base58 prefix (0x3C11) so the encoded address begins "BQ".
+  // Phase 5 (HFv16): post-quantum address tag carrying a Dilithium3 + Kyber768 public
+  // key. The numeric base58 prefix is 0x3C11; get_account_address_{as,from}_str_pq()
+  // key on this value. NB: the human-readable address does NOT actually begin "BQ" —
+  // the leading characters are a property of base58 encode_addr over the full
+  // (varint(tag)||payload||checksum) blob and the 1184-byte Kyber payload (observed
+  // leading chars "RLF..."). Tuning the tag so the rendered prefix is mnemonic ("BQ")
+  // is part of the remaining Step 5 address-format finalization; the constant is kept
+  // at 0x3C11 for now so the gated, inactive plumbing round-trips consistently.
   uint64_t const CRYPTONOTE_PQ_ADDRESS_PREFIX = 0x3C11;
   uint16_t const P2P_DEFAULT_PORT = 19740;
   uint16_t const RPC_DEFAULT_PORT = 19741;
