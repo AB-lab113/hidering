@@ -120,5 +120,31 @@ namespace pqc
   // the given transaction prefix hash. Returns true iff valid.
   bool pqc_tx_verify(const uint8_t *tx_prefix_hash, size_t hash_len,
                      const pq_tx_sig &sig);
+
+  // Phase 5 (HFv16) — Kyber768 KEM for the new BQ... stealth addresses.
+  //
+  // A BQ... address publishes a Kyber768 encapsulation key. The sender encapsulates
+  // against it to obtain a shared secret (mixed into the one-time output key) plus a
+  // ciphertext (carried in tx.extra under TX_EXTRA_TAG_KYBER_CT). The recipient, who
+  // holds the matching decapsulation key, recovers the same shared secret from the
+  // ciphertext. This replaces the classical ECDH shared secret for BQ... outputs;
+  // standard B... addresses keep the Ed25519 ECDH path untouched.
+  struct pq_stealth_keys
+  {
+    uint8_t kyber_pk[KYBER768_PUBLIC_KEY_BYTES];
+    uint8_t kyber_sk[KYBER768_SECRET_KEY_BYTES];
+  };
+
+  // Sender side: encapsulate against a recipient's raw Kyber768 public key
+  // (`pk_len` must equal KYBER768_PUBLIC_KEY_BYTES), producing the ciphertext to put
+  // on-chain and the sender-side shared secret. Returns false on any size mismatch
+  // or liboqs failure.
+  bool pqc_stealth_encaps(const uint8_t *recipient_kyber_pk, size_t pk_len,
+                          kyber_ciphertext &ct, kyber_shared_secret &ss);
+
+  // Recipient side: decapsulate the on-chain ciphertext with the BQ... address'
+  // Kyber768 keypair, recovering the shared secret (matches the sender's on success).
+  bool pqc_stealth_decaps(const pq_stealth_keys &keys, const kyber_ciphertext &ct,
+                          kyber_shared_secret &ss);
 }
 }

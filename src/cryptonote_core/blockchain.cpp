@@ -3290,6 +3290,15 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       tvc.m_verifivation_failed = true;
       return false;
     }
+
+    // HIDERING Phase 5 (HFv16): any TX_EXTRA_TAG_KYBER_CT fields (Kyber768
+    // ciphertexts for BQ... outputs) sit before this trailing Dilithium3 signature,
+    // so the offset math above is unaffected. They are deliberately NOT validated
+    // here: consensus holds no recipient key and cannot decapsulate. Recovery is a
+    // wallet-side concern — on output scan, a BQ... wallet pulls its ciphertext from
+    // tx.extra and calls crypto::pqc::pqc_stealth_decaps to reproduce the shared
+    // secret folded into the one-time key (see generate_output_ephemeral_keys mixing
+    // in cryptonote_tx_utils.cpp). TODO Phase 5: wire that scan path into wallet2.
   }
 
   if (hf_version >= HF_VERSION_MIN_2_OUTPUTS)

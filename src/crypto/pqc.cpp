@@ -145,5 +145,39 @@ namespace pqc
     if (sig != nullptr) OQS_SIG_free(sig);
     return ok;
   }
+
+  bool pqc_stealth_encaps(const uint8_t *recipient_kyber_pk, size_t pk_len,
+                          kyber_ciphertext &ct, kyber_shared_secret &ss)
+  {
+    if (recipient_kyber_pk == nullptr || pk_len != KYBER768_PUBLIC_KEY_BYTES)
+      return false;
+
+    bool ok = false;
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    if (kem != nullptr
+        && kem->length_public_key == KYBER768_PUBLIC_KEY_BYTES
+        && kem->length_ciphertext == KYBER768_CIPHERTEXT_BYTES
+        && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+    {
+      ok = OQS_KEM_encaps(kem, ct.ct, ss.ss, recipient_kyber_pk) == OQS_SUCCESS;
+    }
+    if (kem != nullptr) OQS_KEM_free(kem);
+    return ok;
+  }
+
+  bool pqc_stealth_decaps(const pq_stealth_keys &keys, const kyber_ciphertext &ct,
+                          kyber_shared_secret &ss)
+  {
+    bool ok = false;
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    if (kem != nullptr
+        && kem->length_secret_key == KYBER768_SECRET_KEY_BYTES
+        && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+    {
+      ok = OQS_KEM_decaps(kem, ss.ss, ct.ct, keys.kyber_sk) == OQS_SUCCESS;
+    }
+    if (kem != nullptr) OQS_KEM_free(kem);
+    return ok;
+  }
 }
 }

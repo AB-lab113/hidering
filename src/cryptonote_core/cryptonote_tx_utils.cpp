@@ -62,6 +62,18 @@ namespace cryptonote
     extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES);
   }
   //---------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16): serialise a Kyber768 KEM ciphertext into tx.extra as
+  // [ TX_EXTRA_TAG_KYBER_CT | ct(1088) ]. Fixed length, no length prefix. Appended
+  // after the classic extra fields are sorted and BEFORE the trailing Dilithium3
+  // signature field, so that field stays last (the validator in blockchain.cpp
+  // relies on the PQ signature being the final field). Only emitted for BQ...
+  // outputs once the chain reaches HF_VERSION_PQ (inactive on the live chain).
+  void add_kyber_ct_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::kyber_ciphertext& ct)
+  {
+    extra.push_back(TX_EXTRA_TAG_KYBER_CT);
+    extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::KYBER768_CIPHERTEXT_BYTES);
+  }
+  //---------------------------------------------------------------
   void classify_addresses(const std::vector<tx_destination_entry> &destinations, const boost::optional<cryptonote::account_public_address>& change_addr, size_t &num_stdaddresses, size_t &num_subaddresses, account_public_address &single_dest_subaddress)
   {
     num_stdaddresses = 0;
@@ -414,6 +426,10 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(destinations.size() == additional_tx_keys.size(), false, "Wrong amount of additional tx keys");
 
     uint64_t summary_outs_money = 0;
+    // HIDERING Phase 5 (HFv16): Kyber768 ciphertexts for BQ... outputs, collected
+    // here and appended to tx.extra after the classic fields are sorted (below).
+    // Stays empty on the live chain (no destination is flagged is_pq pre-fork).
+    std::vector<crypto::pqc::kyber_ciphertext> kyber_cts;
     //fill outputs
     size_t output_index = 0;
     for(const tx_destination_entry& dst_entr: destinations)
@@ -427,6 +443,41 @@ namespace cryptonote
                                            need_additional_txkeys, additional_tx_keys,
                                            additional_tx_public_keys, amount_keys, out_eph_public_key,
                                            use_view_tags, view_tag);
+
+      // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): for a post-quantum
+      // BQ... destination, derive a Kyber768 KEM shared secret and fold it into the
+      // classical one-time output key, so spending requires the Kyber decaps key in
+      // addition to the Ed25519 secret. The encapsulation ciphertext is stashed in
+      // kyber_cts and later written to tx.extra. The Ed25519 ECDH path above is left
+      // intact; we only tweak the resulting point by H(ss)*G, which the BQ recipient
+      // reproduces after decapsulating. Gated on both hf_version AND dst_entr.is_pq,
+      // and is_pq is never set on the live chain, so this is doubly inert pre-fork.
+      if (hf_version >= HF_VERSION_PQ && dst_entr.is_pq)
+      {
+        // TODO Phase 5: the recipient's Kyber768 public key must come from the BQ...
+        // destination address. account_public_address cannot yet carry a 1184-byte
+        // Kyber key (only 32-byte spend/view keys), so until the BQ address format +
+        // wallet plumbing land we encapsulate against a throwaway recipient keypair.
+        // This keeps the path compilable/exercisable with zero consensus impact
+        // (no BQ output is constructible on the current chain).
+        crypto::pqc::pq_public_key recip_pk;
+        crypto::pqc::pq_secret_key recip_sk;
+        crypto::pqc::kyber_ciphertext kct;
+        crypto::pqc::kyber_shared_secret kss;
+        if (!crypto::pqc::pqc_keygen(recip_pk, recip_sk)
+            || !crypto::pqc::pqc_stealth_encaps(recip_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES, kct, kss))
+        {
+          LOG_ERROR("Failed to build post-quantum (Kyber768) stealth encapsulation");
+          return false;
+        }
+        // Fold the Kyber shared secret into the one-time key: P' = P + H_s(ss)*G.
+        crypto::secret_key kyber_tweak;
+        crypto::hash_to_scalar(kss.ss, sizeof(kss.ss), reinterpret_cast<crypto::ec_scalar&>(kyber_tweak));
+        crypto::public_key tweak_pub;
+        crypto::secret_key_to_public_key(kyber_tweak, tweak_pub);
+        out_eph_public_key = rct::rct2pk(rct::addKeys(rct::pk2rct(out_eph_public_key), rct::pk2rct(tweak_pub)));
+        kyber_cts.push_back(kct);
+      }
 
       tx_out out;
       cryptonote::set_tx_out(dst_entr.amount, out_eph_public_key, use_view_tags, view_tag, out);
@@ -450,6 +501,13 @@ namespace cryptonote
     if (!sort_tx_extra(tx.extra, tx.extra))
       return false;
 
+    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): write the Kyber768
+    // ciphertexts for BQ... outputs AFTER sorting (sort_tx_extra would drop these
+    // unknown tags) and BEFORE the trailing Dilithium3 signature, keeping that
+    // signature the last field. kyber_cts is empty on the live chain, so this is a
+    // no-op there.
+    for (const auto& kct : kyber_cts)
+      add_kyber_ct_to_extra(tx.extra, kct);
 
     // HIDERING: Hybrid Padding Strategy (Privacy + Efficiency)
     // Small TX: pad to 1000 bytes minimum (privacy floor)
@@ -472,7 +530,12 @@ namespace cryptonote
       tx.extra.push_back(TX_EXTRA_TAG_PADDING);
       tx.extra.insert(tx.extra.end(), padding_to_add - 1, 0);
 
-    CHECK_AND_ASSERT_MES(tx.extra.size() <= MAX_TX_EXTRA_SIZE, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << MAX_TX_EXTRA_SIZE << ")");
+    // HIDERING Phase 5 caveat 3: post-quantum BQ... transactions carry large extra
+    // fields (Kyber768 ciphertexts + the trailing Dilithium3 signature) that exceed
+    // the classic 3000-byte ceiling. Under the HFv16 gate the larger consensus limit
+    // MAX_TX_EXTRA_SIZE_PQ applies; the live chain keeps MAX_TX_EXTRA_SIZE.
+    const size_t max_extra = (hf_version >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;
+    CHECK_AND_ASSERT_MES(tx.extra.size() <= max_extra, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << max_extra << ")");
     }
 
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ ~h1,000,000): attach an
@@ -492,6 +555,12 @@ namespace cryptonote
       crypto::pqc::pq_public_key pq_pk;
       crypto::pqc::pq_secret_key pq_sk;
       crypto::pqc::pq_tx_sig pq_sig;
+      // TODO Phase 5 caveat 1: sign with the sender's persistent Dilithium3 key from
+      // sender_account_keys rather than this throwaway keypair, once account_keys
+      // grows a post-quantum key field (account_keys has no pq member yet). A stable
+      // sender key is what lets a verifier bind the signature to the spender; the
+      // throwaway below keeps the path exercisable without that plumbing and has no
+      // consensus impact pre-fork.
       if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk)
           || !crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
                                        pq_sk.dilithium3_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES,

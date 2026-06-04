@@ -227,6 +227,13 @@
 // hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 
+// Phase 5 (HFv16): tx_extra tag carrying a Kyber768 KEM ciphertext (1088 bytes)
+// for a BQ... post-quantum stealth output. One such field is emitted per BQ...
+// destination, before the trailing Dilithium3 signature field. Tag 0x07 is unused
+// by the classic tx_extra tags. Only emitted once hf_version >= HF_VERSION_PQ;
+// pre-fork transactions never carry it.
+static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;
+
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 #define CRYPTONOTE_SCALING_2021_FEE_ROUNDING_PLACES 2
 
@@ -249,6 +256,17 @@ static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 //a custom tag (1 byte) and up to 32 bytes of custom data for each recipient.
 // (1+32) + (1+1+16*32) + (1+16*32) = 1060
 #define MAX_TX_EXTRA_SIZE                       3000
+
+// Phase 5 caveat 3 — CONSENSUS CHANGE, ACTIVATES WITH HFv16 ONLY.
+// A post-quantum BQ... transaction must fit the Dilithium3 signature field
+// (1 tag + pk 1952 + sig 3293 = 5246 bytes) plus one Kyber768 ciphertext per BQ
+// output (1 tag + 1088 bytes), which blows past the classic 3000-byte limit.
+// MAX_TX_EXTRA_SIZE stays 3000 for the live chain (hf < HF_VERSION_PQ) — the
+// tx_pool relay check and non-PQ construction are unchanged. This larger ceiling
+// is consulted ONLY on paths gated by hf_version >= HF_VERSION_PQ, so the current
+// chain is untouched. When HFv16 activates, the gated check below becomes the
+// effective limit for PQ transactions.
+#define MAX_TX_EXTRA_SIZE_PQ                    8192
 
 // New constants are intended to go here
 namespace config

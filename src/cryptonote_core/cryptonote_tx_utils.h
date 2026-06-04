@@ -78,10 +78,17 @@ namespace cryptonote
     account_public_address addr;        //destination address
     bool is_subaddress;
     bool is_integrated;
+    // Phase 5 (HFv16): set when `addr` is a post-quantum BQ... address
+    // (prefix CRYPTONOTE_PQ_ADDRESS_PREFIX 0x3C11). Construction-time hint only —
+    // NOT serialised (it is recoverable from the address prefix at parse time and
+    // must never alter the tx wire format). Defaults false, so every current
+    // caller and the live chain are unaffected. TODO Phase 5: the wallet sets this
+    // when it learns to parse BQ... addresses.
+    bool is_pq;
 
-    tx_destination_entry() : amount(0), addr(AUTO_VAL_INIT(addr)), is_subaddress(false), is_integrated(false) { }
-    tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress) : amount(a), addr(ad), is_subaddress(is_subaddress), is_integrated(false) { }
-    tx_destination_entry(const std::string &o, uint64_t a, const account_public_address &ad, bool is_subaddress) : original(o), amount(a), addr(ad), is_subaddress(is_subaddress), is_integrated(false) { }
+    tx_destination_entry() : amount(0), addr(AUTO_VAL_INIT(addr)), is_subaddress(false), is_integrated(false), is_pq(false) { }
+    tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress) : amount(a), addr(ad), is_subaddress(is_subaddress), is_integrated(false), is_pq(false) { }
+    tx_destination_entry(const std::string &o, uint64_t a, const account_public_address &ad, bool is_subaddress) : original(o), amount(a), addr(ad), is_subaddress(is_subaddress), is_integrated(false), is_pq(false) { }
 
     std::string address(network_type nettype, const crypto::hash &payment_id) const
     {
