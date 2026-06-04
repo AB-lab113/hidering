@@ -2118,7 +2118,7 @@ bool wallet2::frozen(const transfer_details &td) const
   return td.m_frozen;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info) const
+void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak) const
 {
   hw::device &hwdev = m_account.get_device();
   boost::unique_lock<hw::device> hwdev_lock (hwdev);
@@ -2131,6 +2131,17 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
      return;
   }
   tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, output_public_key, derivation, additional_derivations, i, hwdev, get_output_view_tag(o));
+  // HIDERING Phase 5 (HFv16): a BQ... output's on-chain one-time key is P' = P + t*G,
+  // where P is the standard derivation key and t = H_s(Kyber decaps). The standard match
+  // above sees P', not P, so it misses. Retry with the un-tweaked candidate P = P' - t*G
+  // (the view tag is computed from the derivation only, so it still matches). pq_untweak
+  // is nullptr for every classic wallet → this whole block is skipped on the live chain.
+  if (!tx_scan_info.received && pq_untweak)
+  {
+    rct::key candidate;
+    rct::subKeys(candidate, rct::pk2rct(output_public_key), rct::pk2rct(*pq_untweak));
+    tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, rct::rct2pk(candidate), derivation, additional_derivations, i, hwdev, get_output_view_tag(o));
+  }
   if(tx_scan_info.received)
   {
     tx_scan_info.money_transfered = o.amount; // may be 0 for ringct outputs
@@ -2142,12 +2153,18 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
   tx_scan_info.error = false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info) const
+void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak) const
 {
   if (!is_out_data || i >= is_out_data->received.size())
-    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info);
+    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_untweak);
 
   tx_scan_info.received = is_out_data->received[i];
+  // HIDERING Phase 5 (HFv16): the cached is_out_data was precomputed without the BQ...
+  // un-tweak, so it can't see a BQ output. For a wallet owning a Kyber768 key (pq_untweak
+  // set), if the cache says "not received", fall through to the full (un-tweaking) path.
+  // No-op for classic wallets (pq_untweak == nullptr).
+  if (!tx_scan_info.received && pq_untweak)
+    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_untweak);
   if(tx_scan_info.received)
   {
     tx_scan_info.money_transfered = o.amount; // may be 0 for ringct outputs
@@ -2159,12 +2176,12 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
   tx_scan_info.error = false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp_once(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen) const
+void wallet2::check_acc_out_precomp_once(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::public_key *pq_untweak) const
 {
   tx_scan_info.received = boost::none;
   if (already_seen)
     return;
-  check_acc_out_precomp(o, derivation, additional_derivations, i, is_out_data, tx_scan_info);
+  check_acc_out_precomp(o, derivation, additional_derivations, i, is_out_data, tx_scan_info, pq_untweak);
   if (tx_scan_info.received)
     already_seen = true;
 }
@@ -2311,6 +2328,32 @@ void wallet2::apply_pq_output_tweak(const cryptonote::transaction &tx, tx_scan_i
   crypto::generate_key_image(tx_scan_info.in_ephemeral.pub, tx_scan_info.in_ephemeral.sec, tx_scan_info.ki);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_pq_output_untweak_point(const cryptonote::transaction &tx, crypto::public_key &untweak_point) const
+{
+  // Only a wallet owning a Kyber768 decapsulation key (a BQ... wallet) can receive BQ
+  // outputs. pq_keys is boost::none for every classic/live-chain wallet, so this returns
+  // false immediately and the scan path is byte-for-byte unchanged. Multisig and view-only
+  // (background) syncing have no usable secret to tweak, so skip them too.
+  const cryptonote::account_keys &keys = m_account.get_keys();
+  if (!keys.pq_keys || m_multisig || m_background_syncing)
+    return false;
+
+  crypto::pqc::kyber_ciphertext ct;
+  if (!get_kyber_ct_from_tx_extra(tx.extra, ct))
+    return false; // tx carries no Kyber768 (BQ...) output
+
+  crypto::pqc::kyber_shared_secret ss;
+  if (!crypto::pqc::pqc_stealth_decaps(*keys.pq_keys, ct, ss))
+    return false; // ciphertext is not encapsulated to our key
+
+  // Sender folded t = H_s(ss) into the one-time key: P' = P + t*G. Recovering the standard
+  // key for detection is P = P' - t*G, so the point to subtract is t*G.
+  crypto::secret_key t;
+  crypto::hash_to_scalar(ss.ss, sizeof(ss.ss), reinterpret_cast<crypto::ec_scalar&>(t));
+  crypto::secret_key_to_public_key(t, untweak_point);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::hash &txid, tx_cache_data &tx_cache_data) const
 {
   if(!parse_tx_extra(tx.extra, tx_cache_data.tx_extra_fields))
@@ -2392,6 +2435,14 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   std::vector<tx_scan_info_t> tx_scan_info(tx.vout.size());
   std::deque<bool> output_found(tx.vout.size(), false);
   uint64_t total_received_1 = 0;
+
+  // HIDERING Phase 5 (HFv16): for a BQ... wallet, precompute the per-tx Kyber768 un-tweak
+  // point t*G once (it depends on the tx ciphertext, not the output index) and pass it to
+  // the output checks so BQ... outputs are detected. pq_untweak_ptr stays nullptr for every
+  // classic wallet, so the detection path below is byte-for-byte unchanged on the live chain.
+  crypto::public_key pq_untweak;
+  const crypto::public_key *pq_untweak_ptr = get_pq_output_untweak_point(tx, pq_untweak) ? &pq_untweak : nullptr;
+
   while (!tx.vout.empty())
   {
     std::vector<size_t> outs;
@@ -2474,7 +2525,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     }
     else if (miner_tx && m_refresh_type == RefreshOptimizeCoinbase && tx.version < 2)
     {
-      check_acc_out_precomp_once(tx.vout[0], derivation, additional_derivations, 0, is_out_data_ptr, tx_scan_info[0], output_found[0]);
+      check_acc_out_precomp_once(tx.vout[0], derivation, additional_derivations, 0, is_out_data_ptr, tx_scan_info[0], output_found[0], pq_untweak_ptr);
       THROW_WALLET_EXCEPTION_IF(tx_scan_info[0].error, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
       // this assumes that the miner tx pays a single address
@@ -2484,7 +2535,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         // the first one was already checked
         for (size_t i = 1; i < tx.vout.size(); ++i)
         {
-          check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i]);
+          check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_untweak_ptr);
         }
         // then scan all outputs from 0
         hw::device &hwdev = m_account.get_device();
@@ -2509,7 +2560,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     {
       for (size_t i = 0; i < tx.vout.size(); ++i)
       {
-        check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i]);
+        check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_untweak_ptr);
         THROW_WALLET_EXCEPTION_IF(tx_scan_info[i].error, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
         if (tx_scan_info[i].received)
         {
@@ -5755,7 +5806,7 @@ void wallet2::generate(const std::string& wallet_, const epee::wipeable_string& 
  * \return                         The secret key of the generated wallet
  */
 crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wipeable_string& password,
-  const crypto::secret_key& recovery_param, bool recover, bool two_random, bool create_address_file)
+  const crypto::secret_key& recovery_param, bool recover, bool two_random, bool create_address_file, bool use_pq)
 {
   clear();
   prepare_file_names(wallet_);
@@ -5768,6 +5819,16 @@ crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wip
   }
 
   crypto::secret_key retval = m_account.generate(recovery_param, recover, two_random);
+
+  // HIDERING Phase 5 (HFv16): opt-in BQ... address. After the classic Ed25519 keygen,
+  // attach a Kyber768 keypair so m_account.get_keys().m_account_address.is_pq() == true.
+  // Off by default → existing wallets are unaffected (pq_keys stays boost::none).
+  if (use_pq)
+  {
+    THROW_WALLET_EXCEPTION_IF(!cryptonote::generate_pq_keys(m_account.get_keys_nonconst()),
+        error::wallet_internal_error, "Kyber768 BQ... key generation failed");
+    LOG_PRINT_L0("Generated a post-quantum BQ... address: " << cryptonote::get_pq_address_str(m_account.get_keys(), m_nettype));
+  }
 
   init_type(hw::device::device_type::SOFTWARE);
   setup_keys(password);

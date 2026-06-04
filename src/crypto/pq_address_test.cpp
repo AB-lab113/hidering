@@ -51,11 +51,10 @@ static bool test_pq_bq_address()
 
   const std::string bq_addr = get_account_address_as_str_pq(MAINNET, addr);
   printf("BQ address (len %zu, leading %.4s...): %.24s...\n", bq_addr.size(), bq_addr.c_str(), bq_addr.c_str());
-  // NB: the leading characters are determined by base58 encode_addr mechanics over the
-  // full (tag||payload) blob, NOT just the numeric prefix; 0x3C11 over a 1184-byte
-  // payload does not render as literal "BQ". The parser keys on the NUMERIC prefix,
-  // which is what the round-trip below verifies. Cosmetic prefix tuning is part of the
-  // remaining Step 5 address-format finalization.
+  // Step 6: the rendered address now begins with the mnemonic "BQ" — tag 62 plus a fixed
+  // leading marker byte in the payload pin the first two base58 chars (the tag alone
+  // cannot, see cryptonote_config.h). The parser keys on the NUMERIC prefix + payload
+  // size + marker byte, which is what the round-trip below verifies.
 
   account_public_address parsed{};
   if (!get_account_address_from_str_pq(parsed, bq_addr)) { printf("FAIL: BQ parse failed\n"); return false; }

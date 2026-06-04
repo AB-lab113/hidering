@@ -102,10 +102,13 @@ namespace cryptonote {
     );
 
   // HIDERING Phase 5 (HFv16): encode / parse a post-quantum BQ... address that
-  // additionally carries a Kyber768 public key. The parser fills addr.pq_kyber_pk
-  // (so addr.is_pq() becomes true) only when `str` decodes under the BQ... prefix
-  // (::config::CRYPTONOTE_PQ_ADDRESS_PREFIX); for any other prefix it returns false
-  // and the caller should fall back to get_account_address_from_str().
+  // additionally carries a Kyber768 public key. The rendered string begins "BQ"
+  // (tag 62 + a fixed leading marker byte — see cryptonote_config.h). The parser fills
+  // addr.pq_kyber_pk (so addr.is_pq() becomes true) only when `str` decodes under the BQ
+  // prefix (::config::CRYPTONOTE_PQ_ADDRESS_PREFIX), has the expected 1249-byte payload,
+  // and carries the marker byte; otherwise it returns false and the caller should fall
+  // back to get_account_address_from_str(). The size+marker checks keep it distinct from
+  // a subaddress, which shares the numeric prefix 62.
   std::string get_account_address_as_str_pq(
       network_type nettype
     , const account_public_address& adr

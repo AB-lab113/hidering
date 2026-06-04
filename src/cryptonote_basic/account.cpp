@@ -269,6 +269,47 @@ DISABLE_VS_WARNINGS(4244 4345)
     return m_keys;
   }
   //-----------------------------------------------------------------
+  account_keys& account_base::get_keys_nonconst()
+  {
+    return m_keys;
+  }
+  //-----------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16): attach a fresh Kyber768 keypair to `keys`, turning its
+  // account_public_address into a BQ... (post-quantum) address. Additive and opt-in.
+  bool generate_pq_keys(account_keys& keys)
+  {
+    crypto::pqc::pq_public_key pq_pk;
+    crypto::pqc::pq_secret_key pq_sk;
+    if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk))
+    {
+      MERROR("generate_pq_keys: liboqs Kyber768/Dilithium3 keygen failed");
+      return false;
+    }
+
+    // Stealth (KEM) keypair: only the Kyber768 half is needed for BQ... address
+    // derivation. The Dilithium3 half (tx signing) is plumbed separately (Step 3 caveat 1).
+    crypto::pqc::pq_stealth_keys sk{};
+    memcpy(sk.kyber_pk, pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    memcpy(sk.kyber_sk, pq_sk.kyber768_sk, crypto::pqc::KYBER768_SECRET_KEY_BYTES);
+    keys.pq_keys = sk;
+
+    // Publish the Kyber768 public key on the address so is_pq() == true.
+    std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
+    memcpy(kpk.data(), pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    keys.m_account_address.pq_kyber_pk = kpk;
+    return true;
+  }
+  //-----------------------------------------------------------------
+  std::string get_pq_address_str(const account_keys& keys, network_type nettype)
+  {
+    if (!keys.m_account_address.is_pq())
+    {
+      MWARNING("get_pq_address_str: account has no Kyber768 key (not a BQ... address)");
+      return std::string();
+    }
+    return get_account_address_as_str_pq(nettype, keys.m_account_address);
+  }
+  //-----------------------------------------------------------------
   std::string account_base::get_public_address_str(network_type nettype) const
   {
     //TODO: change this code into base 58

@@ -279,15 +279,31 @@ namespace config
   uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 60;
   uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 61;
   uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 62;
-  // Phase 5 (HFv16): post-quantum address tag carrying a Dilithium3 + Kyber768 public
-  // key. The numeric base58 prefix is 0x3C11; get_account_address_{as,from}_str_pq()
-  // key on this value. NB: the human-readable address does NOT actually begin "BQ" —
-  // the leading characters are a property of base58 encode_addr over the full
-  // (varint(tag)||payload||checksum) blob and the 1184-byte Kyber payload (observed
-  // leading chars "RLF..."). Tuning the tag so the rendered prefix is mnemonic ("BQ")
-  // is part of the remaining Step 5 address-format finalization; the constant is kept
-  // at 0x3C11 for now so the gated, inactive plumbing round-trips consistently.
-  uint64_t const CRYPTONOTE_PQ_ADDRESS_PREFIX = 0x3C11;
+  // Phase 5 (HFv16): post-quantum address tag carrying a Kyber768 public key.
+  // get_account_address_{as,from}_str_pq() key on this NUMERIC value.
+  //
+  // Step 6 mnemonic-prefix tuning: the human-readable BQ... address now actually
+  // begins "BQ". The leading base58 chars are a property of encode_addr over the full
+  // (varint(tag)||payload||checksum) blob — they cannot be set by the tag alone, because
+  // a leading 'B' forces a 1-byte tag in [60,65], leaving random spend-key bytes in the
+  // first 8-byte base58 block (so the 2nd char would vary). The fix has two parts:
+  //   1. tag = 62 (the only [60,65] value whose base 2nd-char digit is reachable to 'Q'
+  //      by a positive marker byte; 60->'3',61->'D',62->'N'=21->+marker->'Q'=23, 63..65
+  //      overshoot), and
+  //   2. a fixed CRYPTONOTE_PQ_ADDRESS_MARKER byte prepended to the address payload, which
+  //      pins the 2nd base58 char to 'Q' regardless of the (random) Ed25519/Kyber keys.
+  // Empirically (see Step 6 search) tag 62 + marker in [0x29,0x41] yields a stable "BQ..."
+  // across thousands of random payloads; 0x33 is used.
+  //
+  // COLLISION NOTE: 62 also equals CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX above. It is
+  // the *only* tag that can render literal "BQ", so the prefix is intentionally shared.
+  // This is unambiguous because the two address types differ in decoded payload SIZE
+  // (subaddress = 2*32 = 64 bytes; BQ = marker + 2*32 + 1184 = 1249 bytes): each parser
+  // size-checks before accepting, so a subaddress never parses as BQ and vice-versa.
+  uint64_t const CRYPTONOTE_PQ_ADDRESS_PREFIX = 62;
+  // Fixed leading byte of the BQ... address payload (before spend|view|kyber). Its sole
+  // purpose is to pin the rendered base58 prefix to "BQ"; the parser validates it.
+  uint8_t const CRYPTONOTE_PQ_ADDRESS_MARKER = 0x33;
   uint16_t const P2P_DEFAULT_PORT = 19740;
   uint16_t const RPC_DEFAULT_PORT = 19741;
   uint16_t const ZMQ_RPC_DEFAULT_PORT = 19742;

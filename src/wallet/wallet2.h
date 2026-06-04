@@ -915,11 +915,15 @@ private:
      * \param  recover              Whether it is a restore
      * \param  two_random           Whether it is a non-deterministic wallet
      * \param  create_address_file  Whether to create an address file
+     * \param  use_pq               HIDERING Phase 5 (HFv16): also derive a Kyber768 BQ...
+     *                              keypair (post-quantum address). Defaults to false, so
+     *                              every existing caller produces an identical classic
+     *                              B... wallet (is_pq() == false).
      * \return                      The secret key of the generated wallet
      */
     crypto::secret_key generate(const std::string& wallet, const epee::wipeable_string& password,
       const crypto::secret_key& recovery_param = crypto::secret_key(), bool recover = false,
-      bool two_random = false, bool create_address_file = false);
+      bool two_random = false, bool create_address_file = false, bool use_pq = false);
     /*!
      * \brief Creates a wallet from a public address and a spend/view secret key pair.
      * \param  wallet_                 Name of wallet file
@@ -1845,9 +1849,17 @@ private:
     bool generate_chacha_key_from_secret_keys(crypto::chacha_key &key) const;
     void generate_chacha_key_from_password(const epee::wipeable_string &pass, crypto::chacha_key &key) const;
     crypto::hash get_payment_id(const pending_tx &ptx) const;
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info) const;
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info) const;
-    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen) const;
+    // HIDERING Phase 5 (HFv16): `pq_untweak`, when non-null, is the Kyber768 tweak point
+    // t*G for this tx (see get_pq_output_untweak_point). If the classic match fails, the
+    // candidate key P_onchain - t*G is retried so BQ... outputs (whose one-time key was
+    // tweaked by the sender) are detected. nullptr for every classic wallet → unchanged.
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak = nullptr) const;
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak = nullptr) const;
+    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::public_key *pq_untweak = nullptr) const;
+    // HIDERING Phase 5 (HFv16): if this wallet owns a Kyber768 decaps key and `tx` carries
+    // a Kyber768 ciphertext for us, compute the tweak point t*G (t = H_s(decaps(ct))) and
+    // return true. Returns false (no output) for every classic wallet (pq_keys none).
+    bool get_pq_output_untweak_point(const cryptonote::transaction &tx, crypto::public_key &untweak_point) const;
     void parse_block_round(const cryptonote::blobdata &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const;
     uint64_t get_upper_transaction_weight_limit();
     std::vector<uint64_t> get_unspent_amounts_vector(bool strict);

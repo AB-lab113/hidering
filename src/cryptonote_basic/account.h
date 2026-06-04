@@ -90,6 +90,9 @@ namespace cryptonote
     void create_from_viewkey(const cryptonote::account_public_address& address, const crypto::secret_key& viewkey);
     bool make_multisig(const crypto::secret_key &view_secret_key, const crypto::secret_key &spend_secret_key, const crypto::public_key &spend_public_key, const std::vector<crypto::secret_key> &multisig_keys);
     const account_keys& get_keys() const;
+    // HIDERING Phase 5 (HFv16): mutable access to the keys, used to attach the optional
+    // Kyber768 BQ... keypair (generate_pq_keys). Classic flows never touch pq_keys.
+    account_keys& get_keys_nonconst();
     std::string get_public_address_str(network_type nettype) const;
     std::string get_public_integrated_address_str(const crypto::hash8 &payment_id, network_type nettype) const;
 
@@ -129,4 +132,23 @@ namespace cryptonote
     account_keys m_keys;
     uint64_t m_creation_timestamp;
   };
+
+  // HIDERING Phase 5 (HFv16) — BQ... (post-quantum) account helpers.
+  //
+  // generate_pq_keys() generates a fresh Kyber768 keypair and attaches it to `keys`:
+  //   - keys.pq_keys                       <- the Kyber768 {pk, sk} (decapsulation key)
+  //   - keys.m_account_address.pq_kyber_pk <- the Kyber768 public key (1184 bytes)
+  // so that keys.m_account_address.is_pq() becomes true and a BQ... address can be
+  // rendered/spent. Returns false if liboqs keygen fails. This is purely additive: it
+  // is only ever called for accounts that opt into a BQ... address; classic accounts
+  // leave pq_keys == boost::none and are byte-for-byte unchanged.
+  //
+  // NB (Step 6 scope): pq_keys is NOT serialized (Step 5 kept the wallet file byte-
+  // identical), so the BQ keypair currently lives only for the session in which it was
+  // generated. Persisting it (encrypted, like the Ed25519 secrets) is future work.
+  bool generate_pq_keys(account_keys& keys);
+
+  // Render the BQ... address string for an account that owns a Kyber768 key. Returns an
+  // empty string if keys.m_account_address.is_pq() is false.
+  std::string get_pq_address_str(const account_keys& keys, network_type nettype);
 }

@@ -246,6 +246,16 @@ namespace cryptonote {
       }
       else if (subaddress_prefix == prefix)
       {
+        // HIDERING Phase 5: prefix 62 is shared with the post-quantum BQ... address.
+        // Disambiguate by decoded payload size (subaddress = 64 bytes; BQ = 1249 bytes,
+        // see get_account_address_from_str_pq). parse_binary does not reject trailing
+        // bytes, so without this guard a BQ blob would silently parse as a subaddress.
+        if (data.size() != 2 * sizeof(crypto::public_key))
+        {
+          LOG_PRINT_L2("Prefix " << prefix << " with payload size " << data.size()
+            << " is not a classic subaddress (likely a BQ... post-quantum address)");
+          return false;
+        }
         info.is_subaddress = true;
         info.has_payment_id = false;
       }
@@ -320,14 +330,16 @@ namespace cryptonote {
   }
   //-----------------------------------------------------------------------
   // HIDERING Phase 5 (HFv16): post-quantum BQ... address payload layout.
-  // A BQ... address base58-encodes, under ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX
-  // (0x3C11 → the encoded string begins "BQ"):
-  //   m_spend_public_key (32) | m_view_public_key (32) | kyber768_pk (1184)
-  // The Kyber768 key is carried out-of-band of account_public_address's standard
-  // object serialization (which only covers the two Ed25519 keys), so classic B...
-  // addresses are entirely unaffected.
+  // A BQ... address base58-encodes, under ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX (62):
+  //   marker (1) | m_spend_public_key (32) | m_view_public_key (32) | kyber768_pk (1184)
+  // Step 6: the leading CRYPTONOTE_PQ_ADDRESS_MARKER byte pins the rendered base58 prefix
+  // to "BQ" (the tag alone cannot — see cryptonote_config.h). The Kyber768 key is carried
+  // out-of-band of account_public_address's standard object serialization (which only
+  // covers the two Ed25519 keys), so classic B... addresses are entirely unaffected. The
+  // 1249-byte payload size is also what disambiguates a BQ... address from a subaddress
+  // (64 bytes), which shares the numeric prefix 62.
   static constexpr size_t PQ_ADDRESS_PAYLOAD_SIZE =
-      2 * sizeof(crypto::public_key) + crypto::pqc::KYBER768_PUBLIC_KEY_BYTES;
+      1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::KYBER768_PUBLIC_KEY_BYTES;
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str_pq(
       network_type /*nettype*/
@@ -339,6 +351,7 @@ namespace cryptonote {
 
     std::string blob;
     blob.reserve(PQ_ADDRESS_PAYLOAD_SIZE);
+    blob.push_back(static_cast<char>(::config::CRYPTONOTE_PQ_ADDRESS_MARKER)); // pins "BQ" prefix
     blob.append(reinterpret_cast<const char*>(&adr.m_spend_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(&adr.m_view_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
@@ -373,6 +386,15 @@ namespace cryptonote {
 
     account_public_address out = AUTO_VAL_INIT(out);
     const char* p = data.data();
+    // Step 6: leading marker byte pins the "BQ" prefix; reject anything else so a blob
+    // that merely shares the (subaddress) prefix 62 and size can't masquerade as BQ.
+    if (static_cast<uint8_t>(*p) != ::config::CRYPTONOTE_PQ_ADDRESS_MARKER)
+    {
+      LOG_PRINT_L1("Wrong BQ... address marker byte: " << (int)static_cast<uint8_t>(*p)
+        << ", expected " << (int)::config::CRYPTONOTE_PQ_ADDRESS_MARKER);
+      return false;
+    }
+    p += 1;
     memcpy(&out.m_spend_public_key, p, sizeof(crypto::public_key));
     p += sizeof(crypto::public_key);
     memcpy(&out.m_view_public_key, p, sizeof(crypto::public_key));
