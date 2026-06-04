@@ -34,6 +34,8 @@
 #include "crypto/crypto.h"
 #include "crypto/pqc.h"
 #include "serialization/keyvalue_serialization.h"
+#include <array>
+#include <cstring>
 #include <boost/optional/optional.hpp>
 
 namespace cryptonote
@@ -62,6 +64,41 @@ namespace cryptonote
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(m_multisig_keys)
       const crypto::chacha_iv default_iv{{0, 0, 0, 0, 0, 0, 0, 0}};
       KV_SERIALIZE_VAL_POD_AS_BLOB_OPT(m_encryption_iv, default_iv)
+      // HIDERING Phase 5 (HFv16): persist the optional Kyber768 BQ keypair (pq_keys).
+      // It is written as a single fixed-size blob (pq_stealth_keys = kyber_pk||kyber_sk,
+      // 3584 B) ONLY for BQ... accounts; classic wallets have pq_keys == boost::none,
+      // emit nothing here, and their key_data stays byte-for-byte unchanged. The secret
+      // half (kyber_sk) is already chacha20-encrypted in place by encrypt()/decrypt()
+      // before this map runs (see xor_with_key_stream), exactly like the Ed25519 secrets;
+      // the public half (kyber_pk) is not secret and stays in the clear.
+      //
+      // We deliberately do NOT add pq_kyber_pk to account_public_address's own
+      // serialization (Step 5 design: keeping B... wire/base58/file bytes identical).
+      // Instead, on load we rehydrate m_account_address.pq_kyber_pk from the (plaintext)
+      // kyber_pk inside the blob, so is_pq() becomes true again for a reloaded BQ wallet.
+      if (is_store)
+      {
+        if (this_ref.pq_keys)
+        {
+          crypto::pqc::pq_stealth_keys pq_blob = *this_ref.pq_keys;
+          epee::serialization::selector<is_store>::serialize_t_val_as_blob(pq_blob, stg, hparent_section, "pq_keys");
+        }
+      }
+      else
+      {
+        crypto::pqc::pq_stealth_keys pq_blob{};
+        if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(pq_blob, stg, hparent_section, "pq_keys"))
+        {
+          this_ref.pq_keys = pq_blob;
+          std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
+          memcpy(kpk.data(), pq_blob.kyber_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+          this_ref.m_account_address.pq_kyber_pk = kpk;
+        }
+        else
+        {
+          this_ref.pq_keys = boost::none;
+        }
+      }
     END_KV_SERIALIZE_MAP()
 
     void encrypt(const crypto::chacha_key &key);

@@ -86,8 +86,14 @@ DISABLE_VS_WARNINGS(4244 4345)
   //-----------------------------------------------------------------
   void account_keys::xor_with_key_stream(const crypto::chacha_key &key)
   {
+    // HIDERING Phase 5 (HFv16): when a Kyber768 BQ keypair is present, its secret key
+    // (kyber_sk, KYBER768_SECRET_KEY_BYTES = 2400 B) is encrypted alongside the Ed25519
+    // secrets, appended after the multisig keys in the derived stream. The public half
+    // (kyber_pk) is not secret and is left in the clear. Classic wallets have
+    // pq_keys == boost::none, so the stream length and on-disk bytes are unchanged.
+    const size_t pq_sk_bytes = pq_keys ? crypto::pqc::KYBER768_SECRET_KEY_BYTES : 0;
     // encrypt a large enough byte stream with chacha20
-    epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()));
+    epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()) + pq_sk_bytes);
     const char *ptr = key_stream.data();
     for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
       m_spend_secret_key.data[i] ^= *ptr++;
@@ -97,6 +103,11 @@ DISABLE_VS_WARNINGS(4244 4345)
     {
       for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
         k.data[i] ^= *ptr++;
+    }
+    if (pq_keys)
+    {
+      for (size_t i = 0; i < crypto::pqc::KYBER768_SECRET_KEY_BYTES; ++i)
+        pq_keys->kyber_sk[i] ^= *ptr++;
     }
   }
   //-----------------------------------------------------------------
