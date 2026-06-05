@@ -91,7 +91,10 @@ DISABLE_VS_WARNINGS(4244 4345)
     // secrets, appended after the multisig keys in the derived stream. The public half
     // (kyber_pk) is not secret and is left in the clear. Classic wallets have
     // pq_keys == boost::none, so the stream length and on-disk bytes are unchanged.
-    const size_t pq_sk_bytes = pq_keys ? crypto::pqc::KYBER768_SECRET_KEY_BYTES : 0;
+    // audit C-1: the persistent Dilithium3 signing key (dilithium_sk) is encrypted
+    // alongside kyber_sk and the Ed25519 secrets, appended last in the derived stream.
+    const size_t pq_sk_bytes = (pq_keys ? crypto::pqc::KYBER768_SECRET_KEY_BYTES : 0)
+                             + (pq_dilithium ? crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES : 0);
     // encrypt a large enough byte stream with chacha20
     epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()) + pq_sk_bytes);
     const char *ptr = key_stream.data();
@@ -108,6 +111,11 @@ DISABLE_VS_WARNINGS(4244 4345)
     {
       for (size_t i = 0; i < crypto::pqc::KYBER768_SECRET_KEY_BYTES; ++i)
         pq_keys->kyber_sk[i] ^= *ptr++;
+    }
+    if (pq_dilithium)
+    {
+      for (size_t i = 0; i < crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES; ++i)
+        pq_dilithium->dilithium_sk[i] ^= *ptr++;
     }
   }
   //-----------------------------------------------------------------
@@ -297,12 +305,19 @@ DISABLE_VS_WARNINGS(4244 4345)
       return false;
     }
 
-    // Stealth (KEM) keypair: only the Kyber768 half is needed for BQ... address
-    // derivation. The Dilithium3 half (tx signing) is plumbed separately (Step 3 caveat 1).
+    // Stealth (KEM) keypair: the Kyber768 half drives BQ... address derivation.
     crypto::pqc::pq_stealth_keys sk{};
     memcpy(sk.kyber_pk, pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
     memcpy(sk.kyber_sk, pq_sk.kyber768_sk, crypto::pqc::KYBER768_SECRET_KEY_BYTES);
     keys.pq_keys = sk;
+
+    // audit C-1: keep the Dilithium3 half too, as the account's PERSISTENT signing key
+    // (used by construct_tx instead of a per-tx throwaway). Persisted encrypted, exactly
+    // like kyber_sk (see account.h / xor_with_key_stream).
+    crypto::pqc::pq_dilithium_keys dk{};
+    memcpy(dk.dilithium_pk, pq_pk.dilithium3_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
+    memcpy(dk.dilithium_sk, pq_sk.dilithium3_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES);
+    keys.pq_dilithium = dk;
 
     // Publish the Kyber768 public key on the address so is_pq() == true.
     std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};

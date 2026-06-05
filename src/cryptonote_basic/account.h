@@ -57,6 +57,13 @@ namespace cryptonote
     // their on-disk layout are byte-for-byte unchanged.
     boost::optional<crypto::pqc::pq_stealth_keys> pq_keys;
 
+    // HIDERING Phase 5 (HFv16, audit C-1): the account's PERSISTENT Dilithium3 signing
+    // keypair, used to authenticate transactions with a stable per-account key instead
+    // of the former per-tx throwaway. Present only for BQ... accounts; boost::none for
+    // every classic account, so it is absent from the serialized key_data (written only
+    // when set, below) and existing wallet files stay byte-for-byte unchanged.
+    boost::optional<crypto::pqc::pq_dilithium_keys> pq_dilithium;
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_account_address)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_spend_secret_key)
@@ -98,6 +105,27 @@ namespace cryptonote
         {
           this_ref.pq_keys = boost::none;
         }
+      }
+      // HIDERING Phase 5 (HFv16, audit C-1): persist the optional persistent Dilithium3
+      // signing keypair (pq_dilithium) as a single fixed-size blob, encrypted exactly
+      // like pq_keys (dilithium_sk is chacha20-encrypted in place by encrypt()/decrypt()
+      // before this map runs; dilithium_pk stays in the clear). Written ONLY when set, so
+      // classic wallets emit no "pq_dilithium" field and their key_data is unchanged.
+      if (is_store)
+      {
+        if (this_ref.pq_dilithium)
+        {
+          crypto::pqc::pq_dilithium_keys d_blob = *this_ref.pq_dilithium;
+          epee::serialization::selector<is_store>::serialize_t_val_as_blob(d_blob, stg, hparent_section, "pq_dilithium");
+        }
+      }
+      else
+      {
+        crypto::pqc::pq_dilithium_keys d_blob{};
+        if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(d_blob, stg, hparent_section, "pq_dilithium"))
+          this_ref.pq_dilithium = d_blob;
+        else
+          this_ref.pq_dilithium = boost::none;
       }
     END_KV_SERIALIZE_MAP()
 

@@ -135,6 +135,18 @@ namespace pqc
     uint8_t kyber_sk[KYBER768_SECRET_KEY_BYTES];
   };
 
+  // Phase 5 (HFv16, audit C-1) — the account's PERSISTENT Dilithium3 signing keypair.
+  // The external tx signature (pq_tx_sig) must be produced by a stable per-account key,
+  // not a throwaway generated per transaction: only a persistent key carries authority
+  // that survives a quantum break of the Ed25519 ring (the entire point of Phase 5).
+  // Held in account_keys (encrypted at rest like the Ed25519 secrets) and used by
+  // construct_tx to sign the tx prefix hash.
+  struct pq_dilithium_keys
+  {
+    uint8_t dilithium_pk[DILITHIUM3_PUBLIC_KEY_BYTES];
+    uint8_t dilithium_sk[DILITHIUM3_SECRET_KEY_BYTES];
+  };
+
   // Sender side: encapsulate against a recipient's raw Kyber768 public key
   // (`pk_len` must equal KYBER768_PUBLIC_KEY_BYTES), producing the ciphertext to put
   // on-chain and the sender-side shared secret. Returns false on any size mismatch
