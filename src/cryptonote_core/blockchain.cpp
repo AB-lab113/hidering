@@ -3265,25 +3265,66 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   // Wholly skipped below HF_VERSION_PQ, so the live chain stays untouched.
   if (hf_version >= HF_VERSION_PQ)
   {
-    const std::vector<uint8_t> &ex = tx.extra;
-    const size_t pq_field_len = 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES;
-    // The PQ field is the last thing appended to extra: it occupies the trailing
-    // pq_field_len bytes and starts with TX_EXTRA_TAG_PQ_SIG.
-    if (ex.size() < pq_field_len || ex[ex.size() - pq_field_len] != TX_EXTRA_TAG_PQ_SIG)
+    // HIDERING Phase 5 (HFv16): every tx must carry a valid external Dilithium3
+    // signature (the LAST tx_extra field) covering the prefix hash with that field
+    // stripped — exactly what construct_tx_with_tx_key signed before appending it.
+
+    // audit E-5: PQ transactions legitimately exceed the classic 3000-byte extra cap
+    // (Dilithium pk+sig 5246 B + one Kyber768 ciphertext per BQ output), so enforce the
+    // larger PQ ceiling on the consensus path here (the relay/mempool path enforces it
+    // too — see tx_pool.cpp). Anything beyond it is rejected.
+    if (tx.extra.size() > MAX_TX_EXTRA_SIZE_PQ)
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " missing required post-quantum (Dilithium3) signature at/after HFv16");
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has oversized tx_extra (" << tx.extra.size() << " > " << MAX_TX_EXTRA_SIZE_PQ << ") at/after HFv16");
       tvc.m_verifivation_failed = true;
       return false;
     }
-    const size_t pos = ex.size() - pq_field_len;
-    crypto::pqc::pq_tx_sig pq_sig;
-    std::memcpy(pq_sig.pk, ex.data() + pos + 1, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
-    std::memcpy(pq_sig.sig, ex.data() + pos + 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES, crypto::pqc::DILITHIUM3_SIGNATURE_BYTES);
-    // Recompute the prefix hash with the trailing PQ field removed — the message
-    // that was signed at construction time.
-    transaction tx_pq_stripped = tx;
-    tx_pq_stripped.extra.resize(pos);
-    crypto::hash pq_prefix_hash = get_transaction_prefix_hash(tx_pq_stripped);
+
+    // audit E-3/M-1: parse tx.extra CANONICALLY via the typed TLV parser rather than a
+    // raw trailing-byte slice (which an attacker could make ambiguous, since 0x06/0x07
+    // bytes occur freely inside other fields' payloads). Enforce: extra is fully
+    // well-formed (parse consumes every byte — no trailing garbage, no unknown tags),
+    // EXACTLY ONE Dilithium3 signature field, it is the LAST field, and the number of
+    // Kyber768 ciphertext fields does not exceed the number of outputs.
+    std::vector<tx_extra_field> pq_fields;
+    if (!parse_tx_extra(tx.extra, pq_fields) || pq_fields.empty())
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has malformed tx_extra at/after HFv16");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+    size_t pq_sig_count = 0, kyber_ct_count = 0;
+    for (const tx_extra_field &f : pq_fields)
+    {
+      if (f.type() == typeid(tx_extra_pq_sig)) ++pq_sig_count;
+      else if (f.type() == typeid(tx_extra_kyber_ct)) ++kyber_ct_count;
+    }
+    if (pq_sig_count != 1 || pq_fields.back().type() != typeid(tx_extra_pq_sig))
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " must carry exactly one Dilithium3 signature as the LAST tx_extra field at/after HFv16");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+    if (kyber_ct_count > tx.vout.size())
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has more Kyber768 ciphertexts (" << kyber_ct_count << ") than outputs (" << tx.vout.size() << ")");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+    const crypto::pqc::pq_tx_sig &pq_sig = boost::get<tx_extra_pq_sig>(pq_fields.back()).sig;
+
+    // Recover the signed message: the prefix hash with the trailing PQ signature field
+    // removed. audit M-2: avoid deep-copying the whole transaction — truncate tx.extra
+    // in place (tx is non-const here), hash, then restore. The PQ sig is the last field
+    // and wire-identical to its raw [tag|pk|sig] blob, so dropping its trailing bytes is
+    // exactly the pre-append extra.
+    const size_t pq_field_len = 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES;
+    CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len, false, "PQ sig field shorter than expected");
+    const std::vector<uint8_t> saved_pq_tail(tx.extra.end() - pq_field_len, tx.extra.end());
+    tx.extra.resize(tx.extra.size() - pq_field_len);
+    const crypto::hash pq_prefix_hash = get_transaction_prefix_hash(tx);
+    tx.extra.insert(tx.extra.end(), saved_pq_tail.begin(), saved_pq_tail.end());
+
     if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash), pq_sig))
     {
       MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (Dilithium3) signature");
@@ -3291,14 +3332,11 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       return false;
     }
 
-    // HIDERING Phase 5 (HFv16): any TX_EXTRA_TAG_KYBER_CT fields (Kyber768
-    // ciphertexts for BQ... outputs) sit before this trailing Dilithium3 signature,
-    // so the offset math above is unaffected. They are deliberately NOT validated
-    // here: consensus holds no recipient key and cannot decapsulate. Recovery is a
-    // wallet-side concern — on output scan, a BQ... wallet pulls its ciphertext from
-    // tx.extra and calls crypto::pqc::pqc_stealth_decaps to reproduce the shared
-    // secret folded into the one-time key (see generate_output_ephemeral_keys mixing
-    // in cryptonote_tx_utils.cpp). TODO Phase 5: wire that scan path into wallet2.
+    // The Kyber768 ciphertext fields (now bounded above) are intentionally NOT validated
+    // here: consensus holds no recipient key and cannot decapsulate. They ARE covered by
+    // the Dilithium3 signature (they precede the stripped field) and by the ring/rct
+    // signatures (which commit to the full extra). Recovery is wallet-side, via
+    // crypto::pqc::pqc_stealth_decaps on output scan (see wallet2.cpp).
   }
 
   if (hf_version >= HF_VERSION_MIN_2_OUTPUTS)
@@ -3328,6 +3366,15 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       if (txin.type() == typeid(txin_to_key))
       {
         const txin_to_key& in_to_key = boost::get<txin_to_key>(txin);
+        // HIDERING (audit F-3): guard against an empty key_offsets vector before the
+        // `size() - 1` below, which would otherwise underflow size_t to SIZE_MAX and
+        // poison the ring-size bounds. A ring with no offsets is never valid.
+        if (in_to_key.key_offsets.empty())
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " has an input with empty key_offsets");
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
         if (in_to_key.amount == 0)
         {
           // always consider rct inputs mixable. Even if there's not enough rct
@@ -3385,7 +3432,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         tvc.m_low_mixin = true;
         return false;
       }
-    } else if ((hf_version >= HF_VERSION_MIN_MIXIN_31 && min_actual_mixin > 63)
+    } else if ((hf_version >= HF_VERSION_MIN_MIXIN_31 && max_actual_mixin > 63) // HIDERING (audit F-2): ceiling must test the LARGEST ring, not the smallest
       || (hf_version < HF_VERSION_MIN_MIXIN_31 && hf_version >= HF_VERSION_MIN_MIXIN_10+2 && min_actual_mixin > 10)
       || ((hf_version == HF_VERSION_MIN_MIXIN_10 || hf_version == HF_VERSION_MIN_MIXIN_10+1) && min_actual_mixin != 10)
     )
