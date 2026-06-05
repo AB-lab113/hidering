@@ -74,6 +74,26 @@ namespace cryptonote
     extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::KYBER768_CIPHERTEXT_BYTES);
   }
   //---------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16, audit E-4): see cryptonote_tx_utils.h. The tweak is
+  // t = H_s("HRG_BQ_TWEAK" || ss || output_index_le8) — domain-separated and bound to the
+  // output index so distinct BQ outputs (even to the same recipient) get distinct tweaks.
+  // Returns false on a zero scalar (which would make P' = P, spendable without the secret).
+  bool derive_bq_output_tweak(const crypto::pqc::kyber_shared_secret& ss, size_t output_index, crypto::secret_key& tweak)
+  {
+    static const char domain[] = "HRG_BQ_TWEAK";
+    std::string buf;
+    buf.reserve(sizeof(domain) - 1 + sizeof(ss.ss) + 8);
+    buf.append(domain, sizeof(domain) - 1);
+    buf.append(reinterpret_cast<const char*>(ss.ss), sizeof(ss.ss));
+    for (int i = 0; i < 8; ++i)
+      buf.push_back(static_cast<char>((static_cast<uint64_t>(output_index) >> (8 * i)) & 0xff));
+    crypto::hash_to_scalar(buf.data(), buf.size(), reinterpret_cast<crypto::ec_scalar&>(tweak));
+    memwipe(&buf[0], buf.size());
+    crypto::ec_scalar zero;
+    memset(&zero, 0, sizeof(zero));
+    return memcmp(&tweak, &zero, sizeof(zero)) != 0;
+  }
+  //---------------------------------------------------------------
   void classify_addresses(const std::vector<tx_destination_entry> &destinations, const boost::optional<cryptonote::account_public_address>& change_addr, size_t &num_stdaddresses, size_t &num_subaddresses, account_public_address &single_dest_subaddress)
   {
     num_stdaddresses = 0;
@@ -475,13 +495,23 @@ namespace cryptonote
           LOG_ERROR("Failed to build post-quantum (Kyber768) stealth encapsulation");
           return false;
         }
-        // Fold the Kyber shared secret into the one-time key: P' = P + H_s(ss)*G.
+        // Fold the Kyber shared secret into the one-time key: P' = P + t*G, with
+        // t = derive_bq_output_tweak(ss, output_index) — audit E-4: domain-separated,
+        // output-index-bound, zero-scalar-rejected. The receiver recomputes the same t.
         crypto::secret_key kyber_tweak;
-        crypto::hash_to_scalar(kss.ss, sizeof(kss.ss), reinterpret_cast<crypto::ec_scalar&>(kyber_tweak));
+        if (!derive_bq_output_tweak(kss, output_index, kyber_tweak))
+        {
+          LOG_ERROR("Degenerate (zero) BQ output tweak; aborting tx construction");
+          memwipe(&kss, sizeof(kss));
+          return false;
+        }
         crypto::public_key tweak_pub;
         crypto::secret_key_to_public_key(kyber_tweak, tweak_pub);
         out_eph_public_key = rct::rct2pk(rct::addKeys(rct::pk2rct(out_eph_public_key), rct::pk2rct(tweak_pub)));
         kyber_cts.push_back(kct);
+        // audit M-3: wipe the Kyber shared secret and the derived tweak scalar.
+        memwipe(&kss, sizeof(kss));
+        memwipe(&kyber_tweak, sizeof(kyber_tweak));
       }
 
       tx_out out;
@@ -542,20 +572,22 @@ namespace cryptonote
     {
       crypto::hash pq_prefix_hash;
       get_transaction_prefix_hash(tx, pq_prefix_hash);
-      crypto::pqc::pq_public_key pq_pk;
-      crypto::pqc::pq_secret_key pq_sk;
+      // audit C-1: sign with the sender's PERSISTENT Dilithium3 key (account_keys
+      // .pq_dilithium), NOT a per-tx throwaway. A stable per-account key is what gives the
+      // signature real authority — one that still holds when the Ed25519 ring signature is
+      // quantum-broken (the whole point of Phase 5). The ring/rct signatures generated
+      // below commit to the full extra (this PQ field included), so the Dilithium public
+      // key cannot be stripped/replaced without invalidating the spend. Full PQ-era
+      // sender-identity binding (a BQ-address PQ-key registry the validator can check) is
+      // deferred to the finalised Phase 5 spec — a self-contained per-tx signature on a
+      // privacy chain cannot be tied to a hidden spender by the validator alone.
+      CHECK_AND_ASSERT_MES(sender_account_keys.pq_dilithium, false,
+          "HFv16 transaction requires the sender's persistent Dilithium3 key (account has no pq_dilithium)");
       crypto::pqc::pq_tx_sig pq_sig;
-      // TODO Phase 5 caveat 1: sign with the sender's persistent Dilithium3 key from
-      // sender_account_keys rather than this throwaway keypair, once account_keys
-      // grows a post-quantum key field (account_keys has no pq member yet). A stable
-      // sender key is what lets a verifier bind the signature to the spender; the
-      // throwaway below keeps the path exercisable without that plumbing and has no
-      // consensus impact pre-fork.
-      if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk)
-          || !crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
-                                       pq_sk.dilithium3_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES,
-                                       pq_pk.dilithium3_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES,
-                                       pq_sig))
+      if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
+                                    sender_account_keys.pq_dilithium->dilithium_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES,
+                                    sender_account_keys.pq_dilithium->dilithium_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES,
+                                    pq_sig))
       {
         LOG_ERROR("Failed to build post-quantum (Dilithium3) tx signature");
         return false;
