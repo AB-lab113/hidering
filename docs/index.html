@@ -301,7 +301,11 @@
   /* PRIVACY FEATURES */
   .features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    /* Exactly 6 feature cards: fixed 3-column layout so both rows fill completely.
+       Same fix as .token-grid — auto-fit left empty trailing cells on the last row at
+       4-column widths, which showed the gold --border grid background as blank gold
+       rectangles. 3 divides 6 evenly (mobile drops to 1 column below 768px). */
+    grid-template-columns: repeat(3, 1fr);
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
@@ -809,6 +813,7 @@
     .hero-stats { gap: 1.5rem; }
     .roadmap-item { grid-template-columns: 1fr; gap: 0.5rem; }
     .token-grid { grid-template-columns: repeat(2, 1fr); } /* 6 cards -> 3 full rows of 2, no empty gold cells */
+    .features-grid { grid-template-columns: 1fr; } /* 6 text cards -> single column on mobile, no empty gold cells */
     .token-section { padding: 4rem 1.5rem; }
     .fairlaunch-box { padding: 2rem 1.5rem; }
   }
