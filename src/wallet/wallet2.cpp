@@ -2118,7 +2118,7 @@ bool wallet2::frozen(const transfer_details &td) const
   return td.m_frozen;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak) const
+void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss) const
 {
   hw::device &hwdev = m_account.get_device();
   boost::unique_lock<hw::device> hwdev_lock (hwdev);
@@ -2131,16 +2131,29 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
      return;
   }
   tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, output_public_key, derivation, additional_derivations, i, hwdev, get_output_view_tag(o));
-  // HIDERING Phase 5 (HFv16): a BQ... output's on-chain one-time key is P' = P + t*G,
-  // where P is the standard derivation key and t = H_s(Kyber decaps). The standard match
-  // above sees P', not P, so it misses. Retry with the un-tweaked candidate P = P' - t*G
-  // (the view tag is computed from the derivation only, so it still matches). pq_untweak
-  // is nullptr for every classic wallet → this whole block is skipped on the live chain.
-  if (!tx_scan_info.received && pq_untweak)
+  // HIDERING Phase 5 (HFv16): a BQ... output's on-chain one-time key is P' = P + t_i*G,
+  // where P is the standard derivation key and t_i = derive_bq_output_tweak(ss, i) (audit
+  // E-4: per-output, domain-separated). The standard match above sees P', not P, so it
+  // misses. Retry with the un-tweaked candidate P = P' - t_i*G (the view tag is computed
+  // from the derivation only, so it still matches). This is the AUTHORITATIVE ownership
+  // test (audit E-1: Kyber decaps "succeeds" for any ciphertext, so we must rely on this
+  // real match, not on decaps). On a match, flag the output so its secret is tweaked later
+  // (audit E-2); a classic output never enters this branch with received already true.
+  // pq_ss is nullptr for every classic wallet → this whole block is skipped on the live chain.
+  if (!tx_scan_info.received && pq_ss)
   {
-    rct::key candidate;
-    rct::subKeys(candidate, rct::pk2rct(output_public_key), rct::pk2rct(*pq_untweak));
-    tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, rct::rct2pk(candidate), derivation, additional_derivations, i, hwdev, get_output_view_tag(o));
+    crypto::secret_key t;
+    if (cryptonote::derive_bq_output_tweak(*pq_ss, i, t))
+    {
+      crypto::public_key tG;
+      crypto::secret_key_to_public_key(t, tG);
+      rct::key candidate;
+      rct::subKeys(candidate, rct::pk2rct(output_public_key), rct::pk2rct(tG));
+      tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, rct::rct2pk(candidate), derivation, additional_derivations, i, hwdev, get_output_view_tag(o));
+      if (tx_scan_info.received)
+        tx_scan_info.received_via_pq_untweak = true;
+    }
+    memwipe(&t, sizeof(t));
   }
   if(tx_scan_info.received)
   {
@@ -2153,18 +2166,18 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
   tx_scan_info.error = false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::public_key *pq_untweak) const
+void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss) const
 {
   if (!is_out_data || i >= is_out_data->received.size())
-    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_untweak);
+    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_ss);
 
   tx_scan_info.received = is_out_data->received[i];
   // HIDERING Phase 5 (HFv16): the cached is_out_data was precomputed without the BQ...
-  // un-tweak, so it can't see a BQ output. For a wallet owning a Kyber768 key (pq_untweak
-  // set), if the cache says "not received", fall through to the full (un-tweaking) path.
-  // No-op for classic wallets (pq_untweak == nullptr).
-  if (!tx_scan_info.received && pq_untweak)
-    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_untweak);
+  // un-tweak, so it can't see a BQ output. For a wallet owning a Kyber768 key (pq_ss set),
+  // if the cache says "not received", fall through to the full (un-tweaking) path so the
+  // per-output match + received_via_pq_untweak flag are computed. No-op for classic wallets.
+  if (!tx_scan_info.received && pq_ss)
+    return check_acc_out_precomp(o, derivation, additional_derivations, i, tx_scan_info, pq_ss);
   if(tx_scan_info.received)
   {
     tx_scan_info.money_transfered = o.amount; // may be 0 for ringct outputs
@@ -2176,12 +2189,13 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
   tx_scan_info.error = false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::check_acc_out_precomp_once(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::public_key *pq_untweak) const
+void wallet2::check_acc_out_precomp_once(const tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::pqc::kyber_shared_secret *pq_ss) const
 {
   tx_scan_info.received = boost::none;
+  tx_scan_info.received_via_pq_untweak = false;
   if (already_seen)
     return;
-  check_acc_out_precomp(o, derivation, additional_derivations, i, is_out_data, tx_scan_info, pq_untweak);
+  check_acc_out_precomp(o, derivation, additional_derivations, i, is_out_data, tx_scan_info, pq_ss);
   if (tx_scan_info.received)
     already_seen = true;
 }
@@ -2247,9 +2261,11 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
     THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
     // HIDERING Phase 5 (HFv16): for a BQ... output the one-time key was tweaked by the
     // sender's Kyber768 KEM; fold the recovered tweak into in_ephemeral so the secret
-    // matches the on-chain (tweaked) output key BEFORE the consistency check. No-op for
-    // wallets without a Kyber768 key (every wallet on the live chain).
-    apply_pq_output_tweak(tx, tx_scan_info);
+    // matches the on-chain (tweaked) output key BEFORE the consistency check. Applied ONLY
+    // when this output was matched via the un-tweak path (audit E-2), and bound to the
+    // output index `i` (audit E-4). No-op for wallets without a Kyber768 key and for
+    // classic outputs (so a classic output sharing a tx with a Kyber CT is never corrupted).
+    apply_pq_output_tweak(tx, i, tx_scan_info);
     THROW_WALLET_EXCEPTION_IF(tx_scan_info.in_ephemeral.pub != output_public_key,
         error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
   }
@@ -2275,82 +2291,107 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
 //----------------------------------------------------------------------------------------------------
 namespace
 {
-  // HIDERING Phase 5 (HFv16): extract the Kyber768 ciphertext appended to tx.extra under
-  // TX_EXTRA_TAG_KYBER_CT. cryptonote_tx_utils writes it as a raw [tag | ct(1088)] blob
-  // after sort_tx_extra and before the trailing Dilithium3 signature, so it is not a
-  // registered tx_extra field; we scan for the tag and read the fixed-length payload.
-  // Returns the first one found (single BQ... output per tx in this Phase-5 stage).
+  // HIDERING Phase 5 (HFv16, audit E-3): extract the Kyber768 ciphertext carried in
+  // tx.extra (tx_extra_kyber_ct) via the CANONICAL TLV parser, not a raw byte scan — a raw
+  // scan for the 0x07 tag could match a 0x07 byte inside another field's payload (e.g. the
+  // Dilithium blob), feeding garbage into decaps. Returns the first ciphertext field
+  // (single BQ... output per tx in this Phase-5 stage).
   bool get_kyber_ct_from_tx_extra(const std::vector<uint8_t>& extra, crypto::pqc::kyber_ciphertext& ct)
   {
-    constexpr size_t CT = crypto::pqc::KYBER768_CIPHERTEXT_BYTES;
-    for (size_t i = 0; i < extra.size(); )
-    {
-      if (extra[i] == TX_EXTRA_TAG_KYBER_CT && i + 1 + CT <= extra.size())
-      {
-        memcpy(ct.ct, extra.data() + i + 1, CT);
-        return true;
-      }
-      ++i;
-    }
-    return false;
+    std::vector<cryptonote::tx_extra_field> fields;
+    if (!cryptonote::parse_tx_extra(extra, fields))
+      return false;
+    cryptonote::tx_extra_kyber_ct kct;
+    if (!cryptonote::find_tx_extra_field_by_type(fields, kct))
+      return false;
+    ct = kct.ct;
+    return true;
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::apply_pq_output_tweak(const cryptonote::transaction &tx, tx_scan_info_t &tx_scan_info) const
+void wallet2::apply_pq_output_tweak(const cryptonote::transaction &tx, size_t output_index, tx_scan_info_t &tx_scan_info) const
 {
+  // audit E-2: only fold the tweak when this output was matched via the BQ un-tweak path.
+  // A classic output sharing a tx with a Kyber ciphertext is NOT tweaked — tweaking it
+  // would corrupt its one-time secret and abort the scan (an attacker-triggerable DoS).
+  if (!tx_scan_info.received_via_pq_untweak)
+    return;
+
   // Gate on the wallet actually owning a Kyber768 decapsulation key. pq_keys is
-  // boost::none for every existing/classic wallet, so this returns immediately and the
-  // live-chain scan path is byte-for-byte unchanged (one boolean test). Multisig and
-  // background (view-only) syncing have no usable in_ephemeral secret, so skip them.
+  // boost::none for every existing/classic wallet. Multisig and background (view-only)
+  // syncing have no usable in_ephemeral secret, so skip them.
   if (!m_account.get_keys().pq_keys || m_multisig || m_background_syncing)
     return;
 
-  crypto::pqc::kyber_ciphertext ct;
-  if (!get_kyber_ct_from_tx_extra(tx.extra, ct))
-    return; // not a BQ... (post-quantum) output
-
   crypto::pqc::kyber_shared_secret ss;
-  if (!crypto::pqc::pqc_stealth_decaps(*m_account.get_keys().pq_keys, ct, ss))
+  if (!get_pq_output_shared_secret(tx, ss))
+    return;
+
+  // Recover the SAME tweak the sender folded in: P' = P + t_i*G with t_i bound to the
+  // output index (audit E-4), so the matching one-time secret is x' = x + t_i. Fold t_i
+  // into in_ephemeral.sec and recompute the public key / key image to match the on-chain
+  // (tweaked) output key.
+  crypto::secret_key kyber_tweak;
+  if (!cryptonote::derive_bq_output_tweak(ss, output_index, kyber_tweak))
   {
-    MWARNING("Kyber768 decapsulation failed for a candidate BQ... output; leaving key untweaked");
+    memwipe(&ss, sizeof(ss));
     return;
   }
-
-  // Recover the same tweak the sender mixed in: P' = P + H_s(ss)*G, so the matching
-  // one-time secret is x' = x + H_s(ss). Fold H_s(ss) into in_ephemeral.sec and
-  // recompute the public key / key image to match the on-chain output key.
-  crypto::secret_key kyber_tweak;
-  crypto::hash_to_scalar(ss.ss, sizeof(ss.ss), reinterpret_cast<crypto::ec_scalar&>(kyber_tweak));
   sc_add(reinterpret_cast<unsigned char*>(&tx_scan_info.in_ephemeral.sec),
          reinterpret_cast<const unsigned char*>(&tx_scan_info.in_ephemeral.sec),
          reinterpret_cast<const unsigned char*>(&kyber_tweak));
   crypto::secret_key_to_public_key(tx_scan_info.in_ephemeral.sec, tx_scan_info.in_ephemeral.pub);
   crypto::generate_key_image(tx_scan_info.in_ephemeral.pub, tx_scan_info.in_ephemeral.sec, tx_scan_info.ki);
+  // audit M-3: wipe the recovered shared secret and tweak scalar.
+  memwipe(&ss, sizeof(ss));
+  memwipe(&kyber_tweak, sizeof(kyber_tweak));
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_pq_output_untweak_point(const cryptonote::transaction &tx, crypto::public_key &untweak_point) const
+void wallet2::verify_pq_tx_well_formed(const cryptonote::transaction &tx, const std::vector<cryptonote::tx_destination_entry> &dests, uint8_t hf_version) const
+{
+  // audit F-5. Below HFv16 no PQ fields are emitted, so there is nothing to verify; a BQ
+  // destination on the live chain is simply treated as a classic B... output by construction.
+  if (hf_version < HF_VERSION_PQ)
+    return;
+  size_t n_bq = 0;
+  for (const auto &d : dests)
+    if (d.addr.is_pq()) ++n_bq;
+  if (n_bq == 0)
+    return; // no BQ... destinations in this tx
+  std::vector<cryptonote::tx_extra_field> fields;
+  THROW_WALLET_EXCEPTION_IF(!cryptonote::parse_tx_extra(tx.extra, fields), error::wallet_internal_error, "BQ tx integrity: tx_extra failed to parse");
+  size_t n_ct = 0, n_sig = 0;
+  for (const auto &f : fields)
+  {
+    if (f.type() == typeid(cryptonote::tx_extra_kyber_ct)) ++n_ct;
+    else if (f.type() == typeid(cryptonote::tx_extra_pq_sig)) ++n_sig;
+  }
+  THROW_WALLET_EXCEPTION_IF(n_ct != n_bq, error::wallet_internal_error, "BQ tx integrity: Kyber768 ciphertext count does not match BQ destination count");
+  THROW_WALLET_EXCEPTION_IF(n_sig != 1, error::wallet_internal_error, "BQ tx integrity: expected exactly one Dilithium3 signature");
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_pq_output_shared_secret(const cryptonote::transaction &tx, crypto::pqc::kyber_shared_secret &ss) const
 {
   // Only a wallet owning a Kyber768 decapsulation key (a BQ... wallet) can receive BQ
   // outputs. pq_keys is boost::none for every classic/live-chain wallet, so this returns
   // false immediately and the scan path is byte-for-byte unchanged. Multisig and view-only
-  // (background) syncing have no usable secret to tweak, so skip them too.
+  // (background) syncing have no usable secret, so skip them too.
   const cryptonote::account_keys &keys = m_account.get_keys();
   if (!keys.pq_keys || m_multisig || m_background_syncing)
     return false;
 
   crypto::pqc::kyber_ciphertext ct;
   if (!get_kyber_ct_from_tx_extra(tx.extra, ct))
-    return false; // tx carries no Kyber768 (BQ...) output
+    return false; // tx carries no Kyber768 (BQ...) ciphertext
 
-  crypto::pqc::kyber_shared_secret ss;
+  // NB (audit E-1): Kyber uses implicit rejection — decaps "succeeds" for ANY well-formed
+  // ciphertext, returning a deterministic pseudo-random secret. So a true return here only
+  // means "well-formed ciphertext", NOT "encapsulated to us". Ownership is decided by the
+  // per-output is_out_to_acc_precomp match on P_onchain - t_i*G (check_acc_out_precomp), not
+  // by this call: a wrong ss yields a wrong candidate that simply fails to match.
   if (!crypto::pqc::pqc_stealth_decaps(*keys.pq_keys, ct, ss))
-    return false; // ciphertext is not encapsulated to our key
+    return false;
 
-  // Sender folded t = H_s(ss) into the one-time key: P' = P + t*G. Recovering the standard
-  // key for detection is P = P' - t*G, so the point to subtract is t*G.
-  crypto::secret_key t;
-  crypto::hash_to_scalar(ss.ss, sizeof(ss.ss), reinterpret_cast<crypto::ec_scalar&>(t));
-  crypto::secret_key_to_public_key(t, untweak_point);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2436,12 +2477,12 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   std::deque<bool> output_found(tx.vout.size(), false);
   uint64_t total_received_1 = 0;
 
-  // HIDERING Phase 5 (HFv16): for a BQ... wallet, precompute the per-tx Kyber768 un-tweak
-  // point t*G once (it depends on the tx ciphertext, not the output index) and pass it to
-  // the output checks so BQ... outputs are detected. pq_untweak_ptr stays nullptr for every
-  // classic wallet, so the detection path below is byte-for-byte unchanged on the live chain.
-  crypto::public_key pq_untweak;
-  const crypto::public_key *pq_untweak_ptr = get_pq_output_untweak_point(tx, pq_untweak) ? &pq_untweak : nullptr;
+  // HIDERING Phase 5 (HFv16): for a BQ... wallet, recover the per-tx Kyber768 shared secret
+  // once and pass it to the output checks, which derive the per-OUTPUT tweak t_i = H_s(...,
+  // i) (audit E-4) to detect BQ outputs. pq_ss_ptr stays nullptr for every classic wallet,
+  // so the detection path below is byte-for-byte unchanged on the live chain.
+  crypto::pqc::kyber_shared_secret pq_ss;
+  const crypto::pqc::kyber_shared_secret *pq_ss_ptr = get_pq_output_shared_secret(tx, pq_ss) ? &pq_ss : nullptr;
 
   while (!tx.vout.empty())
   {
@@ -2525,7 +2566,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     }
     else if (miner_tx && m_refresh_type == RefreshOptimizeCoinbase && tx.version < 2)
     {
-      check_acc_out_precomp_once(tx.vout[0], derivation, additional_derivations, 0, is_out_data_ptr, tx_scan_info[0], output_found[0], pq_untweak_ptr);
+      check_acc_out_precomp_once(tx.vout[0], derivation, additional_derivations, 0, is_out_data_ptr, tx_scan_info[0], output_found[0], pq_ss_ptr);
       THROW_WALLET_EXCEPTION_IF(tx_scan_info[0].error, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
       // this assumes that the miner tx pays a single address
@@ -2535,7 +2576,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         // the first one was already checked
         for (size_t i = 1; i < tx.vout.size(); ++i)
         {
-          check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_untweak_ptr);
+          check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_ss_ptr);
         }
         // then scan all outputs from 0
         hw::device &hwdev = m_account.get_device();
@@ -2560,7 +2601,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     {
       for (size_t i = 0; i < tx.vout.size(); ++i)
       {
-        check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_untweak_ptr);
+        check_acc_out_precomp_once(tx.vout[i], derivation, additional_derivations, i, is_out_data_ptr, tx_scan_info[i], output_found[i], pq_ss_ptr);
         THROW_WALLET_EXCEPTION_IF(tx_scan_info[i].error, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
         if (tx_scan_info[i].received)
         {
@@ -7807,6 +7848,11 @@ std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) c
   }
   
   txs.new_transfers = export_outputs();
+  // HIDERING audit F-1: record the live hard-fork version so the offline cold-signer gates
+  // the post-quantum paths correctly. Best-effort: on the live chain get_pq_hf_version()
+  // returns 0 (PQ inert); offline / unreachable daemon also falls back to 0.
+  try { txs.pq_hf_version = const_cast<wallet2*>(this)->get_pq_hf_version(); }
+  catch (...) { txs.pq_hf_version = 0; }
   // save as binary
   std::ostringstream oss;
   binary_archive<true> ar(oss);
@@ -7927,13 +7973,12 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
     rct::RCTConfig rct_config = sd.rct_config;
     crypto::secret_key tx_key;
     std::vector<crypto::secret_key> additional_tx_keys;
-    // HIDERING Phase 5 caveat 2: this is the cold-signing path (signing exported txs on
-    // an offline machine with no daemon), so we cannot query the hard-fork version —
-    // get_pq_hf_version() / use_fork_rules() require a daemon. hf_version therefore stays
-    // at its default 0, keeping the post-quantum paths inert. This is correct pre-fork;
-    // once HFv16 cold-signing is needed, the hf version must be threaded into the
-    // exported unsigned-tx set (tx_construction_data) rather than fetched live.
-    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sd.sources, sd.splitted_dsts, sd.change_dts.addr, sd.extra, ptx.tx, tx_key, additional_tx_keys, sd.use_rct, rct_config, sd.use_view_tags);
+    // HIDERING Phase 5 (audit F-1): this is the cold-signing path (offline, no daemon), so
+    // we cannot query the hard-fork version live. Use the version threaded into the exported
+    // unsigned-tx set at export time (exported_txs.pq_hf_version), instead of silently
+    // defaulting to 0. On the live chain this is 0 (PQ inert); at HFv16 it carries 16 so the
+    // offline signer emits the required Dilithium3 signature / BQ fields.
+    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sd.sources, sd.splitted_dsts, sd.change_dts.addr, sd.extra, ptx.tx, tx_key, additional_tx_keys, sd.use_rct, rct_config, sd.use_view_tags, exported_txs.pq_hf_version);
     THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sd.sources, sd.splitted_dsts, m_nettype);
     // we don't test tx size, because we don't know the current limit, due to not having a blockchain,
     // and it's a bit pointless to fail there anyway, since it'd be a (good) guess only. We sign anyway,
@@ -9931,9 +9976,11 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   // HIDERING Phase 5 (caveat 2 resolved): pass the real hard-fork version so the
   // BQ.../Dilithium3 paths activate exactly at HFv16. get_pq_hf_version() returns 0
   // on the live chain (hf 15), keeping all post-quantum logic inert pre-fork.
-  bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, false, {}, use_view_tags, get_pq_hf_version());
+  const uint8_t pq_hf = get_pq_hf_version();
+  bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, false, {}, use_view_tags, pq_hf);
   LOG_PRINT_L2("constructed tx, r="<<r);
   THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, splitted_dsts, m_nettype);
+  verify_pq_tx_well_formed(tx, splitted_dsts, pq_hf); // audit F-5
   THROW_WALLET_EXCEPTION_IF(upper_transaction_weight_limit <= get_transaction_weight(tx), error::tx_too_big, tx, upper_transaction_weight_limit);
 
   std::string key_images;
@@ -10199,9 +10246,11 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     // HIDERING Phase 5 (caveat 2 resolved): pass the real hard-fork version so the
     // BQ.../Dilithium3 paths activate exactly at HFv16. get_pq_hf_version() returns 0
     // on the live chain (hf 15), keeping all post-quantum logic inert pre-fork.
-    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, true, rct_config, use_view_tags, get_pq_hf_version());
+    const uint8_t pq_hf = get_pq_hf_version();
+    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts.addr, extra, tx, tx_key, additional_tx_keys, true, rct_config, use_view_tags, pq_hf);
     LOG_PRINT_L2("constructed tx, r="<<r);
     THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, dsts, m_nettype);
+    verify_pq_tx_well_formed(tx, splitted_dsts, pq_hf); // audit F-5
   }
   THROW_WALLET_EXCEPTION_IF(upper_transaction_weight_limit <= get_transaction_weight(tx), error::tx_too_big, tx, upper_transaction_weight_limit);
 
