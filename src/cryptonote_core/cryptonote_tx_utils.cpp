@@ -514,33 +514,18 @@ namespace cryptonote
     for (const auto& kct : kyber_cts)
       add_kyber_ct_to_extra(tx.extra, kct);
 
-    // HIDERING: Hybrid Padding Strategy (Privacy + Efficiency)
-    // Small TX: pad to 1000 bytes minimum (privacy floor)
-    // Large TX: add 25% padding, max 2500 bytes (efficiency cap)
-    size_t min_total_size = 1000;
-    size_t max_padding = 2500;
-    size_t current_size = tx.extra.size();
-    size_t padding_to_add;
-    
-    if (current_size < min_total_size) {
-      // Small TX: pad to minimum for privacy
-      padding_to_add = min_total_size - current_size;
-    } else {
-      // Large TX: proportional padding with cap
-      size_t proportional = (size_t)(current_size * 0.25);
-      padding_to_add = std::min(proportional, max_padding);
-    }
-    
-    if (padding_to_add > 0) {
+    // HIDERING privacy padding (audit F-4): normalise every transaction's tx_extra to a
+    // FIXED target of 2500 bytes, per the HIDERING spec (Patch 2: fixed 2500-byte TX
+    // padding), replacing the former hybrid/proportional scheme whose variable size was
+    // itself a metadata fingerprint. If extra already meets/exceeds the target (e.g. a
+    // PQ tx carrying several Kyber768 ciphertexts), no padding is added; the size ceiling
+    // is enforced ONCE, after all fields (incl. the trailing Dilithium3 signature) are in
+    // place — see below — rather than here (audit: the old check ran before the sig append).
+    const size_t HIDERING_EXTRA_PADDING_TARGET = 2500;
+    if (tx.extra.size() < HIDERING_EXTRA_PADDING_TARGET) {
+      const size_t padding_to_add = HIDERING_EXTRA_PADDING_TARGET - tx.extra.size();
       tx.extra.push_back(TX_EXTRA_TAG_PADDING);
       tx.extra.insert(tx.extra.end(), padding_to_add - 1, 0);
-
-    // HIDERING Phase 5 caveat 3: post-quantum BQ... transactions carry large extra
-    // fields (Kyber768 ciphertexts + the trailing Dilithium3 signature) that exceed
-    // the classic 3000-byte ceiling. Under the HFv16 gate the larger consensus limit
-    // MAX_TX_EXTRA_SIZE_PQ applies; the live chain keeps MAX_TX_EXTRA_SIZE.
-    const size_t max_extra = (hf_version >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;
-    CHECK_AND_ASSERT_MES(tx.extra.size() <= max_extra, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << max_extra << ")");
     }
 
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ ~h1,000,000): attach an
@@ -576,6 +561,17 @@ namespace cryptonote
         return false;
       }
       add_pq_sig_to_extra(tx.extra, pq_sig);
+    }
+
+    // HIDERING (audit E-5 / finding #4): enforce the tx_extra size ceiling ONCE, here,
+    // after EVERY field is in place — padding, Kyber768 ciphertexts, AND the trailing
+    // Dilithium3 signature. The old check ran inside the padding branch, before the
+    // 5246-byte signature was appended, so it never accounted for it. Under HFv16 the
+    // larger PQ ceiling applies; the live chain (hf < HF_VERSION_PQ) keeps the classic
+    // MAX_TX_EXTRA_SIZE.
+    {
+      const size_t max_extra = (hf_version >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;
+      CHECK_AND_ASSERT_MES(tx.extra.size() <= max_extra, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << max_extra << ")");
     }
 
     //check money
