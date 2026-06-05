@@ -218,8 +218,15 @@
 // HFv16 introduces the external Dilithium3 signature carried in tx `extra` and
 // the Kyber768-based BQ... addresses. HF_HEIGHT_PQ is a placeholder height: the
 // fork is registered in the schedule but inactive until mainnet reaches it.
+//
+// SECURITY (audit M-6): a hard fork registered with threshold 0 at a fixed height
+// is a REAL consensus rule — at HF_HEIGHT_PQ every block MUST be major_version 16.
+// If the PQ consensus rules (and the audit findings C-1/E-*) are not finalised and
+// audited before the tip approaches this height, the chain would halt (no valid v16
+// block can be produced). The placeholder is therefore pushed far above any realistic
+// near-term tip. À AJUSTER QUAND LA SPEC PQC SERA FINALISÉE ET AUDITÉE (cible T2 2027).
 #define HF_VERSION_PQ                           16
-#define HF_HEIGHT_PQ                            1000000ULL
+#define HF_HEIGHT_PQ                            2000000ULL
 
 // Phase 5 (HFv16): tx_extra tag carrying the external Dilithium3 signature
 // (pk + sig). Distinct from the classic tx_extra tags in tx_extra.h
