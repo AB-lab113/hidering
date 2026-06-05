@@ -622,6 +622,12 @@ namespace cryptonote
     if (!pick<tx_extra_merge_mining_tag>(nar, tx_extra_fields, TX_EXTRA_MERGE_MINING_TAG)) return false;
     if (!pick<tx_extra_mysterious_minergate>(nar, tx_extra_fields, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG)) return false;
     if (!pick<tx_extra_padding>(nar, tx_extra_fields, TX_EXTRA_TAG_PADDING)) return false;
+    // HIDERING Phase 5 (HFv16): keep sort_tx_extra complete for the post-quantum field
+    // types (audit E-3). Note construction never calls sort_tx_extra on a tx that
+    // already carries PQ fields — they are appended AFTER sorting — so this only guards
+    // against the "not empty after sorting" error if sort is ever run on a full PQ tx.
+    if (!pick<tx_extra_kyber_ct>(nar, tx_extra_fields, TX_EXTRA_TAG_KYBER_CT)) return false;
+    if (!pick<tx_extra_pq_sig>(nar, tx_extra_fields, TX_EXTRA_TAG_PQ_SIG)) return false;
 
     // if not empty, someone added a new type and did not add a case above
     if (!tx_extra_fields.empty())

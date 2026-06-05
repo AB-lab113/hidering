@@ -39,8 +39,16 @@
 #include "serialization/binary_archive.h"
 #include "serialization/variant.h"
 #include "crypto/crypto.h"
+#include "crypto/pqc.h" // HIDERING Phase 5 (HFv16): post-quantum tx_extra field payload sizes
 
-#define TX_EXTRA_PADDING_MAX_COUNT          255
+// HIDERING (audit F-4 support): HIDERING normalises every tx_extra to a fixed
+// privacy padding (2500 bytes, see cryptonote_tx_utils.cpp). That single padding run
+// exceeds the stock Monero cap of 255, which made HIDERING tx_extra fail canonical
+// parse_tx_extra() — historically tolerated only because tx_extra is opaque at
+// consensus. Raising the parse cap (load-side only; more permissive; emits no new
+// bytes) lets parse_tx_extra() accept HIDERING padding, which the HFv16 post-quantum
+// validator now relies on (audit E-3). No consensus rule keys on this value.
+#define TX_EXTRA_PADDING_MAX_COUNT          2500
 #define TX_EXTRA_NONCE_MAX_COUNT            255
 
 #define TX_EXTRA_TAG_PADDING                0x00
@@ -183,12 +191,40 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  // HIDERING Phase 5 (HFv16) — post-quantum tx_extra fields. The on-wire layout is
+  // byte-identical to the raw [tag | fixed-bytes] blobs that cryptonote_tx_utils.cpp
+  // appends (the pqc structs are fixed-size trivially-copyable PODs serialized as
+  // blobs), so registering them as proper variant types lets parse_tx_extra and
+  // sort_tx_extra handle them CANONICALLY (audit E-3) with zero change to the bytes
+  // on the wire. Tags 0x06/0x07 mirror TX_EXTRA_TAG_PQ_SIG / TX_EXTRA_TAG_KYBER_CT in
+  // cryptonote_config.h. These fields only ever appear once hf_version >= HF_VERSION_PQ.
+  struct tx_extra_pq_sig
+  {
+    crypto::pqc::pq_tx_sig sig; // pk(1952) || sig(3293) = 5245 bytes
+
+    BEGIN_SERIALIZE()
+      FIELD(sig)
+    END_SERIALIZE()
+  };
+
+  struct tx_extra_kyber_ct
+  {
+    crypto::pqc::kyber_ciphertext ct; // 1088 bytes
+
+    BEGIN_SERIALIZE()
+      FIELD(ct)
+    END_SERIALIZE()
+  };
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
   //   varint data[];
-  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate> tx_extra_field;
+  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate, tx_extra_pq_sig, tx_extra_kyber_ct> tx_extra_field;
 }
+
+BLOB_SERIALIZER(crypto::pqc::pq_tx_sig);
+BLOB_SERIALIZER(crypto::pqc::kyber_ciphertext);
 
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_padding, TX_EXTRA_TAG_PADDING);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_pub_key, TX_EXTRA_TAG_PUBKEY);
@@ -196,3 +232,6 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_nonce, TX_EXTRA_NONCE);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_merge_mining_tag, TX_EXTRA_MERGE_MINING_TAG);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_additional_pub_keys, TX_EXTRA_TAG_ADDITIONAL_PUBKEYS);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate, TX_EXTRA_MYSTERIOUS_MINERGATE_TAG);
+// HIDERING Phase 5 (HFv16): tags 0x06 / 0x07 (free in the classic tx_extra tag space).
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_pq_sig, 0x06);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_kyber_ct, 0x07);
