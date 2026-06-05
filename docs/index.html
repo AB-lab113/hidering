@@ -369,7 +369,10 @@
 
   .token-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    /* Exactly 6 cards: use a fixed 3-column layout so both rows fill completely.
+       auto-fit left empty trailing cells on the last row, which showed the gold
+       --border grid background as blank gold rectangles next to the RandomX card. */
+    grid-template-columns: repeat(3, 1fr);
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
@@ -805,6 +808,7 @@
     .nav-links { display: none; }
     .hero-stats { gap: 1.5rem; }
     .roadmap-item { grid-template-columns: 1fr; gap: 0.5rem; }
+    .token-grid { grid-template-columns: repeat(2, 1fr); } /* 6 cards -> 3 full rows of 2, no empty gold cells */
     .token-section { padding: 4rem 1.5rem; }
     .fairlaunch-box { padding: 2rem 1.5rem; }
   }
