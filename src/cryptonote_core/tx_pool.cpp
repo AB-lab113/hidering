@@ -182,9 +182,14 @@ namespace cryptonote
     }
 
     size_t tx_extra_size = tx.extra.size();
-    if (!kept_by_block && tx_extra_size > MAX_TX_EXTRA_SIZE)
+    // HIDERING (audit E-5): from HFv16 onward a post-quantum tx legitimately carries a
+    // larger tx_extra (Dilithium pk+sig 5246 B + one Kyber768 ciphertext per BQ output),
+    // so the relay/mempool ceiling tracks the consensus PQ limit. Pre-fork the classic
+    // 3000-byte limit is unchanged, so the live chain is untouched.
+    const size_t max_tx_extra_size = (m_blockchain.get_current_hard_fork_version() >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;
+    if (!kept_by_block && tx_extra_size > max_tx_extra_size)
     {
-      LOG_PRINT_L1("transaction tx-extra is too big: " << tx_extra_size << " bytes, the limit is: " << MAX_TX_EXTRA_SIZE);
+      LOG_PRINT_L1("transaction tx-extra is too big: " << tx_extra_size << " bytes, the limit is: " << max_tx_extra_size);
       tvc.m_verifivation_failed = true;
       tvc.m_tx_extra_too_big = true;
       tvc.m_no_drop_offense = true;
