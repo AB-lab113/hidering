@@ -64,7 +64,13 @@ namespace pqc
   {
     bool ok = false;
     OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
-    if (sig != nullptr)
+    // audit M-5: validate the runtime liboqs sizes and the caller-supplied signature
+    // length before verifying, so a mismatched/truncated length can never reach
+    // OQS_SIG_verify with an inconsistent buffer view.
+    if (sig != nullptr
+        && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES
+        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES
+        && sig_len == DILITHIUM3_SIGNATURE_BYTES)
     {
       ok = OQS_SIG_verify(sig, msg, msg_len, sig_in.sig, sig_len, pk.dilithium3_pk) == OQS_SUCCESS;
     }
@@ -137,7 +143,11 @@ namespace pqc
 
     bool ok = false;
     OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
-    if (sig != nullptr)
+    // audit M-5: confirm the runtime liboqs signature/public-key sizes match the
+    // compile-time constants before verifying the fixed-length blob.
+    if (sig != nullptr
+        && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES
+        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES)
     {
       ok = OQS_SIG_verify(sig, tx_prefix_hash, hash_len,
                           sig_in.sig, DILITHIUM3_SIGNATURE_BYTES, sig_in.pk) == OQS_SUCCESS;
