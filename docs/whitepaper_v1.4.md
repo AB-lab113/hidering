@@ -1,8 +1,8 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
-**Version 1.3 (révisée 1 Juin 2026 — release v2.0.2)**  
-**Mai 2026**
+**Version 1.4 (révisée 6 Juin 2026 — post-audit sécurité juin 2026)**  
+**Juin 2026**
 
 ---
 
@@ -15,11 +15,12 @@
 6. Résistance Quantique
 7. Distribution Fair Launch
 8. Roadmap Complète
-9. Comparaison Technique
-10. Spécifications Techniques
-11. Conformité & Légal
-12. Ressources
-13. Conclusion
+9. Pool Mining
+10. Comparaison Technique
+11. Spécifications Techniques
+12. Conformité & Légal
+13. Ressources
+14. Conclusion
 
 ---
 
@@ -27,7 +28,7 @@
 
 HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero v0.18.1, combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
 
-**FAIR LAUNCH** : émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. v2.0.0 introduit une courte phase de pré-minage en réseau privé (réponse à l'attaque 51% du 16 mai 2026 sur la chaîne v1.x à h≈3577) — voir §7 pour la justification complète.
+**FAIR LAUNCH** : émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. v2.0.0 introduit une courte phase de pré-minage en réseau privé (réponse à l'attaque 51% du 16 mai 2026 sur la chaîne v1.x à h≈3577) constituant une réserve minée — voir §7 pour la justification complète et l'usage des fonds.
 
 **INNOVATIONS CLÉS** :
 - Ring size dynamique 32–64 (vs Monero 16)
@@ -35,7 +36,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 - TX padding interne fixe 2500 bytes (tx_extra)
 - Routage stem multi-hops (biais best-effort vers ≥3 hops, par-dessus Dandelion++)
 - Montants confidentiels via RingCT (engagements de Pedersen)
-- Stealth addresses V2
+- Stealth addresses one-time (CryptoNote)
 - Résistance quantique programmée (2027)
 
 ---
@@ -50,9 +51,9 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 
 HIDERING vise la confidentialité maximale par construction :
 
-- **Anonymat on-chain** : ring signatures 32–64, stealth addresses V2, RingCT
-- **Anonymat réseau** : routage stem multi-hops (best-effort par-dessus Dandelion++), chiffrement bout-en-bout
-- **Confidentialité des montants** : TX padding interne fixe 2500 bytes (tx_extra)
+- **Anonymat on-chain** : ring signatures 32–64, stealth addresses one-time, RingCT
+- **Anonymat réseau** : routage stem multi-hops (best-effort par-dessus Dandelion++), chiffrement bout-en-bout hérité de Monero
+- **Confidentialité des montants** : RingCT (engagements de Pedersen) ; TX padding interne fixe 2500 bytes (tx_extra) pour uniformiser la taille des champs annexes
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
 
 ### 2.3 Modèle économique sain
@@ -77,11 +78,13 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|----------------|----------|
 | Ring size | 16 | 32–64 (dynamique) |
 | TX padding | Variable | TX interne 2500 o (réseau : Monero 1024 o) |
-| Réseau | P2P direct | Routage stem multi-hops |
+| Réseau | P2P direct | Routage stem multi-hops (best-effort) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
-| Stealth | V1 | V2 |
+| Stealth | One-time | One-time (CryptoNote) |
 | PoW | RandomX | RandomX (identique) |
 | Hard Fork | HFv15 | HFv15 dès bloc 1 |
+
+> **Note transparence (audit juin 2026).** Le routage stem multi-hops est un biais *best-effort* greffé sur Dandelion++ : il n'est pas « obligatoire/garanti », l'epoch Dandelion++ décidant in fine du chemin. Le padding interne 2500 o porte sur le champ `tx_extra` ; le padding *réseau* reste celui de Monero (granularité 1024 o). Ces formulations ont été requalifiées après l'audit pour refléter exactement le code.
 
 ---
 
@@ -93,6 +96,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|--------|
 | Ticker | HRG |
 | Supply maximum | **18,000,000 HRG (hard cap irrévocable)** |
+| Supply circulant max | 17,999,842.86 HRG (genesis NUMS 157.14 HRG déduit) |
 | Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~2.66 ans) |
@@ -169,14 +173,19 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 
 - **Signatures** : Dilithium3 (NIST PQC standard)
 - **Échange de clés** : Kyber768 (NIST PQC standard)
+- **Nouvelles adresses** : format BQ... dédié aux clés Kyber768 (le format B... classique reste inchangé)
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
+
+**État (juin 2026).** Le prototype post-quantique (intégration liboqs, keygen BQ, persistance des clés, signatures Dilithium3 en `tx_extra`, KEM Kyber768) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16) ; la spécification du *binding* validateur des clés PQ doit être finalisée avant toute activation. Cible mainnet : **T2 2027**.
 
 ---
 
 ## 7. DISTRIBUTION FAIR LAUNCH
 
-**Principe** : émission 100% via PoW RandomX, aucune vente privée, aucun seed round, pas de token allocation à l'équipe. Bloc 0 est un genesis avec 157.14 HRG verrouillés sous clé NUMS (cryptographiquement unspendable, héritage chaîne — voir `GENESIS_PROOF.md`). Bloc 1 onwards : récompense distribuée par compétition PoW pure.
+**Principe** : émission 100% via PoW RandomX, aucune vente privée, aucun seed round. Bloc 0 est un genesis avec 157.14 HRG verrouillés sous clé NUMS (cryptographiquement unspendable, héritage chaîne — voir `GENESIS_PROOF.md`). Bloc 1 onwards : récompense distribuée par compétition PoW pure.
+
+> **Transparence (révision juin 2026).** La promesse « aucune allocation à l'équipe » du narratif v1.x **n'est plus exacte depuis v2.0.0** : la phase de pré-minage en réseau privé (§7.1) constitue une **réserve minée** détenue par les nœuds fondateurs avant la ré-ouverture publique. Cette réserve n'est pas une vente privée ni un seed round — elle est produite par PoW sous les mêmes règles RandomX — mais elle existe et son usage est détaillé ci-dessous.
 
 ### 7.1 Phase pré-publique v2.0.0 (post-attaque 16 mai 2026)
 
@@ -188,14 +197,15 @@ Peu après le lancement v1.x, le réseau HIDERING a subi une attaque 51% (16 mai
   2. **Financer le développement** — les tests du wallet GUI et l'implémentation des signatures post-quantiques (Dilithium3 + Kyber768, prévues 2027) requièrent des transactions on-chain réelles.
   3. **Constituer une réserve communautaire** — qui sera soit redistribuée aux mineurs et DEX participants au lancement public, soit partiellement brûlée pour réduire la supply en circulation.
 
-Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'agit d'un bouclier défensif et d'un levier de financement développement. Une fois le réseau ouvert publiquement, tous les mineurs concourent sous les mêmes règles RandomX, sans avantage insider sur des coins inaccessibles au public.
+Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement développement**, pas une vente d'insiders : tous les coins sont produits par PoW. Une fois le réseau ouvert publiquement, tous les mineurs concourent sous les mêmes règles RandomX, sans avantage insider sur des coins inaccessibles au public. Le volume exact, la durée et la destination finale de la réserve seront communiqués publiquement au launch.
 
 ### 7.2 Engagements
 
 - ✓ Algorithme PoW RandomX (CPU-only, ASIC-resistant)
-- ✓ Aucune vente privée, aucun seed round, aucun token allocation équipe
+- ✓ Aucune vente privée, aucun seed round, aucun ICO
+- ✓ Émission 100% PoW — y compris la réserve minée en phase privée (§7.1)
 - ✓ Genesis vérifiable on-chain (`GENESIS_PROOF.md`)
-- ✓ Transparence sur la phase pré-publique v2.0.0 : durée, hashrate, destination des coins minés (communiqués au launch public)
+- ✓ Transparence sur la phase pré-publique v2.0.0 : durée, hashrate, volume et destination de la réserve minée (communiqués au launch public)
 
 ---
 
@@ -215,15 +225,15 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 **PHASE 2 : PRIVACY ENHANCEMENTS ✅**
 - P1 ✅ Ring dynamique 32–64
 - P2 ✅ TX padding interne 2500 bytes (tx_extra) ; padding réseau = Monero 1024 o
-- P3 ✅ Mixnet 3-hops
-- P4 ✅ Montants confidentiels (RingCT)
-- P5 ✅ Stealth V2
+- P3 ✅ Routage stem multi-hops (best-effort par-dessus Dandelion++)
+- P4 ✅ Montants confidentiels (RingCT — engagements de Pedersen)
+- P5 ✅ Stealth addresses one-time (CryptoNote)
 
 **PHASE 3 : INFRASTRUCTURE ✅**
 - Rebranding complet HIDERING
-- Seed nodes Flux (hideringseed1, hideringseed2)
+- Seed nodes sur VPS dédiés (seed1/seed2.hidering.org)
 - DNS seed1/seed2.hidering.org
-- Block explorer (hrgexplorer.app.runonflux.io)
+- Block explorer (explorer.hidering.org)
 - Site web hidering.org
 
 **PHASE 4 : MAINNET LAUNCH (En cours)**
@@ -231,24 +241,52 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 - ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (pré-launch, ~h≈3577) retirée au profit du nouveau réseau v2.0.0.
 - ✅ **Release v2.0.2 (1 juin 2026)** — dernière publique, bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
 - ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256
-- ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333`)
+- ✅ Wallet GUI Desktop multi-plateformes (v2.0.2-gui : Linux AppImage, macOS ARM64, Windows x64)
+- ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333` — voir §9)
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
-- Dilithium3 + Kyber768 signatures
-- Hard fork PQC
+- Dilithium3 + Kyber768 signatures (prototype audité, code inerte jusqu'à HFv16)
+- Finalisation spec binding PQ + tests end-to-end
+- Hard fork PQC mainnet (cible T2 2027)
 
 ---
 
-## 9. COMPARAISON TECHNIQUE
+## 9. POOL MINING
+
+HIDERING opère un pool de minage public RandomX en production pour abaisser la barrière d'entrée au minage CPU et faciliter la participation au fair launch.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Endpoint stratum | `pool.hidering.org:3333` |
+| Algorithme | RandomX (`rx/0`) |
+| Stack | cryptonote-nodejs-pool + Redis + Nginx |
+| Difficulté de départ | varDiff (auto-ajustée) |
+| Récompense bloc | 42.857142857143 HRG (période 1) |
+
+Exemple de commande mineur (xmrig) :
+
+```
+xmrig -o pool.hidering.org:3333 -u <votre_adresse_B...> -p x -a rx/0
+```
+
+Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli`. RandomX étant CPU-only et résistant aux ASIC, un simple processeur de bureau permet de participer à l'émission.
+
+### 9.1 Checkpoints d'intégrité
+
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+
+---
+
+## 10. COMPARAISON TECHNIQUE
 
 | Fonctionnalité | Monero | **HIDERING** |
 |---------------|--------|--------------|
 | Ring size | 16 (fixe) | 32–64 (dynamique) |
 | TX padding | Non | TX interne 2500 o (réseau : Monero 1024 o) |
-| Mixnet | Non | Routage stem multi-hops |
+| Routage réseau | Dandelion++ | Stem multi-hops best-effort (sur Dandelion++) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
-| Stealth | V1 | V2 |
+| Stealth | One-time | One-time (CryptoNote) |
 | Supply | Tail emission | 18M hard cap |
 | Halving | Non | Tous les 210,000 blocs |
 | PoW | RandomX | RandomX (identique) |
@@ -256,7 +294,7 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 
 ---
 
-## 10. SPÉCIFICATIONS TECHNIQUES
+## 11. SPÉCIFICATIONS TECHNIQUES
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -275,39 +313,41 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 | Supply | 18,000,000 HRG |
 | Reward initial | 42.857142857143 HRG/bloc |
 | Halving | 210,000 blocs (~2.66 ans) |
+| Unlock window | 60 blocs |
 | Émission | 100% PoW (voir §7) |
 | Repo | github.com/AB-lab113/hidering |
 
 ---
 
-## 11. CONFORMITÉ & LÉGAL
+## 12. CONFORMITÉ & LÉGAL
 
 HIDERING est un logiciel open-source distribué sous licence identique à Monero (BSD 3-Clause). L'équipe ne donne aucun conseil financier. HRG est un actif expérimental. Les utilisateurs sont responsables du respect des lois locales relatives aux cryptomonnaies.
 
 ---
 
-## 12. RESSOURCES
+## 13. RESSOURCES
 
 - **Site web** : https://hidering.org
 - **GitHub** : https://github.com/AB-lab113/hidering
 - **Releases** : https://github.com/AB-lab113/hidering/releases
-- **Block Explorer** : https://hrgexplorer.app.runonflux.io
+- **Block Explorer** : https://explorer.hidering.org
+- **Pool mining** : pool.hidering.org:3333
 - **DNS Seed 1** : seed1.hidering.org
 - **DNS Seed 2** : seed2.hidering.org
 
 ---
 
-## 13. CONCLUSION
+## 14. CONCLUSION
 
-HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o, routage stem multi-hops), HIDERING offre une confidentialité maximale par construction.
+HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o, routage stem multi-hops best-effort), HIDERING offre une confidentialité forte par construction.
 
-Le fair launch garantit une distribution équitable par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
+Le fair launch garantit une distribution par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique ; la réserve qui en résulte est minée, transparente et son usage sera communiqué au launch. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
 **HIDERING — Privacy by design. Fair by launch.** 🚀
 
 ---
 
-*Whitepaper v1.3 — Mai 2026 (révisé 1 juin 2026 pour release v2.0.2)*  
+*Whitepaper v1.4 — Juin 2026 (révisé 6 juin 2026 après l'audit sécurité de juin 2026 : corrections privacy, transparence réserve minée, ajout pool mining + checkpoints)*  
 *SHA256 release v2.0.2 (dernière publique) :*  
 *  Linux x64 : `844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30`*  
 *  macOS ARM64 : `5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22`*  
