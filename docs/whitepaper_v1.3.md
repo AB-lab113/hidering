@@ -34,7 +34,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 - Transaction padding fixe 2500 bytes
 - Mixnet natif 3-hops obligatoire
 - Normalisation montants (chunks 0.1 HRG)
-- Stealth addresses V2 avec view keys temporelles
+- Stealth addresses V2
 - Résistance quantique programmée (2027)
 
 ---
@@ -78,7 +78,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 | TX padding | Variable | 2500 bytes fixe |
 | Réseau | P2P direct | Mixnet 3-hops |
 | Montants | Variable | Normalisés 0.1 HRG |
-| Stealth | V1 | V2 + view keys temporelles |
+| Stealth | V1 | V2 |
 | PoW | RandomX | RandomX (identique) |
 | Hard Fork | HFv15 | HFv15 dès bloc 1 |
 
@@ -247,7 +247,7 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 | TX padding | Non | 2500 bytes fixe |
 | Mixnet | Non | 3-hops natif |
 | Montants | Variables | Normalisés 0.1 HRG |
-| Stealth | V1 | V2 + view keys temporelles |
+| Stealth | V1 | V2 |
 | Supply | Tail emission | 18M hard cap |
 | Halving | Non | Tous les 210,000 blocs |
 | PoW | RandomX | RandomX (identique) |
