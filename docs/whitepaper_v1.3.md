@@ -34,7 +34,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 - Padding réseau hérité de Monero (granularité 1024 bytes)
 - TX padding interne fixe 2500 bytes (tx_extra)
 - Routage stem multi-hops (biais best-effort vers ≥3 hops, par-dessus Dandelion++)
-- Normalisation montants (chunks 0.1 HRG)
+- Montants confidentiels via RingCT (engagements de Pedersen)
 - Stealth addresses V2
 - Résistance quantique programmée (2027)
 
@@ -78,7 +78,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 | Ring size | 16 | 32–64 (dynamique) |
 | TX padding | Variable | TX interne 2500 o (réseau : Monero 1024 o) |
 | Réseau | P2P direct | Routage stem multi-hops |
-| Montants | Variable | Normalisés 0.1 HRG |
+| Montants | Masqués (RingCT) | Masqués (RingCT) |
 | Stealth | V1 | V2 |
 | PoW | RandomX | RandomX (identique) |
 | Hard Fork | HFv15 | HFv15 dès bloc 1 |
@@ -216,7 +216,7 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 - P1 ✅ Ring dynamique 32–64
 - P2 ✅ TX padding interne 2500 bytes (tx_extra) ; padding réseau = Monero 1024 o
 - P3 ✅ Mixnet 3-hops
-- P4 ✅ Normalisation montants 0.1 HRG
+- P4 ✅ Montants confidentiels (RingCT)
 - P5 ✅ Stealth V2
 
 **PHASE 3 : INFRASTRUCTURE ✅**
@@ -247,7 +247,7 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 | Ring size | 16 (fixe) | 32–64 (dynamique) |
 | TX padding | Non | TX interne 2500 o (réseau : Monero 1024 o) |
 | Mixnet | Non | Routage stem multi-hops |
-| Montants | Variables | Normalisés 0.1 HRG |
+| Montants | Masqués (RingCT) | Masqués (RingCT) |
 | Stealth | V1 | V2 |
 | Supply | Tail emission | 18M hard cap |
 | Halving | Non | Tous les 210,000 blocs |
