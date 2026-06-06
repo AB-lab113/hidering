@@ -881,8 +881,8 @@
     <div class="feature">
       <div class="feature-icon">▦</div>
       <h3>TX Padding</h3>
-      <p>Every transaction padded to 2500 bytes. Eliminates size-based fingerprinting and correlation attacks across the network.</p>
-      <span class="feature-tag">fixed: 2500B</span>
+      <p>Each transaction's tx_extra is padded to a fixed 2500 bytes internally, removing size-based fingerprints. Network-layer relay padding is inherited from Monero (1024-byte granularity).</p>
+      <span class="feature-tag">tx_extra: 2500B</span>
     </div>
     <div class="feature">
       <div class="feature-icon">⬡</div>
