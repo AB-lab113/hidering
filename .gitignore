@@ -138,7 +138,8 @@ genesis_fix*.patch
 fix_supply.patch
 
 # cake wallet import binary (contains sensitive material)
-cake-import
+# glob covers cake-import, cake-import-v2, and any future variant
+cake-import*
 
 # release tarballs assembled by build-release workflow / local packaging
 /dist/

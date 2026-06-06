@@ -113,11 +113,10 @@ namespace cryptonote
   //---------------------------------------------------------------------------
   bool checkpoints::check_block(uint64_t height, const crypto::hash& h, bool& is_a_checkpoint) const
   {
-    // HIDERING: Désactiver checkpoints Monero
-    is_a_checkpoint = false;
-    return true;
-    
-    /* Code original commenté
+    // HIDERING: les checkpoints Monero hardcodés ont été purgés de init_default_checkpoints
+    // (seules les ancres HRG y subsistent). On applique réellement la vérification de hash
+    // sur ces ancres — sans quoi elles seraient décoratives et n'offriraient aucune
+    // protection au sync initial.
     auto it = m_points.find(height);
     is_a_checkpoint = it != m_points.end();
     if(!is_a_checkpoint)
@@ -132,7 +131,6 @@ namespace cryptonote
       MWARNING("CHECKPOINT FAILED FOR HEIGHT " << height << ". EXPECTED HASH: " << it->second << ", FETCHED HASH: " << h);
       return false;
     }
-    */
   }
   //---------------------------------------------------------------------------
   bool checkpoints::check_block(uint64_t height, const crypto::hash& h) const
