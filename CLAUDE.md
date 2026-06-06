@@ -65,7 +65,7 @@ effectif après wrap). **Patch source appliqué en v1.0.1 (12 mai 2026, commit d
 ## PRIVACY ENHANCEMENTS (TOUS COMPLETES)
 - Patch 1 : Ring size dynamique 32-64 (vs Monero 16) OK
 - Patch 2 : TX padding fixe 2500 bytes OK
-- Patch 3 : Mixnet natif 3-hops obligatoire OK
+- Patch 3 : Routage stem multi-hops (biais best-effort vers ≥3 hops, par-dessus Dandelion++) — câblé le 6 juin 2026 (audit H3 : le compteur `hidering_hop_count` était incrémenté mais jamais sérialisé en sortie → feature inerte ; corrigé en propageant le compteur sur le chemin stem via `send_txs`/`make_tx_message`, fluff→MIN_HOPS). NB : « obligatoire/garanti » N'EST PAS atteignable (le force-stem est greffé sur Dandelion++ dont l'epoch décide in fine) → revendication requalifiée doc+site. Filet de sécurité : embargo D++ inchangé.
 - Patch 4 : Normalisation montants 0.1 HRG OK
 - Patch 5 : Stealth addresses V2 OK (NB : « view keys temporelles » initialement annoncées mais JAMAIS implémentées dans le code — revendication retirée de la doc + du site le 6 juin 2026, audit H4. Les adresses furtives one-time standard CryptoNote restent en place.)
 

@@ -32,7 +32,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 **INNOVATIONS CLÉS** :
 - Ring size dynamique 32–64 (vs Monero 16)
 - Transaction padding fixe 2500 bytes
-- Mixnet natif 3-hops obligatoire
+- Routage stem multi-hops (biais best-effort vers ≥3 hops, par-dessus Dandelion++)
 - Normalisation montants (chunks 0.1 HRG)
 - Stealth addresses V2
 - Résistance quantique programmée (2027)
@@ -50,7 +50,7 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 HIDERING vise la confidentialité maximale par construction :
 
 - **Anonymat on-chain** : ring signatures 32–64, stealth addresses V2, RingCT
-- **Anonymat réseau** : mixnet 3-hops natif, chiffrement bout-en-bout
+- **Anonymat réseau** : routage stem multi-hops (best-effort par-dessus Dandelion++), chiffrement bout-en-bout
 - **Confidentialité des montants** : padding fixe 2500 bytes, normalisation en chunks 0.1 HRG
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
 
@@ -76,7 +76,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|----------------|----------|
 | Ring size | 16 | 32–64 (dynamique) |
 | TX padding | Variable | 2500 bytes fixe |
-| Réseau | P2P direct | Mixnet 3-hops |
+| Réseau | P2P direct | Routage stem multi-hops |
 | Montants | Variable | Normalisés 0.1 HRG |
 | Stealth | V1 | V2 |
 | PoW | RandomX | RandomX (identique) |
@@ -245,7 +245,7 @@ Le pré-minage v2.0.0 n'est **pas** une capture de valeur par l'équipe : il s'a
 |---------------|--------|--------------|
 | Ring size | 16 (fixe) | 32–64 (dynamique) |
 | TX padding | Non | 2500 bytes fixe |
-| Mixnet | Non | 3-hops natif |
+| Mixnet | Non | Routage stem multi-hops |
 | Montants | Variables | Normalisés 0.1 HRG |
 | Stealth | V1 | V2 |
 | Supply | Tail emission | 18M hard cap |
@@ -298,7 +298,7 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 ## 13. CONCLUSION
 
-HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, padding fixe, mixnet 3-hops), HIDERING offre une confidentialité maximale par construction.
+HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, padding fixe, routage stem multi-hops), HIDERING offre une confidentialité maximale par construction.
 
 Le fair launch garantit une distribution équitable par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
