@@ -10698,34 +10698,6 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   // throw if attempting a transaction with no money
   THROW_WALLET_EXCEPTION_IF(needed_money == 0, error::zero_amount);
 
-  // HIDERING Amount Normalization: round each destination to 0.1 HRG quantum
-  // This makes all transaction outputs uniform in denomination, improving privacy
-  // by preventing amount-based transaction linking. Remainder is added to fee.
-  {
-    uint64_t normalization_dust = 0;
-    for (auto& dt : dsts)
-    {
-      uint64_t remainder = dt.amount % HIDERING_AMOUNT_QUANTUM;
-      if (remainder > 0)
-      {
-        LOG_PRINT_L1("HIDERING Normalization: rounding " << print_money(dt.amount)
-                     << " down by " << print_money(remainder) << " to nearest 0.1 HRG");
-        dt.amount -= remainder;
-        normalization_dust += remainder;
-      }
-    }
-    if (normalization_dust > 0)
-    {
-      LOG_PRINT_L1("HIDERING Normalization: " << print_money(normalization_dust) << " dust from rounding added to fee");
-      // Recalculate needed_money after normalization
-      needed_money = 0;
-      for (const auto& dt : dsts)
-      {
-        needed_money += dt.amount;
-      }
-    }
-  }
-
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> unlocked_balance_per_subaddr = unlocked_balance_per_subaddress(subaddr_account, false);
   std::map<uint32_t, uint64_t> balance_per_subaddr = balance_per_subaddress(subaddr_account, false);
 
