@@ -323,6 +323,13 @@ DISABLE_VS_WARNINGS(4244 4345)
     std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
     memcpy(kpk.data(), pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
     keys.m_account_address.pq_kyber_pk = kpk;
+
+    // audit M4: the secret material now lives in the mlocked keys.pq_keys / keys.pq_dilithium
+    // members (pinned against swap). Scrub the plaintext keygen output and the transient
+    // un-mlocked stack copies (pq_sk, sk, dk) so no unprotected residue is left on the stack.
+    memwipe(&pq_sk, sizeof(pq_sk));
+    memwipe(&sk, sizeof(sk));
+    memwipe(&dk, sizeof(dk));
     return true;
   }
   //-----------------------------------------------------------------

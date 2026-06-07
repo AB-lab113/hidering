@@ -55,14 +55,20 @@ namespace cryptonote
     // existing account is unaffected and the field is NOT serialized (absent from the
     // KV map below and from account_boost_serialization.h) — existing wallet files and
     // their on-disk layout are byte-for-byte unchanged.
-    boost::optional<crypto::pqc::pq_stealth_keys> pq_keys;
+    // audit M4: wrapped in epee::mlocked so the secret half (kyber_sk) is pinned in RAM
+    // and never swapped to disk, mirroring crypto::secret_key (= mlocked<scrubbed<...>>).
+    // mlocked<T> publicly derives from T, so every access here (!pq_keys, *pq_keys,
+    // pq_keys->kyber_sk, pq_keys = plainT) and the blob (de)serialization below are
+    // inheritance-transparent and the on-disk key_data bytes are unchanged.
+    boost::optional<epee::mlocked<crypto::pqc::pq_stealth_keys>> pq_keys;
 
     // HIDERING Phase 5 (HFv16, audit C-1): the account's PERSISTENT Dilithium3 signing
     // keypair, used to authenticate transactions with a stable per-account key instead
     // of the former per-tx throwaway. Present only for BQ... accounts; boost::none for
     // every classic account, so it is absent from the serialized key_data (written only
     // when set, below) and existing wallet files stay byte-for-byte unchanged.
-    boost::optional<crypto::pqc::pq_dilithium_keys> pq_dilithium;
+    // audit M4: mlocked for the same reason as pq_keys (pins dilithium_sk against swap).
+    boost::optional<epee::mlocked<crypto::pqc::pq_dilithium_keys>> pq_dilithium;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_account_address)
@@ -87,8 +93,12 @@ namespace cryptonote
       {
         if (this_ref.pq_keys)
         {
+          // audit M4: pq_blob is a plain (un-mlocked) stack copy of the blob. The secret
+          // half is chacha20-encrypted at this point (encrypt_keys runs before this map),
+          // but scrub it anyway as defense-in-depth — the mlocked member itself stays pinned.
           crypto::pqc::pq_stealth_keys pq_blob = *this_ref.pq_keys;
           epee::serialization::selector<is_store>::serialize_t_val_as_blob(pq_blob, stg, hparent_section, "pq_keys");
+          memwipe(&pq_blob, sizeof(pq_blob));
         }
       }
       else
@@ -96,10 +106,11 @@ namespace cryptonote
         crypto::pqc::pq_stealth_keys pq_blob{};
         if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(pq_blob, stg, hparent_section, "pq_keys"))
         {
-          this_ref.pq_keys = pq_blob;
+          this_ref.pq_keys = pq_blob; // copies into the mlocked member (implicit mlocked(const T&))
           std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
           memcpy(kpk.data(), pq_blob.kyber_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
           this_ref.m_account_address.pq_kyber_pk = kpk;
+          memwipe(&pq_blob, sizeof(pq_blob)); // audit M4: scrub the transient un-mlocked copy
         }
         else
         {
@@ -117,13 +128,17 @@ namespace cryptonote
         {
           crypto::pqc::pq_dilithium_keys d_blob = *this_ref.pq_dilithium;
           epee::serialization::selector<is_store>::serialize_t_val_as_blob(d_blob, stg, hparent_section, "pq_dilithium");
+          memwipe(&d_blob, sizeof(d_blob)); // audit M4: scrub the transient un-mlocked copy
         }
       }
       else
       {
         crypto::pqc::pq_dilithium_keys d_blob{};
         if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(d_blob, stg, hparent_section, "pq_dilithium"))
+        {
           this_ref.pq_dilithium = d_blob;
+          memwipe(&d_blob, sizeof(d_blob)); // audit M4: scrub the transient un-mlocked copy
+        }
         else
           this_ref.pq_dilithium = boost::none;
       }
