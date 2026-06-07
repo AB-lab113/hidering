@@ -547,27 +547,44 @@ namespace cryptonote
     // HIDERING privacy padding (audit F-4): normalise every transaction's tx_extra to a
     // FIXED target of 2500 bytes, per the HIDERING spec (Patch 2: fixed 2500-byte TX
     // padding), replacing the former hybrid/proportional scheme whose variable size was
-    // itself a metadata fingerprint. If extra already meets/exceeds the target (e.g. a
-    // PQ tx carrying several Kyber768 ciphertexts), no padding is added; the size ceiling
-    // is enforced ONCE, after all fields (incl. the trailing Dilithium3 signature) are in
-    // place — see below — rather than here (audit: the old check ran before the sig append).
-    const size_t HIDERING_EXTRA_PADDING_TARGET = 2500;
-    if (tx.extra.size() < HIDERING_EXTRA_PADDING_TARGET) {
-      const size_t padding_to_add = HIDERING_EXTRA_PADDING_TARGET - tx.extra.size();
-      tx.extra.push_back(TX_EXTRA_TAG_PADDING);
-      tx.extra.insert(tx.extra.end(), padding_to_add - 1, 0);
+    // itself a metadata fingerprint. If extra already meets/exceeds the target, no padding
+    // is added; the size ceiling is enforced ONCE, after all fields are in place — see below.
+    //
+    // HIDERING Phase 5 (audit H2): the greedy TX_EXTRA_TAG_PADDING (0x00) field can ONLY be
+    // the TERMINAL tx_extra field. Its canonical parser (tx_extra.h tx_extra_padding load)
+    // reads zero bytes until EOF and REJECTS the whole tx_extra on the first non-zero byte
+    // (proven by the unit test parse_tx_extra.handles_invalid_padding_only: [0x00][0x2A]
+    // → parse_tx_extra == false). At/after HFv16 the terminal field MUST be the Dilithium3
+    // signature (tag 0x06, audit E-3 — blockchain.cpp requires pq_fields.back() == pq_sig),
+    // so any 0x00 padding emitted here would sit *before* that 0x06 tag and the canonical
+    // parser would greedily consume the 0x06 byte, reject the tx, and halt the chain at the
+    // fork. A greedy 0x00 padding and a trailing 0x06 signature are therefore mutually
+    // exclusive — the two "must be last" fields cannot coexist. We resolve this by OMITTING
+    // the 0x00 padding on the PQ path: under HFv16 tx_extra ends cleanly with the pq_sig and
+    // parses canonically, and the bulky fixed-size PQ fields (Dilithium pk+sig 5245 B, plus
+    // a 1088-byte Kyber768 ciphertext per BQ output) provide the size obfuscation the padding
+    // otherwise would. The live chain (get_pq_hf_version() → 0, default 0 at every other call
+    // site → hf_version < HF_VERSION_PQ) keeps the 2500-byte padding BYTE-FOR-BYTE as before.
+    if (hf_version < HF_VERSION_PQ)
+    {
+      const size_t HIDERING_EXTRA_PADDING_TARGET = 2500;
+      if (tx.extra.size() < HIDERING_EXTRA_PADDING_TARGET) {
+        const size_t padding_to_add = HIDERING_EXTRA_PADDING_TARGET - tx.extra.size();
+        tx.extra.push_back(TX_EXTRA_TAG_PADDING);
+        tx.extra.insert(tx.extra.end(), padding_to_add - 1, 0);
+      }
     }
 
-    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ ~h1,000,000): attach an
-    // external Dilithium3 signature over the tx prefix as the LAST field of
-    // tx.extra. Gated on hf_version, which defaults to 0 at every current call
-    // site, so the live chain (hf < HF_VERSION_PQ) is never touched. The signature
-    // covers the prefix hash as it stands here (after padding, before the PQ field
-    // itself), so the validator recovers the signed message by stripping the
-    // trailing PQ field; the ring/rct signatures generated below still commit to
-    // the full extra (PQ field included). The per-output BQ... post-quantum key
-    // plumbing lands later in Phase 5 — until then a self-contained throwaway
-    // keypair keeps this path compilable and exercisable without altering consensus.
+    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): attach an external
+    // Dilithium3 signature over the tx prefix as the LAST field of tx.extra. Gated on
+    // hf_version, which is 0 on the live chain (get_pq_hf_version()) / at every other
+    // call site, so hf < HF_VERSION_PQ is never touched. The signature covers the prefix
+    // hash as it stands here — i.e. with the Kyber768 ciphertexts already appended but
+    // BEFORE the PQ field itself, and (audit H2) with NO trailing 0x00 padding, which is
+    // omitted above on the PQ path so that this signature can be the canonically-parseable
+    // terminal field. The validator recovers the signed message by stripping the trailing
+    // PQ field; the ring/rct signatures generated below still commit to the full extra
+    // (PQ field included).
     if (hf_version >= HF_VERSION_PQ)
     {
       crypto::hash pq_prefix_hash;

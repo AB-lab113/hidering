@@ -541,6 +541,22 @@ namespace cryptonote
     return r;
   }
   //---------------------------------------------------------------
+  // Canonical TLV parser for tx_extra (audit E-3): deserialises every field in order and
+  // fails on the first malformed byte, leaving NO trailing slack. Two ordering invariants
+  // matter for HIDERING Phase 5 (HFv16) and are NOT free to violate:
+  //   (1) TX_EXTRA_TAG_PADDING (0x00) is parsed greedily by tx_extra_padding (tx_extra.h):
+  //       it consumes zero bytes until EOF and REJECTS the whole buffer on the first
+  //       non-zero byte. So a 0x00 padding field is only ever canonical as the TERMINAL
+  //       field. (See unit test parse_tx_extra.handles_invalid_padding_only.)
+  //   (2) The Dilithium3 signature (TX_EXTRA_TAG_PQ_SIG, 0x06) MUST be the terminal field
+  //       at/after HFv16 (blockchain.cpp check_tx_inputs requires pq_fields.back() to be
+  //       the pq_sig, since the signed message is the prefix hash with that trailing field
+  //       stripped).
+  // (1) and (2) are mutually exclusive — two "must be last" fields cannot coexist — which is
+  // why construct_tx_with_tx_key OMITS the 0x00 padding on the PQ path (audit H2). This
+  // parser is therefore deliberately left as the stock greedy-padding behaviour: the PQ tx
+  // never feeds it a 0x00-padding-then-0x06 sequence, and changing the padding parser to
+  // tolerate trailing data would relax a live-chain consensus rule. Do not "fix" it here.
   bool parse_tx_extra(const std::vector<uint8_t>& tx_extra, std::vector<tx_extra_field>& tx_extra_fields)
   {
     tx_extra_fields.clear();
