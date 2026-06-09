@@ -102,7 +102,7 @@ namespace cryptonote {
     );
 
   // HIDERING Phase 5 (HFv16): encode / parse a post-quantum BQ... address that
-  // additionally carries a Kyber768 public key. The rendered string begins "BQ"
+  // additionally carries a ML-KEM-768 public key. The rendered string begins "BQ"
   // (tag 62 + a fixed leading marker byte — see cryptonote_config.h). The parser fills
   // addr.pq_kyber_pk (so addr.is_pq() becomes true) only when `str` decodes under the BQ
   // prefix (::config::CRYPTONOTE_PQ_ADDRESS_PREFIX), has the expected 1249-byte payload,

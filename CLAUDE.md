@@ -400,8 +400,9 @@ Sister repo : **github.com/AB-lab113/hidering-gui** (public, créé 23 mai). For
 
 ## POST-QUANTIQUE (PHASE 5 — 2027)
 Hard fork additif (n'altère pas la blockchain existante) :
-- Dilithium3 (CRYSTALS) — signatures
-- Kyber768 — échange de clés
+- **ML-DSA-65** (FIPS 204, ex-Dilithium3) — signatures
+- **ML-KEM-768** (FIPS 203, ex-Kyber768) — échange de clés
+- **Migration FIPS ✅ 9 juin 2026 (Étape 9)** : liboqs 0.10.1→0.15.0, `OQS_SIG_alg_ml_dsa_65`/`OQS_KEM_alg_ml_kem_768` (les Round 3 pré-FIPS ne sont plus appelés). Tailles ML-DSA-65 : sk 4000→**4032**, sig 3293→**3309** (pk 1952 inchangé ; champ tx_extra PQ_SIG = 5262 o tag inclus). Tailles ML-KEM-768 = identiques à Kyber768 (1184/2400/1088/32) → adresse BQ (1249 o), blob `pq_keys` (3584 o) et CT (1088 o) inchangés en taille, mais **clés/sigs/CT incompatibles avec les versions draft** (wallets BQ expérimentaux à régénérer ; aucun impact chaîne, HFv16 inactif). Constantes renommées `ML_DSA_65_*`/`ML_KEM_768_*` ; noms de membres/clés KV historiques (`dilithium3_pk`, `kyber_sk`, `"pq_dilithium"`, `"pq_keys"`) **conservés** pour ne pas casser le format wallet. NB : les sections Étapes 1–8 ci-dessous sont des archives historiques et conservent la terminologie Dilithium3/Kyber768 de l'époque.
 - Calendrier : Étapes 1–7 (implémentation) ✅ mai–juin 2026 + **audit de sécurité ✅ 5 juin 2026** (18 findings corrigés, voir Étape 8) → finalisation spec binding PQ + tests end-to-end T1 2027 → hard fork mainnet T2 2027
 - **Statut : prototype durci, NON production-final.** Tout le code PQ reste inerte (`hf_version >= HF_VERSION_PQ` (16) et/ou `pq_keys`) jusqu'à HFv16, désormais à **h=2,000,000** (placeholder repoussé de 1,000,000 par l'audit M-6). **Ne PAS activer HFv16 avant la finalisation du binding C-1** (voir Étape 8).
 

@@ -333,13 +333,13 @@ namespace cryptonote {
   // A BQ... address base58-encodes, under ::config::CRYPTONOTE_PQ_ADDRESS_PREFIX (62):
   //   marker (1) | m_spend_public_key (32) | m_view_public_key (32) | kyber768_pk (1184)
   // Step 6: the leading CRYPTONOTE_PQ_ADDRESS_MARKER byte pins the rendered base58 prefix
-  // to "BQ" (the tag alone cannot — see cryptonote_config.h). The Kyber768 key is carried
+  // to "BQ" (the tag alone cannot — see cryptonote_config.h). The ML-KEM-768 key is carried
   // out-of-band of account_public_address's standard object serialization (which only
   // covers the two Ed25519 keys), so classic B... addresses are entirely unaffected. The
   // 1249-byte payload size is also what disambiguates a BQ... address from a subaddress
   // (64 bytes), which shares the numeric prefix 62.
   static constexpr size_t PQ_ADDRESS_PAYLOAD_SIZE =
-      1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::KYBER768_PUBLIC_KEY_BYTES;
+      1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES;
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str_pq(
       network_type /*nettype*/
@@ -347,14 +347,14 @@ namespace cryptonote {
     )
   {
     // BQ... addresses are mainnet-only for now (single ::config prefix).
-    CHECK_AND_ASSERT_MES(adr.is_pq(), std::string(), "get_account_address_as_str_pq: address carries no Kyber768 key");
+    CHECK_AND_ASSERT_MES(adr.is_pq(), std::string(), "get_account_address_as_str_pq: address carries no ML-KEM-768 key");
 
     std::string blob;
     blob.reserve(PQ_ADDRESS_PAYLOAD_SIZE);
     blob.push_back(static_cast<char>(::config::CRYPTONOTE_PQ_ADDRESS_MARKER)); // pins "BQ" prefix
     blob.append(reinterpret_cast<const char*>(&adr.m_spend_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(&adr.m_view_public_key), sizeof(crypto::public_key));
-    blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     return tools::base58::encode_addr(::config::CRYPTONOTE_PQ_ADDRESS_PREFIX, blob);
   }
   //-----------------------------------------------------------------------
@@ -400,7 +400,7 @@ namespace cryptonote {
     memcpy(&out.m_view_public_key, p, sizeof(crypto::public_key));
     p += sizeof(crypto::public_key);
     std::array<uint8_t, 1184> kpk;
-    memcpy(kpk.data(), p, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    memcpy(kpk.data(), p, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     out.pq_kyber_pk = kpk;
 
     if (!crypto::check_key(out.m_spend_public_key) || !crypto::check_key(out.m_view_public_key))

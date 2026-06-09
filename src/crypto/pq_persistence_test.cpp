@@ -3,7 +3,7 @@
 // Standalone (built like pqc_test.cpp / pq_keygen_test.cpp), but it additionally
 // exercises the wallet-file serialization path used by wallet2::store_keys /
 // load_keys: account_keys is (de)serialized via its KV map (epee store_t_to_binary /
-// load_t_from_binary), with the Kyber768 secret key chacha20-encrypted in place by
+// load_t_from_binary), with the ML-KEM-768 secret key chacha20-encrypted in place by
 // account_keys::encrypt()/decrypt() — exactly as a .keys file is written/read.
 //
 // It checks:
@@ -52,10 +52,10 @@ static bool test_bq_key_persistence()
   std::string blob(reinterpret_cast<const char*>(slice.data()), slice.size());
 
   // The kyber_sk must be encrypted on disk, never the plaintext secret bytes.
-  std::string needle(reinterpret_cast<const char*>(pq_plain.kyber_sk), crypto::pqc::KYBER768_SECRET_KEY_BYTES);
+  std::string needle(reinterpret_cast<const char*>(pq_plain.kyber_sk), crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES);
   if (blob.find(needle) != std::string::npos) { printf("FAIL: plaintext kyber_sk found in serialized blob\n"); return false; }
   // ... but the (public) kyber_pk is in the clear.
-  std::string pk_needle(reinterpret_cast<const char*>(pq_plain.kyber_pk), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+  std::string pk_needle(reinterpret_cast<const char*>(pq_plain.kyber_pk), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
   if (blob.find(pk_needle) == std::string::npos) { printf("FAIL: kyber_pk not present in serialized blob\n"); return false; }
 
   // Deserialize into a fresh account and decrypt (as load_keys_buf does).
@@ -68,9 +68,9 @@ static bool test_bq_key_persistence()
   const account_keys& k2 = acc2.get_keys();
   if (memcmp(&k2.m_spend_secret_key, &spend_plain, sizeof(crypto::secret_key)) != 0) { printf("FAIL: spend key mismatch\n"); return false; }
   if (memcmp(&k2.m_view_secret_key,  &view_plain,  sizeof(crypto::secret_key)) != 0) { printf("FAIL: view key mismatch\n"); return false; }
-  if (memcmp(k2.pq_keys->kyber_sk, pq_plain.kyber_sk, crypto::pqc::KYBER768_SECRET_KEY_BYTES) != 0) { printf("FAIL: kyber_sk mismatch after decrypt\n"); return false; }
-  if (memcmp(k2.pq_keys->kyber_pk, pq_plain.kyber_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: kyber_pk mismatch\n"); return false; }
-  if (memcmp(k2.m_account_address.pq_kyber_pk->data(), pq_plain.kyber_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: rehydrated address kyber_pk mismatch\n"); return false; }
+  if (memcmp(k2.pq_keys->kyber_sk, pq_plain.kyber_sk, crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES) != 0) { printf("FAIL: kyber_sk mismatch after decrypt\n"); return false; }
+  if (memcmp(k2.pq_keys->kyber_pk, pq_plain.kyber_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: kyber_pk mismatch\n"); return false; }
+  if (memcmp(k2.m_account_address.pq_kyber_pk->data(), pq_plain.kyber_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: rehydrated address kyber_pk mismatch\n"); return false; }
 
   printf("PASS: BQ keypair persists through encrypt -> serialize -> reload -> decrypt (kyber_sk encrypted on disk)\n");
   return true;

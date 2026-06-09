@@ -4,8 +4,8 @@
 //
 // Exercises the Open Quantum Safe (liboqs) primitives that HIDERING will adopt
 // in the Phase 5 additive hard fork:
-//   * Dilithium3 (CRYSTALS-Dilithium, NIST level 3) — digital signatures
-//   * Kyber768   (CRYSTALS-Kyber,     NIST level 3) — key encapsulation
+//   * ML-DSA-65 (CRYSTALS-ML-DSA, NIST level 3) — digital signatures
+//   * ML-KEM-768   (CRYSTALS-ML-KEM,     NIST level 3) — key encapsulation
 //
 // Build (standalone, against the statically-built liboqs in external/liboqs):
 //   g++ -std=c++17 -I external/liboqs/build/include \
@@ -26,9 +26,9 @@ static int test_dilithium3()
     static const char MESSAGE[] = "HIDERING_PQC_TEST";
     const size_t message_len = std::strlen(MESSAGE);
 
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
     if (sig == nullptr) {
-        std::fprintf(stderr, "ERROR: Dilithium3 is not enabled in this liboqs build\n");
+        std::fprintf(stderr, "ERROR: ML-DSA-65 is not enabled in this liboqs build\n");
         return 1;
     }
 
@@ -38,7 +38,7 @@ static int test_dilithium3()
     size_t signature_len = 0;
 
     if (OQS_SIG_keypair(sig, public_key.data(), secret_key.data()) != OQS_SUCCESS) {
-        std::fprintf(stderr, "ERROR: Dilithium3 keypair generation failed\n");
+        std::fprintf(stderr, "ERROR: ML-DSA-65 keypair generation failed\n");
         OQS_SIG_free(sig);
         return 1;
     }
@@ -46,7 +46,7 @@ static int test_dilithium3()
     if (OQS_SIG_sign(sig, signature.data(), &signature_len,
                      reinterpret_cast<const uint8_t *>(MESSAGE), message_len,
                      secret_key.data()) != OQS_SUCCESS) {
-        std::fprintf(stderr, "ERROR: Dilithium3 signing failed\n");
+        std::fprintf(stderr, "ERROR: ML-DSA-65 signing failed\n");
         OQS_SIG_free(sig);
         return 1;
     }
@@ -61,7 +61,7 @@ static int test_dilithium3()
         OQS_SIG_verify(sig, reinterpret_cast<const uint8_t *>(MESSAGE), message_len,
                        signature.data(), signature_len, public_key.data());
 
-    std::printf("[Dilithium3]  (%s)\n", sig->method_name);
+    std::printf("[ML-DSA-65]  (%s)\n", sig->method_name);
     std::printf("  message              : \"%s\" (%zu bytes)\n", MESSAGE, message_len);
     std::printf("  public key size      : %zu bytes\n", sig->length_public_key);
     std::printf("  secret key size      : %zu bytes\n", sig->length_secret_key);
@@ -76,9 +76,9 @@ static int test_dilithium3()
 
 static int test_kyber768()
 {
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (kem == nullptr) {
-        std::fprintf(stderr, "ERROR: Kyber768 is not enabled in this liboqs build\n");
+        std::fprintf(stderr, "ERROR: ML-KEM-768 is not enabled in this liboqs build\n");
         return 1;
     }
 
@@ -96,7 +96,7 @@ static int test_kyber768()
     const bool match = (rc == 0) &&
         std::memcmp(shared_secret_e.data(), shared_secret_d.data(), kem->length_shared_secret) == 0;
 
-    std::printf("[Kyber768]    (%s)\n", kem->method_name);
+    std::printf("[ML-KEM-768]    (%s)\n", kem->method_name);
     std::printf("  public key size      : %zu bytes\n", kem->length_public_key);
     std::printf("  secret key size      : %zu bytes\n", kem->length_secret_key);
     std::printf("  ciphertext size      : %zu bytes\n", kem->length_ciphertext);

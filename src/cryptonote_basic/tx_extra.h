@@ -200,7 +200,7 @@ namespace cryptonote
   // cryptonote_config.h. These fields only ever appear once hf_version >= HF_VERSION_PQ.
   struct tx_extra_pq_sig
   {
-    crypto::pqc::pq_tx_sig sig; // pk(1952) || sig(3293) = 5245 bytes
+    crypto::pqc::pq_tx_sig sig; // pk(1952) || sig(3309) = 5261 bytes
 
     BEGIN_SERIALIZE()
       FIELD(sig)

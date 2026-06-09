@@ -548,7 +548,7 @@ namespace cryptonote
   //       it consumes zero bytes until EOF and REJECTS the whole buffer on the first
   //       non-zero byte. So a 0x00 padding field is only ever canonical as the TERMINAL
   //       field. (See unit test parse_tx_extra.handles_invalid_padding_only.)
-  //   (2) The Dilithium3 signature (TX_EXTRA_TAG_PQ_SIG, 0x06) MUST be the terminal field
+  //   (2) The ML-DSA-65 signature (TX_EXTRA_TAG_PQ_SIG, 0x06) MUST be the terminal field
   //       at/after HFv16 (blockchain.cpp check_tx_inputs requires pq_fields.back() to be
   //       the pq_sig, since the signed message is the prefix hash with that trailing field
   //       stripped).

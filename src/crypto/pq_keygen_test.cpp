@@ -2,10 +2,10 @@
 // the mnemonic "BQ" address prefix, and the encode/parse round-trip.
 //
 // Standalone (built like pqc_test.cpp / pq_address_test.cpp). It exercises:
-//   * generate_pq_keys() attaches a Kyber768 keypair → account_address.is_pq() == true,
+//   * generate_pq_keys() attaches a ML-KEM-768 keypair → account_address.is_pq() == true,
 //   * a classic account stays is_pq() == false (generate_pq_keys is purely opt-in),
 //   * the rendered BQ... address actually begins with "BQ" (tag 62 + marker 0x33),
-//   * encode → parse round-trips the spend/view Ed25519 keys and the 1184-byte Kyber key.
+//   * encode → parse round-trips the spend/view Ed25519 keys and the 1184-byte ML-KEM key.
 #include <cstdio>
 #include <cstring>
 #include "crypto/crypto.h"
@@ -37,11 +37,11 @@ static bool test_bq_keygen_and_address()
   if (!acc.get_keys().m_account_address.is_pq()) { printf("FAIL: is_pq()=false after generate_pq_keys\n"); return false; }
   if (!acc.get_keys().pq_keys) { printf("FAIL: pq_keys (decaps key) not set\n"); return false; }
 
-  // The published Kyber key on the address must match the keypair's public half.
+  // The published ML-KEM key on the address must match the keypair's public half.
   if (memcmp(acc.get_keys().m_account_address.pq_kyber_pk->data(),
              acc.get_keys().pq_keys->kyber_pk,
-             crypto::pqc::KYBER768_PUBLIC_KEY_BYTES) != 0)
-  { printf("FAIL: address Kyber pk != keypair Kyber pk\n"); return false; }
+             crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0)
+  { printf("FAIL: address ML-KEM pk != keypair ML-KEM pk\n"); return false; }
 
   // Render the BQ... address and check the mnemonic prefix.
   const std::string bq = get_pq_address_str(acc.get_keys(), MAINNET);
@@ -56,15 +56,15 @@ static bool test_bq_keygen_and_address()
       parsed.m_view_public_key  != acc.get_keys().m_account_address.m_view_public_key)
   { printf("FAIL: Ed25519 keys mismatch after round-trip\n"); return false; }
   if (memcmp(parsed.pq_kyber_pk->data(), acc.get_keys().m_account_address.pq_kyber_pk->data(),
-             crypto::pqc::KYBER768_PUBLIC_KEY_BYTES) != 0)
-  { printf("FAIL: Kyber768 key mismatch after round-trip\n"); return false; }
+             crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0)
+  { printf("FAIL: ML-KEM-768 key mismatch after round-trip\n"); return false; }
 
   // A BQ... address must NOT parse via the classic path (shares prefix 62 with subaddress,
   // disambiguated by payload size + marker byte).
   address_parse_info info{};
   if (get_account_address_from_str(info, MAINNET, bq)) { printf("FAIL: BQ address wrongly parsed as classic/subaddress\n"); return false; }
 
-  printf("PASS: BQ keygen + \"BQ\" prefix + encode/parse round-trip (spend/view + Kyber768 1184B)\n");
+  printf("PASS: BQ keygen + \"BQ\" prefix + encode/parse round-trip (spend/view + ML-KEM-768 1184B)\n");
   return true;
 }
 

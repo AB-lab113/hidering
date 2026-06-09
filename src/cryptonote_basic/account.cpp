@@ -86,15 +86,15 @@ DISABLE_VS_WARNINGS(4244 4345)
   //-----------------------------------------------------------------
   void account_keys::xor_with_key_stream(const crypto::chacha_key &key)
   {
-    // HIDERING Phase 5 (HFv16): when a Kyber768 BQ keypair is present, its secret key
-    // (kyber_sk, KYBER768_SECRET_KEY_BYTES = 2400 B) is encrypted alongside the Ed25519
+    // HIDERING Phase 5 (HFv16): when a ML-KEM-768 BQ keypair is present, its secret key
+    // (kyber_sk, ML_KEM_768_SECRET_KEY_BYTES = 2400 B) is encrypted alongside the Ed25519
     // secrets, appended after the multisig keys in the derived stream. The public half
     // (kyber_pk) is not secret and is left in the clear. Classic wallets have
     // pq_keys == boost::none, so the stream length and on-disk bytes are unchanged.
-    // audit C-1: the persistent Dilithium3 signing key (dilithium_sk) is encrypted
+    // audit C-1: the persistent ML-DSA-65 signing key (dilithium_sk) is encrypted
     // alongside kyber_sk and the Ed25519 secrets, appended last in the derived stream.
-    const size_t pq_sk_bytes = (pq_keys ? crypto::pqc::KYBER768_SECRET_KEY_BYTES : 0)
-                             + (pq_dilithium ? crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES : 0);
+    const size_t pq_sk_bytes = (pq_keys ? crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES : 0)
+                             + (pq_dilithium ? crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES : 0);
     // encrypt a large enough byte stream with chacha20
     epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()) + pq_sk_bytes);
     const char *ptr = key_stream.data();
@@ -109,12 +109,12 @@ DISABLE_VS_WARNINGS(4244 4345)
     }
     if (pq_keys)
     {
-      for (size_t i = 0; i < crypto::pqc::KYBER768_SECRET_KEY_BYTES; ++i)
+      for (size_t i = 0; i < crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES; ++i)
         pq_keys->kyber_sk[i] ^= *ptr++;
     }
     if (pq_dilithium)
     {
-      for (size_t i = 0; i < crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES; ++i)
+      for (size_t i = 0; i < crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES; ++i)
         pq_dilithium->dilithium_sk[i] ^= *ptr++;
     }
   }
@@ -293,7 +293,7 @@ DISABLE_VS_WARNINGS(4244 4345)
     return m_keys;
   }
   //-----------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): attach a fresh Kyber768 keypair to `keys`, turning its
+  // HIDERING Phase 5 (HFv16): attach a fresh ML-KEM-768 keypair to `keys`, turning its
   // account_public_address into a BQ... (post-quantum) address. Additive and opt-in.
   bool generate_pq_keys(account_keys& keys)
   {
@@ -301,27 +301,27 @@ DISABLE_VS_WARNINGS(4244 4345)
     crypto::pqc::pq_secret_key pq_sk;
     if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk))
     {
-      MERROR("generate_pq_keys: liboqs Kyber768/Dilithium3 keygen failed");
+      MERROR("generate_pq_keys: liboqs ML-KEM-768/ML-DSA-65 keygen failed");
       return false;
     }
 
-    // Stealth (KEM) keypair: the Kyber768 half drives BQ... address derivation.
+    // Stealth (KEM) keypair: the ML-KEM-768 half drives BQ... address derivation.
     crypto::pqc::pq_stealth_keys sk{};
-    memcpy(sk.kyber_pk, pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
-    memcpy(sk.kyber_sk, pq_sk.kyber768_sk, crypto::pqc::KYBER768_SECRET_KEY_BYTES);
+    memcpy(sk.kyber_pk, pq_pk.kyber768_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+    memcpy(sk.kyber_sk, pq_sk.kyber768_sk, crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES);
     keys.pq_keys = sk;
 
-    // audit C-1: keep the Dilithium3 half too, as the account's PERSISTENT signing key
+    // audit C-1: keep the ML-DSA-65 half too, as the account's PERSISTENT signing key
     // (used by construct_tx instead of a per-tx throwaway). Persisted encrypted, exactly
     // like kyber_sk (see account.h / xor_with_key_stream).
     crypto::pqc::pq_dilithium_keys dk{};
-    memcpy(dk.dilithium_pk, pq_pk.dilithium3_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
-    memcpy(dk.dilithium_sk, pq_sk.dilithium3_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES);
+    memcpy(dk.dilithium_pk, pq_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+    memcpy(dk.dilithium_sk, pq_sk.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES);
     keys.pq_dilithium = dk;
 
-    // Publish the Kyber768 public key on the address so is_pq() == true.
-    std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
-    memcpy(kpk.data(), pq_pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+    // Publish the ML-KEM-768 public key on the address so is_pq() == true.
+    std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kpk{};
+    memcpy(kpk.data(), pq_pk.kyber768_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     keys.m_account_address.pq_kyber_pk = kpk;
 
     // audit M4: the secret material now lives in the mlocked keys.pq_keys / keys.pq_dilithium
@@ -337,7 +337,7 @@ DISABLE_VS_WARNINGS(4244 4345)
   {
     if (!keys.m_account_address.is_pq())
     {
-      MWARNING("get_pq_address_str: account has no Kyber768 key (not a BQ... address)");
+      MWARNING("get_pq_address_str: account has no ML-KEM-768 key (not a BQ... address)");
       return std::string();
     }
     return get_account_address_as_str_pq(nettype, keys.m_account_address);

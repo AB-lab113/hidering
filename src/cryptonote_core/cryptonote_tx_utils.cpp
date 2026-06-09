@@ -50,28 +50,28 @@ using namespace crypto;
 namespace cryptonote
 {
   //---------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): serialise an external Dilithium3 signature into
-  // tx.extra as [ TX_EXTRA_TAG_PQ_SIG | pk(1952) | sig(3293) ]. Both fields are
+  // HIDERING Phase 5 (HFv16): serialise an external ML-DSA-65 signature into
+  // tx.extra as [ TX_EXTRA_TAG_PQ_SIG | pk(1952) | sig(3309) ]. Both fields are
   // fixed length so no length prefix is needed; the parser in blockchain.cpp
   // reads exactly that many bytes after the tag. Only emitted once the chain
   // reaches HF_VERSION_PQ (inactive on the live chain).
   void add_pq_sig_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::pq_tx_sig& sig)
   {
     extra.push_back(TX_EXTRA_TAG_PQ_SIG);
-    extra.insert(extra.end(), sig.pk, sig.pk + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES);
-    extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES);
+    extra.insert(extra.end(), sig.pk, sig.pk + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+    extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
   }
   //---------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): serialise a Kyber768 KEM ciphertext into tx.extra as
+  // HIDERING Phase 5 (HFv16): serialise a ML-KEM-768 KEM ciphertext into tx.extra as
   // [ TX_EXTRA_TAG_KYBER_CT | ct(1088) ]. Fixed length, no length prefix. Appended
-  // after the classic extra fields are sorted and BEFORE the trailing Dilithium3
+  // after the classic extra fields are sorted and BEFORE the trailing ML-DSA-65
   // signature field, so that field stays last (the validator in blockchain.cpp
   // relies on the PQ signature being the final field). Only emitted for BQ...
   // outputs once the chain reaches HF_VERSION_PQ (inactive on the live chain).
   void add_kyber_ct_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::kyber_ciphertext& ct)
   {
     extra.push_back(TX_EXTRA_TAG_KYBER_CT);
-    extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::KYBER768_CIPHERTEXT_BYTES);
+    extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES);
   }
   //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16, audit E-4): see cryptonote_tx_utils.h. The tweak is
@@ -446,7 +446,7 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(destinations.size() == additional_tx_keys.size(), false, "Wrong amount of additional tx keys");
 
     uint64_t summary_outs_money = 0;
-    // HIDERING Phase 5 (HFv16): Kyber768 ciphertexts for BQ... outputs, collected
+    // HIDERING Phase 5 (HFv16): ML-KEM-768 ciphertexts for BQ... outputs, collected
     // here and appended to tx.extra after the classic fields are sorted (below).
     // Stays empty on the live chain (no destination is flagged is_pq pre-fork).
     std::vector<crypto::pqc::kyber_ciphertext> kyber_cts;
@@ -454,7 +454,7 @@ namespace cryptonote
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): mark each post-quantum
     // BQ... destination from its parsed address. is_pq() is false for every classic
     // B... address, so this is a no-op on the live chain; combined with the HFv16
-    // height gate below, the Kyber768 output path stays doubly inert pre-fork.
+    // height gate below, the ML-KEM-768 output path stays doubly inert pre-fork.
     for (tx_destination_entry& dst_entr : destinations)
       dst_entr.is_pq = dst_entr.addr.is_pq();
 
@@ -473,8 +473,8 @@ namespace cryptonote
                                            use_view_tags, view_tag);
 
       // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): for a post-quantum
-      // BQ... destination, derive a Kyber768 KEM shared secret and fold it into the
-      // classical one-time output key, so spending requires the Kyber decaps key in
+      // BQ... destination, derive a ML-KEM-768 KEM shared secret and fold it into the
+      // classical one-time output key, so spending requires the ML-KEM decaps key in
       // addition to the Ed25519 secret. The encapsulation ciphertext is stashed in
       // kyber_cts and later written to tx.extra. The Ed25519 ECDH path above is left
       // intact; we only tweak the resulting point by H(ss)*G, which the BQ recipient
@@ -482,20 +482,20 @@ namespace cryptonote
       // and is_pq is never set on the live chain, so this is doubly inert pre-fork.
       if (hf_version >= HF_VERSION_PQ && dst_entr.is_pq)
       {
-        // Phase 5 Step 5: encapsulate against the recipient's REAL Kyber768 public key,
+        // Phase 5 Step 5: encapsulate against the recipient's REAL ML-KEM-768 public key,
         // now carried by the BQ... destination address (account_public_address::pq_kyber_pk,
         // populated by get_account_address_from_str_pq()). is_pq is only ever set from
         // addr.is_pq(), so the key is guaranteed present here.
         CHECK_AND_ASSERT_MES(dst_entr.addr.pq_kyber_pk, false,
-            "BQ... destination flagged is_pq but carries no Kyber768 public key");
+            "BQ... destination flagged is_pq but carries no ML-KEM-768 public key");
         crypto::pqc::kyber_ciphertext kct;
         crypto::pqc::kyber_shared_secret kss;
-        if (!crypto::pqc::pqc_stealth_encaps(dst_entr.addr.pq_kyber_pk->data(), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES, kct, kss))
+        if (!crypto::pqc::pqc_stealth_encaps(dst_entr.addr.pq_kyber_pk->data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES, kct, kss))
         {
-          LOG_ERROR("Failed to build post-quantum (Kyber768) stealth encapsulation");
+          LOG_ERROR("Failed to build post-quantum (ML-KEM-768) stealth encapsulation");
           return false;
         }
-        // Fold the Kyber shared secret into the one-time key: P' = P + t*G, with
+        // Fold the ML-KEM shared secret into the one-time key: P' = P + t*G, with
         // t = derive_bq_output_tweak(ss, output_index) — audit E-4: domain-separated,
         // output-index-bound, zero-scalar-rejected. The receiver recomputes the same t.
         crypto::secret_key kyber_tweak;
@@ -509,7 +509,7 @@ namespace cryptonote
         crypto::secret_key_to_public_key(kyber_tweak, tweak_pub);
         out_eph_public_key = rct::rct2pk(rct::addKeys(rct::pk2rct(out_eph_public_key), rct::pk2rct(tweak_pub)));
         kyber_cts.push_back(kct);
-        // audit M-3: wipe the Kyber shared secret and the derived tweak scalar.
+        // audit M-3: wipe the ML-KEM shared secret and the derived tweak scalar.
         memwipe(&kss, sizeof(kss));
         memwipe(&kyber_tweak, sizeof(kyber_tweak));
       }
@@ -536,9 +536,9 @@ namespace cryptonote
     if (!sort_tx_extra(tx.extra, tx.extra))
       return false;
 
-    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): write the Kyber768
+    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): write the ML-KEM-768
     // ciphertexts for BQ... outputs AFTER sorting (sort_tx_extra would drop these
-    // unknown tags) and BEFORE the trailing Dilithium3 signature, keeping that
+    // unknown tags) and BEFORE the trailing ML-DSA-65 signature, keeping that
     // signature the last field. kyber_cts is empty on the live chain, so this is a
     // no-op there.
     for (const auto& kct : kyber_cts)
@@ -554,15 +554,15 @@ namespace cryptonote
     // the TERMINAL tx_extra field. Its canonical parser (tx_extra.h tx_extra_padding load)
     // reads zero bytes until EOF and REJECTS the whole tx_extra on the first non-zero byte
     // (proven by the unit test parse_tx_extra.handles_invalid_padding_only: [0x00][0x2A]
-    // → parse_tx_extra == false). At/after HFv16 the terminal field MUST be the Dilithium3
+    // → parse_tx_extra == false). At/after HFv16 the terminal field MUST be the ML-DSA-65
     // signature (tag 0x06, audit E-3 — blockchain.cpp requires pq_fields.back() == pq_sig),
     // so any 0x00 padding emitted here would sit *before* that 0x06 tag and the canonical
     // parser would greedily consume the 0x06 byte, reject the tx, and halt the chain at the
     // fork. A greedy 0x00 padding and a trailing 0x06 signature are therefore mutually
     // exclusive — the two "must be last" fields cannot coexist. We resolve this by OMITTING
     // the 0x00 padding on the PQ path: under HFv16 tx_extra ends cleanly with the pq_sig and
-    // parses canonically, and the bulky fixed-size PQ fields (Dilithium pk+sig 5245 B, plus
-    // a 1088-byte Kyber768 ciphertext per BQ output) provide the size obfuscation the padding
+    // parses canonically, and the bulky fixed-size PQ fields (ML-DSA pk+sig 5261 B, plus
+    // a 1088-byte ML-KEM-768 ciphertext per BQ output) provide the size obfuscation the padding
     // otherwise would. The live chain (get_pq_hf_version() → 0, default 0 at every other call
     // site → hf_version < HF_VERSION_PQ) keeps the 2500-byte padding BYTE-FOR-BYTE as before.
     if (hf_version < HF_VERSION_PQ)
@@ -576,10 +576,10 @@ namespace cryptonote
     }
 
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): attach an external
-    // Dilithium3 signature over the tx prefix as the LAST field of tx.extra. Gated on
+    // ML-DSA-65 signature over the tx prefix as the LAST field of tx.extra. Gated on
     // hf_version, which is 0 on the live chain (get_pq_hf_version()) / at every other
     // call site, so hf < HF_VERSION_PQ is never touched. The signature covers the prefix
-    // hash as it stands here — i.e. with the Kyber768 ciphertexts already appended but
+    // hash as it stands here — i.e. with the ML-KEM-768 ciphertexts already appended but
     // BEFORE the PQ field itself, and (audit H2) with NO trailing 0x00 padding, which is
     // omitted above on the PQ path so that this signature can be the canonically-parseable
     // terminal field. The validator recovers the signed message by stripping the trailing
@@ -589,33 +589,33 @@ namespace cryptonote
     {
       crypto::hash pq_prefix_hash;
       get_transaction_prefix_hash(tx, pq_prefix_hash);
-      // audit C-1: sign with the sender's PERSISTENT Dilithium3 key (account_keys
+      // audit C-1: sign with the sender's PERSISTENT ML-DSA-65 key (account_keys
       // .pq_dilithium), NOT a per-tx throwaway. A stable per-account key is what gives the
       // signature real authority — one that still holds when the Ed25519 ring signature is
       // quantum-broken (the whole point of Phase 5). The ring/rct signatures generated
-      // below commit to the full extra (this PQ field included), so the Dilithium public
+      // below commit to the full extra (this PQ field included), so the ML-DSA public
       // key cannot be stripped/replaced without invalidating the spend. Full PQ-era
       // sender-identity binding (a BQ-address PQ-key registry the validator can check) is
       // deferred to the finalised Phase 5 spec — a self-contained per-tx signature on a
       // privacy chain cannot be tied to a hidden spender by the validator alone.
       CHECK_AND_ASSERT_MES(sender_account_keys.pq_dilithium, false,
-          "HFv16 transaction requires the sender's persistent Dilithium3 key (account has no pq_dilithium)");
+          "HFv16 transaction requires the sender's persistent ML-DSA-65 key (account has no pq_dilithium)");
       crypto::pqc::pq_tx_sig pq_sig;
       if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
-                                    sender_account_keys.pq_dilithium->dilithium_sk, crypto::pqc::DILITHIUM3_SECRET_KEY_BYTES,
-                                    sender_account_keys.pq_dilithium->dilithium_pk, crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES,
+                                    sender_account_keys.pq_dilithium->dilithium_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
+                                    sender_account_keys.pq_dilithium->dilithium_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
                                     pq_sig))
       {
-        LOG_ERROR("Failed to build post-quantum (Dilithium3) tx signature");
+        LOG_ERROR("Failed to build post-quantum (ML-DSA-65) tx signature");
         return false;
       }
       add_pq_sig_to_extra(tx.extra, pq_sig);
     }
 
     // HIDERING (audit E-5 / finding #4): enforce the tx_extra size ceiling ONCE, here,
-    // after EVERY field is in place — padding, Kyber768 ciphertexts, AND the trailing
-    // Dilithium3 signature. The old check ran inside the padding branch, before the
-    // 5246-byte signature was appended, so it never accounted for it. Under HFv16 the
+    // after EVERY field is in place — padding, ML-KEM-768 ciphertexts, AND the trailing
+    // ML-DSA-65 signature. The old check ran inside the padding branch, before the
+    // 5262-byte signature was appended, so it never accounted for it. Under HFv16 the
     // larger PQ ceiling applies; the live chain (hf < HF_VERSION_PQ) keeps the classic
     // MAX_TX_EXTRA_SIZE.
     {

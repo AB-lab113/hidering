@@ -183,7 +183,7 @@ namespace cryptonote
 
     size_t tx_extra_size = tx.extra.size();
     // HIDERING (audit E-5): from HFv16 onward a post-quantum tx legitimately carries a
-    // larger tx_extra (Dilithium pk+sig 5246 B + one Kyber768 ciphertext per BQ output),
+    // larger tx_extra (ML-DSA pk+sig 5246 B + one ML-KEM-768 ciphertext per BQ output),
     // so the relay/mempool ceiling tracks the consensus PQ limit. Pre-fork the classic
     // 3000-byte limit is unchanged, so the live chain is untouched.
     const size_t max_tx_extra_size = (m_blockchain.get_current_hard_fork_version() >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;

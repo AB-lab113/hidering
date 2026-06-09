@@ -68,8 +68,8 @@ add_subdirectory(easylogging++)
 add_subdirectory(qrcodegen)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
 
-# Phase 5: Post-Quantum Cryptography (Open Quantum Safe / liboqs).
-# Provides Dilithium3 (signatures) and Kyber768 (KEM), NIST PQC standards.
+# Phase 5: Post-Quantum Cryptography (Open Quantum Safe / liboqs 0.15.x).
+# Provides ML-DSA-65 (FIPS 204 signatures) and ML-KEM-768 (FIPS 203 KEM).
 #
 # liboqs is built standalone, static, OpenSSL-backed, library-only:
 #   cmake -S external/liboqs -B external/liboqs/build \

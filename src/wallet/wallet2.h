@@ -327,9 +327,9 @@ private:
       bool error;
       boost::optional<cryptonote::subaddress_receive_info> received;
       // HIDERING Phase 5 (HFv16, audit E-2): true iff this output was matched via the BQ...
-      // Kyber un-tweak path (so the one-time secret must be tweaked in apply_pq_output_tweak).
+      // ML-KEM un-tweak path (so the one-time secret must be tweaked in apply_pq_output_tweak).
       // Stays false for classic outputs, so they are never tweaked even if the tx carries a
-      // Kyber ciphertext.
+      // ML-KEM ciphertext.
       bool received_via_pq_untweak;
 
       tx_scan_info_t(): amount(0), money_transfered(0), error(true), received_via_pq_untweak(false) {}
@@ -927,7 +927,7 @@ private:
      * \param  recover              Whether it is a restore
      * \param  two_random           Whether it is a non-deterministic wallet
      * \param  create_address_file  Whether to create an address file
-     * \param  use_pq               HIDERING Phase 5 (HFv16): also derive a Kyber768 BQ...
+     * \param  use_pq               HIDERING Phase 5 (HFv16): also derive a ML-KEM-768 BQ...
      *                              keypair (post-quantum address). Defaults to false, so
      *                              every existing caller produces an identical classic
      *                              B... wallet (is_pq() == false).
@@ -1861,7 +1861,7 @@ private:
     bool generate_chacha_key_from_secret_keys(crypto::chacha_key &key) const;
     void generate_chacha_key_from_password(const epee::wipeable_string &pass, crypto::chacha_key &key) const;
     crypto::hash get_payment_id(const pending_tx &ptx) const;
-    // HIDERING Phase 5 (HFv16): `pq_ss`, when non-null, is the Kyber768 shared secret
+    // HIDERING Phase 5 (HFv16): `pq_ss`, when non-null, is the ML-KEM-768 shared secret
     // recovered for this tx (see get_pq_output_shared_secret). If the classic match fails,
     // the candidate key P_onchain - t_i*G is retried (t_i = derive_bq_output_tweak(ss, i),
     // per-output index-bound — audit E-4) so BQ... outputs are detected; on such a match
@@ -1870,9 +1870,9 @@ private:
     void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
     void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
     void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
-    // HIDERING Phase 5 (HFv16): if this wallet owns a Kyber768 decaps key and `tx` carries
-    // a Kyber768 ciphertext, recover the shared secret ss and return true. NB (audit E-1):
-    // Kyber uses implicit rejection, so decaps "succeeds" for ANY well-formed ciphertext —
+    // HIDERING Phase 5 (HFv16): if this wallet owns a ML-KEM-768 decaps key and `tx` carries
+    // a ML-KEM-768 ciphertext, recover the shared secret ss and return true. NB (audit E-1):
+    // ML-KEM uses implicit rejection, so decaps "succeeds" for ANY well-formed ciphertext —
     // a true success only means "well-formed", NOT "ours". The authoritative ownership test
     // is the per-output is_out_to_acc_precomp match on P_onchain - t_i*G, not this return.
     // Returns false (no output) for every classic wallet (pq_keys none).
@@ -1893,8 +1893,8 @@ private:
     bool should_pick_a_second_output(bool use_rct, size_t n_transfers, const std::vector<size_t> &unused_transfers_indices, const std::vector<size_t> &unused_dust_indices) const;
     std::vector<size_t> get_only_rct(const std::vector<size_t> &unused_dust_indices, const std::vector<size_t> &unused_transfers_indices) const;
     void scan_output(const cryptonote::transaction &tx, bool miner_tx, const crypto::public_key &tx_pub_key, size_t i, tx_scan_info_t &tx_scan_info, int &num_vouts_received, std::unordered_map<cryptonote::subaddress_index, uint64_t> &tx_money_got_in_outs, std::vector<size_t> &outs, bool pool);
-    // HIDERING Phase 5 (HFv16): if this wallet holds a Kyber768 decapsulation key
-    // (account_keys::pq_keys) and `tx` carries a Kyber768 ciphertext, recover the
+    // HIDERING Phase 5 (HFv16): if this wallet holds a ML-KEM-768 decapsulation key
+    // (account_keys::pq_keys) and `tx` carries a ML-KEM-768 ciphertext, recover the
     // post-quantum tweak and fold it into tx_scan_info.in_ephemeral so the spend
     // secret / key image match the tweaked one-time output key of a BQ... output.
     // No-op (returns immediately) for every wallet without pq_keys, i.e. all wallets
@@ -1903,11 +1903,11 @@ private:
     // audit E-2: `output_index` is the tx output index (must match the index the sender
     // bound the tweak to, audit E-4). The tweak is folded ONLY when the output was matched
     // via the BQ un-tweak path (tx_scan_info.received_via_pq_untweak), so a classic output
-    // sharing a tx with a Kyber ciphertext is never corrupted.
+    // sharing a tx with a ML-KEM ciphertext is never corrupted.
     void apply_pq_output_tweak(const cryptonote::transaction &tx, size_t output_index, tx_scan_info_t &tx_scan_info) const;
     // HIDERING Phase 5 (HFv16, audit F-5): before a BQ... transaction leaves the wallet,
-    // self-check it is structurally well-formed (one Kyber768 ciphertext per BQ destination
-    // + exactly one Dilithium3 signature) so a construction bug fails loudly instead of
+    // self-check it is structurally well-formed (one ML-KEM-768 ciphertext per BQ destination
+    // + exactly one ML-DSA-65 signature) so a construction bug fails loudly instead of
     // silently producing unspendable outputs. No-op below HFv16 / for non-BQ transactions.
     void verify_pq_tx_well_formed(const cryptonote::transaction &tx, const std::vector<cryptonote::tx_destination_entry> &dests, uint8_t hf_version) const;
     void trim_hashchain();

@@ -125,7 +125,7 @@ namespace cryptonote
 
   //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16, audit E-4): derive the per-output BQ... one-time-key tweak
-  // scalar from a Kyber768 shared secret, with domain separation AND output-index binding
+  // scalar from a ML-KEM-768 shared secret, with domain separation AND output-index binding
   // (so two BQ outputs never share a tweak), and reject a degenerate zero scalar. This is
   // the SINGLE source of truth shared by the sender (construct_tx, folds t into P) and the
   // receiver (wallet2 scan, recovers t to detect/spend). Returns false on a zero scalar.

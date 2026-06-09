@@ -171,7 +171,7 @@ namespace mms
     {
       monero_address_known = false;
       // HIDERING Phase 5: account_public_address is no longer trivially copyable
-      // (it gained an optional Kyber768 key), so value-initialize instead of memset:
+      // (it gained an optional ML-KEM-768 key), so value-initialize instead of memset:
       // zeroes the two Ed25519 keys and leaves the post-quantum key as boost::none.
       monero_address = cryptonote::account_public_address{};
       me = false;

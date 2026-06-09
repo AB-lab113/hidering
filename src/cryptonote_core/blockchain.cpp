@@ -3259,18 +3259,18 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   const uint8_t hf_version = m_hardfork->get_current_version();
 
   // HIDERING Phase 5 (HFv16): from HF_VERSION_PQ onward, every tx must carry a
-  // valid external Dilithium3 signature (tag TX_EXTRA_TAG_PQ_SIG) appended as the
+  // valid external ML-DSA-65 signature (tag TX_EXTRA_TAG_PQ_SIG) appended as the
   // last field of tx.extra. The signature covers the prefix hash with the PQ field
   // stripped — exactly what construct_tx_with_tx_key signed before appending it.
   // Wholly skipped below HF_VERSION_PQ, so the live chain stays untouched.
   if (hf_version >= HF_VERSION_PQ)
   {
-    // HIDERING Phase 5 (HFv16): every tx must carry a valid external Dilithium3
+    // HIDERING Phase 5 (HFv16): every tx must carry a valid external ML-DSA-65
     // signature (the LAST tx_extra field) covering the prefix hash with that field
     // stripped — exactly what construct_tx_with_tx_key signed before appending it.
 
     // audit E-5: PQ transactions legitimately exceed the classic 3000-byte extra cap
-    // (Dilithium pk+sig 5246 B + one Kyber768 ciphertext per BQ output), so enforce the
+    // (ML-DSA pk+sig 5246 B + one ML-KEM-768 ciphertext per BQ output), so enforce the
     // larger PQ ceiling on the consensus path here (the relay/mempool path enforces it
     // too — see tx_pool.cpp). Anything beyond it is rejected.
     if (tx.extra.size() > MAX_TX_EXTRA_SIZE_PQ)
@@ -3284,8 +3284,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     // raw trailing-byte slice (which an attacker could make ambiguous, since 0x06/0x07
     // bytes occur freely inside other fields' payloads). Enforce: extra is fully
     // well-formed (parse consumes every byte — no trailing garbage, no unknown tags),
-    // EXACTLY ONE Dilithium3 signature field, it is the LAST field, and the number of
-    // Kyber768 ciphertext fields does not exceed the number of outputs.
+    // EXACTLY ONE ML-DSA-65 signature field, it is the LAST field, and the number of
+    // ML-KEM-768 ciphertext fields does not exceed the number of outputs.
     std::vector<tx_extra_field> pq_fields;
     if (!parse_tx_extra(tx.extra, pq_fields) || pq_fields.empty())
     {
@@ -3301,13 +3301,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
     if (pq_sig_count != 1 || pq_fields.back().type() != typeid(tx_extra_pq_sig))
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " must carry exactly one Dilithium3 signature as the LAST tx_extra field at/after HFv16");
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " must carry exactly one ML-DSA-65 signature as the LAST tx_extra field at/after HFv16");
       tvc.m_verifivation_failed = true;
       return false;
     }
     if (kyber_ct_count > tx.vout.size())
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " has more Kyber768 ciphertexts (" << kyber_ct_count << ") than outputs (" << tx.vout.size() << ")");
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has more ML-KEM-768 ciphertexts (" << kyber_ct_count << ") than outputs (" << tx.vout.size() << ")");
       tvc.m_verifivation_failed = true;
       return false;
     }
@@ -3318,7 +3318,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     // in place (tx is non-const here), hash, then restore. The PQ sig is the last field
     // and wire-identical to its raw [tag|pk|sig] blob, so dropping its trailing bytes is
     // exactly the pre-append extra.
-    const size_t pq_field_len = 1 + crypto::pqc::DILITHIUM3_PUBLIC_KEY_BYTES + crypto::pqc::DILITHIUM3_SIGNATURE_BYTES;
+    const size_t pq_field_len = 1 + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
     CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len, false, "PQ sig field shorter than expected");
     const std::vector<uint8_t> saved_pq_tail(tx.extra.end() - pq_field_len, tx.extra.end());
     tx.extra.resize(tx.extra.size() - pq_field_len);
@@ -3327,14 +3327,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
     if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash), pq_sig))
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (Dilithium3) signature");
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (ML-DSA-65) signature");
       tvc.m_verifivation_failed = true;
       return false;
     }
 
-    // The Kyber768 ciphertext fields (now bounded above) are intentionally NOT validated
+    // The ML-KEM-768 ciphertext fields (now bounded above) are intentionally NOT validated
     // here: consensus holds no recipient key and cannot decapsulate. They ARE covered by
-    // the Dilithium3 signature (they precede the stripped field) and by the ring/rct
+    // the ML-DSA-65 signature (they precede the stripped field) and by the ring/rct
     // signatures (which commit to the full extra). Recovery is wallet-side, via
     // crypto::pqc::pqc_stealth_decaps on output scan (see wallet2.cpp).
   }

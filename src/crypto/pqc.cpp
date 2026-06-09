@@ -3,8 +3,8 @@
 // Phase 5 — Post-Quantum Cryptography operations (liboqs implementation).
 //
 // Thin, allocation-light wrappers over the Open Quantum Safe primitives:
-//   * Dilithium3 (OQS_SIG_alg_dilithium_3) — signatures
-//   * Kyber768   (OQS_KEM_alg_kyber_768)   — key encapsulation
+//   * ML-DSA-65 (OQS_SIG_alg_ml_dsa_65) — signatures
+//   * ML-KEM-768   (OQS_KEM_alg_ml_kem_768)   — key encapsulation
 //
 // Each call constructs and frees its OQS_SIG / OQS_KEM handle; these are cheap
 // (no per-call key material) and keep the wrappers stateless and thread-safe.
@@ -24,13 +24,13 @@ namespace pqc
   bool pqc_keygen(pq_public_key &pk, pq_secret_key &sk)
   {
     bool ok = false;
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (sig != nullptr && kem != nullptr
-        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES
-        && sig->length_secret_key == DILITHIUM3_SECRET_KEY_BYTES
-        && kem->length_public_key == KYBER768_PUBLIC_KEY_BYTES
-        && kem->length_secret_key == KYBER768_SECRET_KEY_BYTES)
+        && sig->length_public_key == ML_DSA_65_PUBLIC_KEY_BYTES
+        && sig->length_secret_key == ML_DSA_65_SECRET_KEY_BYTES
+        && kem->length_public_key == ML_KEM_768_PUBLIC_KEY_BYTES
+        && kem->length_secret_key == ML_KEM_768_SECRET_KEY_BYTES)
     {
       ok = OQS_SIG_keypair(sig, pk.dilithium3_pk, sk.dilithium3_sk) == OQS_SUCCESS
         && OQS_KEM_keypair(kem, pk.kyber768_pk, sk.kyber768_sk) == OQS_SUCCESS;
@@ -45,8 +45,8 @@ namespace pqc
   {
     bool ok = false;
     sig_len = 0;
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
-    if (sig != nullptr && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES)
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
+    if (sig != nullptr && sig->length_signature == ML_DSA_65_SIGNATURE_BYTES)
     {
       size_t produced = 0;
       if (OQS_SIG_sign(sig, sig_out.sig, &produced, msg, msg_len, sk.dilithium3_sk) == OQS_SUCCESS)
@@ -63,14 +63,14 @@ namespace pqc
                   const pq_signature &sig_in, size_t sig_len)
   {
     bool ok = false;
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
     // audit M-5: validate the runtime liboqs sizes and the caller-supplied signature
     // length before verifying, so a mismatched/truncated length can never reach
     // OQS_SIG_verify with an inconsistent buffer view.
     if (sig != nullptr
-        && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES
-        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES
-        && sig_len == DILITHIUM3_SIGNATURE_BYTES)
+        && sig->length_signature == ML_DSA_65_SIGNATURE_BYTES
+        && sig->length_public_key == ML_DSA_65_PUBLIC_KEY_BYTES
+        && sig_len == ML_DSA_65_SIGNATURE_BYTES)
     {
       ok = OQS_SIG_verify(sig, msg, msg_len, sig_in.sig, sig_len, pk.dilithium3_pk) == OQS_SUCCESS;
     }
@@ -82,10 +82,10 @@ namespace pqc
                       kyber_shared_secret &ss)
   {
     bool ok = false;
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (kem != nullptr
-        && kem->length_ciphertext == KYBER768_CIPHERTEXT_BYTES
-        && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+        && kem->length_ciphertext == ML_KEM_768_CIPHERTEXT_BYTES
+        && kem->length_shared_secret == ML_KEM_768_SHARED_SECRET_BYTES)
     {
       ok = OQS_KEM_encaps(kem, ct.ct, ss.ss, pk.kyber768_pk) == OQS_SUCCESS;
     }
@@ -97,8 +97,8 @@ namespace pqc
                       kyber_shared_secret &ss)
   {
     bool ok = false;
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
-    if (kem != nullptr && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
+    if (kem != nullptr && kem->length_shared_secret == ML_KEM_768_SHARED_SECRET_BYTES)
     {
       ok = OQS_KEM_decaps(kem, ss.ss, ct.ct, sk.kyber768_sk) == OQS_SUCCESS;
     }
@@ -112,22 +112,22 @@ namespace pqc
                    pq_tx_sig &out_sig)
   {
     if (tx_prefix_hash == nullptr || sk == nullptr || pk == nullptr
-        || sk_len != DILITHIUM3_SECRET_KEY_BYTES
-        || pk_len != DILITHIUM3_PUBLIC_KEY_BYTES)
+        || sk_len != ML_DSA_65_SECRET_KEY_BYTES
+        || pk_len != ML_DSA_65_PUBLIC_KEY_BYTES)
       return false;
 
     bool ok = false;
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
     if (sig != nullptr
-        && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES
-        && sig->length_secret_key == DILITHIUM3_SECRET_KEY_BYTES
-        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES)
+        && sig->length_signature == ML_DSA_65_SIGNATURE_BYTES
+        && sig->length_secret_key == ML_DSA_65_SECRET_KEY_BYTES
+        && sig->length_public_key == ML_DSA_65_PUBLIC_KEY_BYTES)
     {
       size_t produced = 0;
       if (OQS_SIG_sign(sig, out_sig.sig, &produced, tx_prefix_hash, hash_len, sk) == OQS_SUCCESS
-          && produced == DILITHIUM3_SIGNATURE_BYTES)
+          && produced == ML_DSA_65_SIGNATURE_BYTES)
       {
-        std::memcpy(out_sig.pk, pk, DILITHIUM3_PUBLIC_KEY_BYTES);
+        std::memcpy(out_sig.pk, pk, ML_DSA_65_PUBLIC_KEY_BYTES);
         ok = true;
       }
     }
@@ -142,15 +142,15 @@ namespace pqc
       return false;
 
     bool ok = false;
-    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_dilithium_3);
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
     // audit M-5: confirm the runtime liboqs signature/public-key sizes match the
     // compile-time constants before verifying the fixed-length blob.
     if (sig != nullptr
-        && sig->length_signature == DILITHIUM3_SIGNATURE_BYTES
-        && sig->length_public_key == DILITHIUM3_PUBLIC_KEY_BYTES)
+        && sig->length_signature == ML_DSA_65_SIGNATURE_BYTES
+        && sig->length_public_key == ML_DSA_65_PUBLIC_KEY_BYTES)
     {
       ok = OQS_SIG_verify(sig, tx_prefix_hash, hash_len,
-                          sig_in.sig, DILITHIUM3_SIGNATURE_BYTES, sig_in.pk) == OQS_SUCCESS;
+                          sig_in.sig, ML_DSA_65_SIGNATURE_BYTES, sig_in.pk) == OQS_SUCCESS;
     }
     if (sig != nullptr) OQS_SIG_free(sig);
     return ok;
@@ -159,15 +159,15 @@ namespace pqc
   bool pqc_stealth_encaps(const uint8_t *recipient_kyber_pk, size_t pk_len,
                           kyber_ciphertext &ct, kyber_shared_secret &ss)
   {
-    if (recipient_kyber_pk == nullptr || pk_len != KYBER768_PUBLIC_KEY_BYTES)
+    if (recipient_kyber_pk == nullptr || pk_len != ML_KEM_768_PUBLIC_KEY_BYTES)
       return false;
 
     bool ok = false;
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (kem != nullptr
-        && kem->length_public_key == KYBER768_PUBLIC_KEY_BYTES
-        && kem->length_ciphertext == KYBER768_CIPHERTEXT_BYTES
-        && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+        && kem->length_public_key == ML_KEM_768_PUBLIC_KEY_BYTES
+        && kem->length_ciphertext == ML_KEM_768_CIPHERTEXT_BYTES
+        && kem->length_shared_secret == ML_KEM_768_SHARED_SECRET_BYTES)
     {
       ok = OQS_KEM_encaps(kem, ct.ct, ss.ss, recipient_kyber_pk) == OQS_SUCCESS;
     }
@@ -179,10 +179,10 @@ namespace pqc
                           kyber_shared_secret &ss)
   {
     bool ok = false;
-    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_kyber_768);
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (kem != nullptr
-        && kem->length_secret_key == KYBER768_SECRET_KEY_BYTES
-        && kem->length_shared_secret == KYBER768_SHARED_SECRET_BYTES)
+        && kem->length_secret_key == ML_KEM_768_SECRET_KEY_BYTES
+        && kem->length_shared_secret == ML_KEM_768_SHARED_SECRET_BYTES)
     {
       ok = OQS_KEM_decaps(kem, ss.ss, ct.ct, keys.kyber_sk) == OQS_SUCCESS;
     }

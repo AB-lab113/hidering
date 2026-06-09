@@ -1,5 +1,5 @@
 // HIDERING Phase 5 Step 5 — smoke test: classic B... address parsing is unchanged,
-// and the new BQ... (post-quantum, Kyber768-carrying) address round-trips.
+// and the new BQ... (post-quantum, ML-KEM-768-carrying) address round-trips.
 #include <cstdio>
 #include <cstring>
 #include <array>
@@ -35,7 +35,7 @@ static bool test_classic_b_address()
 
 static bool test_pq_bq_address()
 {
-  // Build a BQ... address: real Ed25519 spend/view keys + a Kyber768 public key.
+  // Build a BQ... address: real Ed25519 spend/view keys + a ML-KEM-768 public key.
   account_public_address addr{};
   crypto::secret_key sec;
   crypto::generate_keys(addr.m_spend_public_key, sec);
@@ -44,7 +44,7 @@ static bool test_pq_bq_address()
   crypto::pqc::pq_public_key pk; crypto::pqc::pq_secret_key sk;
   if (!crypto::pqc::pqc_keygen(pk, sk)) { printf("FAIL: pqc_keygen\n"); return false; }
   std::array<uint8_t, 1184> kpk;
-  memcpy(kpk.data(), pk.kyber768_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+  memcpy(kpk.data(), pk.kyber768_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
   addr.pq_kyber_pk = kpk;
 
   if (!addr.is_pq()) { printf("FAIL: built address is_pq()=false\n"); return false; }
@@ -61,13 +61,13 @@ static bool test_pq_bq_address()
   if (!parsed.is_pq()) { printf("FAIL: parsed BQ is_pq()=false\n"); return false; }
   if (parsed.m_spend_public_key != addr.m_spend_public_key ||
       parsed.m_view_public_key  != addr.m_view_public_key) { printf("FAIL: BQ Ed25519 keys mismatch\n"); return false; }
-  if (memcmp(parsed.pq_kyber_pk->data(), kpk.data(), crypto::pqc::KYBER768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: BQ Kyber768 key mismatch\n"); return false; }
+  if (memcmp(parsed.pq_kyber_pk->data(), kpk.data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: BQ ML-KEM-768 key mismatch\n"); return false; }
 
   // A BQ... address must NOT parse via the classic path with the BQ prefix.
   address_parse_info info{};
   if (get_account_address_from_str(info, MAINNET, bq_addr)) { printf("FAIL: BQ address wrongly parsed as classic\n"); return false; }
 
-  printf("PASS: BQ... address encode + parse round-trip (spend/view + Kyber768 1184B)\n");
+  printf("PASS: BQ... address encode + parse round-trip (spend/view + ML-KEM-768 1184B)\n");
   return true;
 }
 

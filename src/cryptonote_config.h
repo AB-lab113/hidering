@@ -214,9 +214,9 @@
 #define HF_VERSION_VIEW_TAGS                    15
 #define HF_VERSION_2021_SCALING                 15
 
-// HIDERING Phase 5 — Post-Quantum additive hard fork (Dilithium3 + Kyber768).
-// HFv16 introduces the external Dilithium3 signature carried in tx `extra` and
-// the Kyber768-based BQ... addresses. HF_HEIGHT_PQ is a placeholder height: the
+// HIDERING Phase 5 — Post-Quantum additive hard fork (ML-DSA-65 + ML-KEM-768).
+// HFv16 introduces the external ML-DSA-65 signature carried in tx `extra` and
+// the ML-KEM-768-based BQ... addresses. HF_HEIGHT_PQ is a placeholder height: the
 // fork is registered in the schedule but inactive until mainnet reaches it.
 //
 // SECURITY (audit M-6): a hard fork registered with threshold 0 at a fixed height
@@ -228,15 +228,15 @@
 #define HF_VERSION_PQ                           16
 #define HF_HEIGHT_PQ                            2000000ULL
 
-// Phase 5 (HFv16): tx_extra tag carrying the external Dilithium3 signature
+// Phase 5 (HFv16): tx_extra tag carrying the external ML-DSA-65 signature
 // (pk + sig). Distinct from the classic tx_extra tags in tx_extra.h
 // (0x00..0x04, 0xDE) — 0x06 is unused there. Only emitted/validated once
 // hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 
-// Phase 5 (HFv16): tx_extra tag carrying a Kyber768 KEM ciphertext (1088 bytes)
+// Phase 5 (HFv16): tx_extra tag carrying a ML-KEM-768 KEM ciphertext (1088 bytes)
 // for a BQ... post-quantum stealth output. One such field is emitted per BQ...
-// destination, before the trailing Dilithium3 signature field. Tag 0x07 is unused
+// destination, before the trailing ML-DSA-65 signature field. Tag 0x07 is unused
 // by the classic tx_extra tags. Only emitted once hf_version >= HF_VERSION_PQ;
 // pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;
@@ -265,8 +265,8 @@ static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;
 #define MAX_TX_EXTRA_SIZE                       3000
 
 // Phase 5 caveat 3 — CONSENSUS CHANGE, ACTIVATES WITH HFv16 ONLY.
-// A post-quantum BQ... transaction must fit the Dilithium3 signature field
-// (1 tag + pk 1952 + sig 3293 = 5246 bytes) plus one Kyber768 ciphertext per BQ
+// A post-quantum BQ... transaction must fit the ML-DSA-65 signature field
+// (1 tag + pk 1952 + sig 3309 = 5262 bytes) plus one ML-KEM-768 ciphertext per BQ
 // output (1 tag + 1088 bytes), which blows past the classic 3000-byte limit.
 // MAX_TX_EXTRA_SIZE stays 3000 for the live chain (hf < HF_VERSION_PQ) — the
 // tx_pool relay check and non-PQ construction are unchanged. This larger ceiling
@@ -286,7 +286,7 @@ namespace config
   uint64_t const CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX = 60;
   uint64_t const CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX = 61;
   uint64_t const CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX = 62;
-  // Phase 5 (HFv16): post-quantum address tag carrying a Kyber768 public key.
+  // Phase 5 (HFv16): post-quantum address tag carrying a ML-KEM-768 public key.
   // get_account_address_{as,from}_str_pq() key on this NUMERIC value.
   //
   // Step 6 mnemonic-prefix tuning: the human-readable BQ... address now actually
@@ -298,7 +298,7 @@ namespace config
   //      by a positive marker byte; 60->'3',61->'D',62->'N'=21->+marker->'Q'=23, 63..65
   //      overshoot), and
   //   2. a fixed CRYPTONOTE_PQ_ADDRESS_MARKER byte prepended to the address payload, which
-  //      pins the 2nd base58 char to 'Q' regardless of the (random) Ed25519/Kyber keys.
+  //      pins the 2nd base58 char to 'Q' regardless of the (random) Ed25519/ML-KEM keys.
   // Empirically (see Step 6 search) tag 62 + marker in [0x29,0x41] yields a stable "BQ..."
   // across thousands of random payloads; 0x33 is used.
   //

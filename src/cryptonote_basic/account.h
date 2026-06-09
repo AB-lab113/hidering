@@ -50,7 +50,7 @@ namespace cryptonote
     hw::device *m_device = &hw::get_device("default");
     crypto::chacha_iv m_encryption_iv;
 
-    // HIDERING Phase 5 (HFv16): the wallet's Kyber768 decapsulation keypair, present
+    // HIDERING Phase 5 (HFv16): the wallet's ML-KEM-768 decapsulation keypair, present
     // only for accounts owning a BQ... address. Defaults to boost::none, so every
     // existing account is unaffected and the field is NOT serialized (absent from the
     // KV map below and from account_boost_serialization.h) — existing wallet files and
@@ -62,7 +62,7 @@ namespace cryptonote
     // inheritance-transparent and the on-disk key_data bytes are unchanged.
     boost::optional<epee::mlocked<crypto::pqc::pq_stealth_keys>> pq_keys;
 
-    // HIDERING Phase 5 (HFv16, audit C-1): the account's PERSISTENT Dilithium3 signing
+    // HIDERING Phase 5 (HFv16, audit C-1): the account's PERSISTENT ML-DSA-65 signing
     // keypair, used to authenticate transactions with a stable per-account key instead
     // of the former per-tx throwaway. Present only for BQ... accounts; boost::none for
     // every classic account, so it is absent from the serialized key_data (written only
@@ -77,7 +77,7 @@ namespace cryptonote
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(m_multisig_keys)
       const crypto::chacha_iv default_iv{{0, 0, 0, 0, 0, 0, 0, 0}};
       KV_SERIALIZE_VAL_POD_AS_BLOB_OPT(m_encryption_iv, default_iv)
-      // HIDERING Phase 5 (HFv16): persist the optional Kyber768 BQ keypair (pq_keys).
+      // HIDERING Phase 5 (HFv16): persist the optional ML-KEM-768 BQ keypair (pq_keys).
       // It is written as a single fixed-size blob (pq_stealth_keys = kyber_pk||kyber_sk,
       // 3584 B) ONLY for BQ... accounts; classic wallets have pq_keys == boost::none,
       // emit nothing here, and their key_data stays byte-for-byte unchanged. The secret
@@ -107,8 +107,8 @@ namespace cryptonote
         if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(pq_blob, stg, hparent_section, "pq_keys"))
         {
           this_ref.pq_keys = pq_blob; // copies into the mlocked member (implicit mlocked(const T&))
-          std::array<uint8_t, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES> kpk{};
-          memcpy(kpk.data(), pq_blob.kyber_pk, crypto::pqc::KYBER768_PUBLIC_KEY_BYTES);
+          std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kpk{};
+          memcpy(kpk.data(), pq_blob.kyber_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
           this_ref.m_account_address.pq_kyber_pk = kpk;
           memwipe(&pq_blob, sizeof(pq_blob)); // audit M4: scrub the transient un-mlocked copy
         }
@@ -117,7 +117,7 @@ namespace cryptonote
           this_ref.pq_keys = boost::none;
         }
       }
-      // HIDERING Phase 5 (HFv16, audit C-1): persist the optional persistent Dilithium3
+      // HIDERING Phase 5 (HFv16, audit C-1): persist the optional persistent ML-DSA-65
       // signing keypair (pq_dilithium) as a single fixed-size blob, encrypted exactly
       // like pq_keys (dilithium_sk is chacha20-encrypted in place by encrypt()/decrypt()
       // before this map runs; dilithium_pk stays in the clear). Written ONLY when set, so
@@ -171,7 +171,7 @@ namespace cryptonote
     bool make_multisig(const crypto::secret_key &view_secret_key, const crypto::secret_key &spend_secret_key, const crypto::public_key &spend_public_key, const std::vector<crypto::secret_key> &multisig_keys);
     const account_keys& get_keys() const;
     // HIDERING Phase 5 (HFv16): mutable access to the keys, used to attach the optional
-    // Kyber768 BQ... keypair (generate_pq_keys). Classic flows never touch pq_keys.
+    // ML-KEM-768 BQ... keypair (generate_pq_keys). Classic flows never touch pq_keys.
     account_keys& get_keys_nonconst();
     std::string get_public_address_str(network_type nettype) const;
     std::string get_public_integrated_address_str(const crypto::hash8 &payment_id, network_type nettype) const;
@@ -215,9 +215,9 @@ namespace cryptonote
 
   // HIDERING Phase 5 (HFv16) — BQ... (post-quantum) account helpers.
   //
-  // generate_pq_keys() generates a fresh Kyber768 keypair and attaches it to `keys`:
-  //   - keys.pq_keys                       <- the Kyber768 {pk, sk} (decapsulation key)
-  //   - keys.m_account_address.pq_kyber_pk <- the Kyber768 public key (1184 bytes)
+  // generate_pq_keys() generates a fresh ML-KEM-768 keypair and attaches it to `keys`:
+  //   - keys.pq_keys                       <- the ML-KEM-768 {pk, sk} (decapsulation key)
+  //   - keys.m_account_address.pq_kyber_pk <- the ML-KEM-768 public key (1184 bytes)
   // so that keys.m_account_address.is_pq() becomes true and a BQ... address can be
   // rendered/spent. Returns false if liboqs keygen fails. This is purely additive: it
   // is only ever called for accounts that opt into a BQ... address; classic accounts
@@ -228,7 +228,7 @@ namespace cryptonote
   // generated. Persisting it (encrypted, like the Ed25519 secrets) is future work.
   bool generate_pq_keys(account_keys& keys);
 
-  // Render the BQ... address string for an account that owns a Kyber768 key. Returns an
+  // Render the BQ... address string for an account that owns a ML-KEM-768 key. Returns an
   // empty string if keys.m_account_address.is_pq() is false.
   std::string get_pq_address_str(const account_keys& keys, network_type nettype);
 }
