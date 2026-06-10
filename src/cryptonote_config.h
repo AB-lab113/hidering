@@ -89,9 +89,7 @@
 
 #define ORPHANED_BLOCKS_MAX_COUNT                       100
 
-// HIDERING Mixnet: minimum stem hops before fluff broadcast
-#define HIDERING_MIXNET_MIN_HOPS                        3
-// HIDERING Mixnet: random delay range per hop (milliseconds)
+// HIDERING Mixnet: random delay range before TX submission (milliseconds)
 #define HIDERING_MIXNET_HOP_DELAY_MS                    2000
 
 // HIDERING Amount normalization: round to 0.1 HRG (10^10 atomic units)

@@ -161,15 +161,11 @@ namespace levin
       return get_out_connections(p2p, get_blockchain_height(p2p, core));
     }
 
-    epee::levin::message_writer make_tx_message(std::vector<blobdata>&& txs, const bool pad, const bool fluff, const uint8_t hop_count = 0)
+    epee::levin::message_writer make_tx_message(std::vector<blobdata>&& txs, const bool pad, const bool fluff)
     {
       NOTIFY_NEW_TRANSACTIONS::request request{};
       request.txs = std::move(txs);
       request.dandelionpp_fluff = fluff;
-      // HIDERING Mixnet: stem messages carry the propagated hop count; fluff
-      // (broadcast) messages advertise MIN_HOPS so receivers honour the fluff
-      // instead of restarting the 3-hop stem phase.
-      request.hidering_hop_count = fluff ? (uint8_t)HIDERING_MIXNET_MIN_HOPS : hop_count;
 
       if (pad)
       {
@@ -206,9 +202,9 @@ namespace levin
       return out;
     }
 
-    bool make_payload_send_txs(connections& p2p, std::vector<blobdata>&& txs, const boost::uuids::uuid& destination, const bool pad, const bool fluff, const uint8_t hop_count = 0)
+    bool make_payload_send_txs(connections& p2p, std::vector<blobdata>&& txs, const boost::uuids::uuid& destination, const bool pad, const bool fluff)
     {
-      epee::byte_slice blob = make_tx_message(std::move(txs), pad, fluff, hop_count).finalize_notify(NOTIFY_NEW_TRANSACTIONS::ID);
+      epee::byte_slice blob = make_tx_message(std::move(txs), pad, fluff).finalize_notify(NOTIFY_NEW_TRANSACTIONS::ID);
       return p2p.send(std::move(blob), destination);
     }
 
@@ -551,7 +547,6 @@ namespace levin
       std::vector<blobdata> txs_;
       boost::uuids::uuid source_;
       relay_method tx_relay;
-      uint8_t hop_count;
 
       //! \pre Called in `zone_->strand`
       void operator()()
@@ -565,7 +560,7 @@ namespace levin
           for (int tries = 2; 0 < tries; tries--)
           {
             const boost::uuids::uuid destination = zone_->map.get_stem(source_);
-            if (!destination.is_nil() && make_payload_send_txs(*zone_->p2p, std::vector<blobdata>{txs_}, destination, zone_->pad_txs, false, hop_count))
+            if (!destination.is_nil() && make_payload_send_txs(*zone_->p2p, std::vector<blobdata>{txs_}, destination, zone_->pad_txs, false))
             {
               /* Source is intentionally omitted in debug log for privacy - a
                  nil uuid indicates source is that node. */
@@ -821,7 +816,7 @@ namespace levin
     zone_->flush_txs.cancel();
   }
 
-  bool notify::send_txs(std::vector<blobdata> txs, const boost::uuids::uuid& source, relay_method tx_relay, uint8_t hop_count)
+  bool notify::send_txs(std::vector<blobdata> txs, const boost::uuids::uuid& source, relay_method tx_relay)
   {
     if (txs.empty())
       return true;
@@ -890,7 +885,7 @@ namespace levin
             // this will change a local/forward tx to stem or fluff ...
             boost::asio::dispatch(
               zone_->strand,
-              dandelionpp_notify{zone_, core_, std::move(txs), source, tx_relay, hop_count}
+              dandelionpp_notify{zone_, core_, std::move(txs), source, tx_relay}
             );
             break;
           }
