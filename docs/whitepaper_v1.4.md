@@ -171,13 +171,13 @@ bool get_block_reward(uint64_t already_generated_coins, uint64_t &reward) {
 
 La cryptographie post-quantique sera introduite via un **hard fork planifié en 2027** :
 
-- **Signatures** : Dilithium3 (NIST PQC standard)
-- **Échange de clés** : Kyber768 (NIST PQC standard)
-- **Nouvelles adresses** : format BQ... dédié aux clés Kyber768 (le format B... classique reste inchangé)
+- **Signatures** : ML-DSA-65 (FIPS 204, NIST PQC standard)
+- **Échange de clés** : ML-KEM-768 (FIPS 203, NIST PQC standard)
+- **Nouvelles adresses** : format BQ... dédié aux clés ML-KEM-768 (FIPS 203) (le format B... classique reste inchangé)
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (juin 2026).** Le prototype post-quantique (intégration liboqs, keygen BQ, persistance des clés, signatures Dilithium3 en `tx_extra`, KEM Kyber768) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16) ; la spécification du *binding* validateur des clés PQ doit être finalisée avant toute activation. Cible mainnet : **T2 2027**.
+**État (juin 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16) ; la spécification du *binding* validateur des clés PQ doit être finalisée avant toute activation. Cible mainnet : **T2 2027**.
 
 ---
 
@@ -194,7 +194,7 @@ Peu après le lancement v1.x, le réseau HIDERING a subi une attaque 51% (16 mai
 - **Hard fork réseau** : le Network ID passe de `HRG\x01HIDERINGMAIN` à `HRG\x02HIDERINGMAIN` (magic `0x48524701` → `0x48524702`), isolant immédiatement v2.0.0 du mineur malveillant et permettant la consolidation du hashrate sur réseau privé avant ré-ouverture publique.
 - **Phase de pré-minage** : avant l'ouverture publique, les nœuds fondateurs minent en réseau privé pour trois raisons :
   1. **Durcir le réseau dès le premier jour public** — accumuler suffisamment de hashrate pour rendre une nouvelle attaque 51% économiquement prohibitive dès le launch.
-  2. **Financer le développement** — les tests du wallet GUI et l'implémentation des signatures post-quantiques (Dilithium3 + Kyber768, prévues 2027) requièrent des transactions on-chain réelles.
+  2. **Financer le développement** — les tests du wallet GUI et l'implémentation des signatures post-quantiques (ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203), prévues 2027) requièrent des transactions on-chain réelles.
   3. **Constituer une réserve communautaire** — qui sera soit redistribuée aux mineurs et DEX participants au lancement public, soit partiellement brûlée pour réduire la supply en circulation.
 
 Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement développement**, pas une vente d'insiders : tous les coins sont produits par PoW. Une fois le réseau ouvert publiquement, tous les mineurs concourent sous les mêmes règles RandomX, sans avantage insider sur des coins inaccessibles au public. Le volume exact, la durée et la destination finale de la réserve seront communiqués publiquement au launch.
@@ -246,7 +246,7 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
-- Dilithium3 + Kyber768 signatures (prototype audité, code inerte jusqu'à HFv16)
+- ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signatures (prototype audité, code inerte jusqu'à HFv16)
 - Finalisation spec binding PQ + tests end-to-end
 - Hard fork PQC mainnet (cible T2 2027)
 
@@ -290,7 +290,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Supply | Tail emission | 18M hard cap |
 | Halving | Non | Tous les 210,000 blocs |
 | PoW | RandomX | RandomX (identique) |
-| Post-quantique | Non planifié | 2027 (Dilithium3+Kyber768) |
+| Post-quantique | Non planifié | 2027 (ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203)) |
 
 ---
 
