@@ -135,20 +135,20 @@ TEST(parse_tx_extra, handles_pub_key_and_padding)
   ASSERT_EQ(typeid(cryptonote::tx_extra_padding), tx_extra_fields[1].type());
 }
 
-// HIDERING Phase 5 (audit H2): the greedy 0x00 padding field and the trailing Dilithium3
+// HIDERING Phase 5 (audit H2): the greedy 0x00 padding field and the trailing ML-DSA-65
 // signature (0x06) are mutually exclusive as tx_extra fields — both must be the LAST field,
 // and the padding parser rejects any non-zero byte after it. construct_tx_with_tx_key
 // therefore omits the 0x00 padding on the PQ path. These two tests pin that invariant at the
 // parse layer: padding-then-pq_sig must NOT parse; pq_sig-as-terminal must parse cleanly.
 namespace
 {
-  // tx_extra_pq_sig is a BLOB_SERIALIZER: on the wire it is [0x06][pk(1952)||sig(3293)] = 5246 bytes.
-  const size_t PQ_SIG_BODY = 1952 + 3293; // crypto::pqc::DILITHIUM3_{PUBLIC_KEY,SIGNATURE}_BYTES
+  // tx_extra_pq_sig is a BLOB_SERIALIZER: on the wire it is [0x06][pk(1952)||sig(3309)] = 5262 bytes.
+  const size_t PQ_SIG_BODY = 1952 + 3309; // crypto::pqc::ML_DSA_65_{PUBLIC_KEY,SIGNATURE}_BYTES
 }
 
 TEST(parse_tx_extra, rejects_padding_before_pq_sig)
 {
-  // [pubkey][padding 0x00 + zeros][pq_sig 0x06 + 5245 bytes]: the greedy padding parser
+  // [pubkey][padding 0x00 + zeros][pq_sig 0x06 + 5261 bytes]: the greedy padding parser
   // consumes the 0x06 tag byte as "padding", sees it is non-zero, and rejects the whole
   // tx_extra. This is exactly the chain-halting layout H2 prevents from ever being emitted.
   std::vector<uint8_t> extra;
@@ -157,19 +157,19 @@ TEST(parse_tx_extra, rejects_padding_before_pq_sig)
   extra.push_back(TX_EXTRA_TAG_PADDING);            // 0x00
   extra.insert(extra.end(), 99, 0x00);              // padding zeros
   extra.push_back(0x06);                            // TX_EXTRA_TAG_PQ_SIG
-  extra.insert(extra.end(), PQ_SIG_BODY, 0x00);     // Dilithium3 pk||sig body
+  extra.insert(extra.end(), PQ_SIG_BODY, 0x00);     // ML-DSA-65 pk||sig body
   std::vector<cryptonote::tx_extra_field> tx_extra_fields;
   ASSERT_FALSE(cryptonote::parse_tx_extra(extra, tx_extra_fields));
 }
 
 TEST(parse_tx_extra, accepts_pq_sig_as_terminal_field)
 {
-  // [pubkey][pq_sig 0x06 + 5245 bytes] with NO 0x00 padding: parses canonically, pq_sig last.
+  // [pubkey][pq_sig 0x06 + 5261 bytes] with NO 0x00 padding: parses canonically, pq_sig last.
   std::vector<uint8_t> extra;
   extra.push_back(TX_EXTRA_TAG_PUBKEY);
   extra.insert(extra.end(), 32, 0x11);              // pubkey
   extra.push_back(0x06);                            // TX_EXTRA_TAG_PQ_SIG
-  extra.insert(extra.end(), PQ_SIG_BODY, 0x00);     // Dilithium3 pk||sig body
+  extra.insert(extra.end(), PQ_SIG_BODY, 0x00);     // ML-DSA-65 pk||sig body
   std::vector<cryptonote::tx_extra_field> tx_extra_fields;
   ASSERT_TRUE(cryptonote::parse_tx_extra(extra, tx_extra_fields));
   ASSERT_EQ(2, tx_extra_fields.size());
