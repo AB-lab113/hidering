@@ -125,10 +125,9 @@ premine
 premine/
 test_wallet*
 
-# daemon-generated RPC TLS keypair (regenerated automatically on next launch)
-data/rpc_ssl.key
-data/rpc_ssl.crt
-data/rpc_ssl.fingerprint
+# daemon runtime data-dir: LMDB chain, peerlists, and the auto-regenerated
+# RPC TLS keypair — never commit
+/data/
 
 # one-shot dev scripts kept local only
 fix_premine*.py
@@ -150,3 +149,6 @@ hidering-v*.tar.gz.sha256
 
 # local wallet directories (test/dev — never commit)
 hrg-wallet*
+
+# local operational notes (may contain wallet addresses / passwords)
+REPRISE_DEMAIN_MINING.md
