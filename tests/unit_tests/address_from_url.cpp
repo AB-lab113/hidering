@@ -82,27 +82,14 @@ TEST(AddressFromTXT, Failure)
   ASSERT_STREQ("", res.c_str());
 }
 
-TEST(AddressFromURL, Success)
+// HIDERING: this test resolved Monero's OpenAlias donation record (donate.getmonero.org)
+// and compared it to the upstream MONERO_DONATION_ADDR constant, which was removed in the
+// rebrand. It is Monero-infrastructure-specific and requires a live DNS query, so it is
+// disabled for HIDERING (there is no equivalent OpenAlias donation record, and the suite
+// must not phone home to getmonero.org). The OpenAlias TXT parser itself remains covered by
+// the AddressFromTXT tests above.
+TEST(AddressFromURL, DISABLED_Success)
 {
-  const std::string addr = MONERO_DONATION_ADDR;
-  
-  bool dnssec_result = false;
-
-  std::vector<std::string> addresses = tools::dns_utils::addresses_from_url("donate.getmonero.org", dnssec_result);
-
-  EXPECT_EQ(1, addresses.size());
-  if (addresses.size() == 1)
-  {
-    EXPECT_STREQ(addr.c_str(), addresses[0].c_str());
-  }
-
-  // OpenAlias address with an @ instead of first .
-  addresses = tools::dns_utils::addresses_from_url("donate@getmonero.org", dnssec_result);
-  EXPECT_EQ(1, addresses.size());
-  if (addresses.size() == 1)
-  {
-    EXPECT_STREQ(addr.c_str(), addresses[0].c_str());
-  }
 }
 
 TEST(AddressFromURL, Failure)
