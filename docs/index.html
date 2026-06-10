@@ -914,8 +914,8 @@
     <div class="feature">
       <div class="feature-icon">⊛</div>
       <h3>Post-Quantum Ready</h3>
-      <p>Dilithium3 + Kyber768 signature upgrade, now in development via a non-destructive hard fork targeted for 2027 — liboqs already integrated. Existing blockchain history is fully preserved.</p>
-      <span class="feature-tag">Dilithium3 · In Progress</span>
+      <p>ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signature upgrade, now in development via a non-destructive hard fork targeted for 2027 — liboqs already integrated. Existing blockchain history is fully preserved.</p>
+      <span class="feature-tag">ML-DSA-65 (FIPS 204) · In Progress</span>
     </div>
   </div>
 </section>
@@ -1272,9 +1272,9 @@
       </div>
       <div class="roadmap-content">
         <h3>Post-Quantum Upgrade</h3>
-        <p>Hard fork introducing Dilithium3 + Kyber768 signatures. Non-destructive — existing blockchain history is fully preserved. Only transactions beyond fork height use new scheme. Steps 1–7 complete: liboqs integrated, PQ key types, Dilithium3 TX signing, Kyber768 stealth addresses (BQ... format), wallet key persistence — all inactive until HFv16 at block ~2,000,000. Security audit completed June 2026. Mainnet hard fork targeted for Q2 2027.</p>
+        <p>Hard fork introducing ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signatures. Non-destructive — existing blockchain history is fully preserved. Only transactions beyond fork height use new scheme. Steps 1–7 complete: liboqs integrated, PQ key types, ML-DSA-65 (FIPS 204) TX signing, ML-KEM-768 (FIPS 203) stealth addresses (BQ... format), wallet key persistence — all inactive until HFv16 at block ~2,000,000. Security audit completed June 2026. Mainnet hard fork targeted for Q2 2027.</p>
         <div class="roadmap-tags">
-          <span class="rtag">Dilithium3</span><span class="rtag">Kyber768</span><span class="rtag">Hard Fork</span>
+          <span class="rtag">ML-DSA-65 (FIPS 204)</span><span class="rtag">ML-KEM-768 (FIPS 203)</span><span class="rtag">Hard Fork</span>
         </div>
       </div>
     </div>
@@ -1321,7 +1321,7 @@
 
     <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
       <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">What is the post-quantum upgrade?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">HIDERING is adding Dilithium3 and Kyber768 signatures via a non-destructive hard fork, targeted for 2027. Work is already under way — the liboqs library is integrated, PQ key types are defined, Dilithium3 TX signing and Kyber768 stealth addresses (BQ... format) are implemented and committed (May–June 2026) — all dormant until the HFv16 activation height. A full security audit was completed in June 2026. All existing coins and transaction history are fully preserved — only new transactions after the fork height will use the quantum-resistant scheme. No action is required from holders; simply updating the software is enough.</p>
+      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">HIDERING is adding ML-DSA-65 (FIPS 204) and ML-KEM-768 (FIPS 203) signatures via a non-destructive hard fork, targeted for 2027. Work is already under way — the liboqs library is integrated, PQ key types are defined, ML-DSA-65 (FIPS 204) TX signing and ML-KEM-768 (FIPS 203) stealth addresses (BQ... format) are implemented and committed (May–June 2026) — all dormant until the HFv16 activation height. A full security audit was completed in June 2026. All existing coins and transaction history are fully preserved — only new transactions after the fork height will use the quantum-resistant scheme. No action is required from holders; simply updating the software is enough.</p>
     </div>
 
     <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);"><h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">How do I choose my ring size?</h3><p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">By default, every transaction uses ring size 32 — the minimum on HIDERING, already 2× Monero's default of 16. For enhanced privacy, specify a larger ring size: <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 48</code> or <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 64</code>. Higher ring sizes increase anonymity but slightly increase transaction size and fees.</p></div>
