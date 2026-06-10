@@ -34,7 +34,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 - Ring size dynamique 32–64 (vs Monero 16)
 - Padding réseau hérité de Monero (granularité 1024 bytes)
 - TX padding interne fixe 2500 bytes (tx_extra)
-- Routage stem multi-hops (biais best-effort vers ≥3 hops, par-dessus Dandelion++)
+- Propagation des transactions via Dandelion++ (stem/fluff, héritée de Monero)
 - Montants confidentiels via RingCT (engagements de Pedersen)
 - Stealth addresses one-time (CryptoNote)
 - Résistance quantique programmée (2027)
@@ -52,7 +52,7 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 HIDERING vise la confidentialité maximale par construction :
 
 - **Anonymat on-chain** : ring signatures 32–64, stealth addresses one-time, RingCT
-- **Anonymat réseau** : routage stem multi-hops (best-effort par-dessus Dandelion++), chiffrement bout-en-bout hérité de Monero
+- **Anonymat réseau** : propagation Dandelion++ (héritée de Monero), chiffrement bout-en-bout hérité de Monero
 - **Confidentialité des montants** : RingCT (engagements de Pedersen) ; TX padding interne fixe 2500 bytes (tx_extra) pour uniformiser la taille des champs annexes
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
 
@@ -78,13 +78,13 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|----------------|----------|
 | Ring size | 16 | 32–64 (dynamique) |
 | TX padding | Variable | TX interne 2500 o (réseau : Monero 1024 o) |
-| Réseau | P2P direct | Routage stem multi-hops (best-effort) |
+| Réseau | Dandelion++ | Dandelion++ (hérité) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
 | Stealth | One-time | One-time (CryptoNote) |
 | PoW | RandomX | RandomX (identique) |
 | Hard Fork | HFv15 | HFv15 dès bloc 1 |
 
-> **Note transparence (audit juin 2026).** Le routage stem multi-hops est un biais *best-effort* greffé sur Dandelion++ : il n'est pas « obligatoire/garanti », l'epoch Dandelion++ décidant in fine du chemin. Le padding interne 2500 o porte sur le champ `tx_extra` ; le padding *réseau* reste celui de Monero (granularité 1024 o). Ces formulations ont été requalifiées après l'audit pour refléter exactement le code.
+> **Note transparence (audit juin 2026, mise à jour).** Le biais de routage stem « multi-hops best-effort » initialement annoncé a été **retiré** : le compteur de hops sérialisé sur le wire révélait la distance à l'origine de la transaction (un pair recevant un compteur à 0 identifiait l'émetteur), dégradant l'anonymat que Dandelion++ protège. La propagation repose désormais sur **Dandelion++ stock** hérité de Monero, sans mécanisme multi-hop spécifique à HIDERING. Le padding interne 2500 o porte sur le champ `tx_extra` ; le padding *réseau* reste celui de Monero (granularité 1024 o). Ces formulations ont été requalifiées pour refléter exactement le code.
 
 ---
 
@@ -225,7 +225,7 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 **PHASE 2 : PRIVACY ENHANCEMENTS ✅**
 - P1 ✅ Ring dynamique 32–64
 - P2 ✅ TX padding interne 2500 bytes (tx_extra) ; padding réseau = Monero 1024 o
-- P3 ✅ Routage stem multi-hops (best-effort par-dessus Dandelion++)
+- P3 ⊘ Routage stem multi-hops **retiré** : retour à Dandelion++ stock (le compteur de hops sérialisé fuyait la distance à l'origine ; voir Note transparence §3.2)
 - P4 ✅ Montants confidentiels (RingCT — engagements de Pedersen)
 - P5 ✅ Stealth addresses one-time (CryptoNote)
 
@@ -284,7 +284,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 |---------------|--------|--------------|
 | Ring size | 16 (fixe) | 32–64 (dynamique) |
 | TX padding | Non | TX interne 2500 o (réseau : Monero 1024 o) |
-| Routage réseau | Dandelion++ | Stem multi-hops best-effort (sur Dandelion++) |
+| Routage réseau | Dandelion++ | Dandelion++ (hérité) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
 | Stealth | One-time | One-time (CryptoNote) |
 | Supply | Tail emission | 18M hard cap |
@@ -339,7 +339,7 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 ## 14. CONCLUSION
 
-HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o, routage stem multi-hops best-effort), HIDERING offre une confidentialité forte par construction.
+HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o) par-dessus la propagation Dandelion++ et le RingCT hérités de Monero, HIDERING offre une confidentialité forte par construction.
 
 Le fair launch garantit une distribution par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique ; la réserve qui en résulte est minée, transparente et son usage sera communiqué au launch. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
