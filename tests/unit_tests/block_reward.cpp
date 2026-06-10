@@ -53,10 +53,12 @@ namespace
 
   TEST_F(block_reward_and_already_generated_coins, handles_first_values)
   {
-  	// 17592186044415 from neozaru, confirmed by fluffypony
-    TEST_ALREADY_GENERATED_COINS(0, UINT64_C(17592186044415));
-    TEST_ALREADY_GENERATED_COINS(m_block_reward, UINT64_C(17592169267200));
-    TEST_ALREADY_GENERATED_COINS(UINT64_C(2756434948434199641), UINT64_C(14963444829249));
+    // HIDERING: flat 42.86 HRG/block (42857142857143 atomic) across the whole first halving
+    // period (210000 blocks), not Monero's smooth exponential decay. All three inputs lie in
+    // period 0 (< 9,000,000 HRG emitted), so the reward is the constant initial value.
+    TEST_ALREADY_GENERATED_COINS(0, UINT64_C(42857142857143));
+    TEST_ALREADY_GENERATED_COINS(m_block_reward, UINT64_C(42857142857143));
+    TEST_ALREADY_GENERATED_COINS(UINT64_C(2756434948434199641), UINT64_C(42857142857143));
   }
 
   TEST_F(block_reward_and_already_generated_coins, correctly_steps_from_2_to_1)

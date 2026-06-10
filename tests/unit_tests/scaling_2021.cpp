@@ -33,60 +33,65 @@
 #include "gtest/gtest.h"
 #include "cryptonote_core/blockchain.h"
 
+// HIDERING: DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT is 12, not Monero's 3000 (~250x lower,
+// see cryptonote_config.h), so the absolute fees diverge from the Monero MoneroScaling2021.pdf
+// reference. The values below are the HRG-computed outputs for the same inputs (the scaling
+// algorithm is unchanged; only the reference weight differs).
 TEST(fee_2021_scaling, relay_fee_cases_from_pdf)
 {
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 300000), 38000);
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 1425000), 1684 /*1680*/);
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 1500000), 1520);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 300000), 152);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 1425000), 7);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(1200000000000, 1500000), 6);
 
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 300000), 19000);
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 1425000), 842 /*840*/);
-  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 1500000), 760);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 300000), 76);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 1425000), 3);
+  ASSERT_EQ(cryptonote::Blockchain::get_dynamic_base_fee(600000000000, 1500000), 3);
 }
 
 TEST(fee_2021_scaling, wallet_fee_cases_from_pdf)
 {
   std::vector<uint64_t> fees;
 
+  // HIDERING-computed values (DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT=12; see comment above).
   fees.clear();
   cryptonote::Blockchain::get_dynamic_base_fee_estimate_2021_scaling(600000000000, 300000, 300000, fees);
   ASSERT_EQ(fees.size(), 4);
-  ASSERT_EQ(fees[0], 20000);
-  ASSERT_EQ(fees[1], 80000);
-  ASSERT_EQ(fees[2], 320000);
+  ASSERT_EQ(fees[0], 80);
+  ASSERT_EQ(fees[1], 320);
+  ASSERT_EQ(fees[2], 1300);
   ASSERT_EQ(fees[3], 4000000);
 
   fees.clear();
   cryptonote::Blockchain::get_dynamic_base_fee_estimate_2021_scaling(600000000000, 15000000, 300000, fees);
   ASSERT_EQ(fees.size(), 4);
-  ASSERT_EQ(fees[0], 20000);
-  ASSERT_EQ(fees[1], 80000);
-  ASSERT_EQ(fees[2], 320000);
-  ASSERT_EQ(fees[3], 1300000);
+  ASSERT_EQ(fees[0], 80);
+  ASSERT_EQ(fees[1], 320);
+  ASSERT_EQ(fees[2], 1300);
+  ASSERT_EQ(fees[3], 80000);
 
   fees.clear();
   cryptonote::Blockchain::get_dynamic_base_fee_estimate_2021_scaling(600000000000, 1425000, 1425000, fees);
   ASSERT_EQ(fees.size(), 4);
-  ASSERT_EQ(fees[0], 890);
-  ASSERT_EQ(fees[1], 3600);
-  ASSERT_EQ(fees[2], 68000);
-  ASSERT_EQ(fees[3], 850000 /* 842000 */);
+  ASSERT_EQ(fees[0], 3);
+  ASSERT_EQ(fees[1], 14);
+  ASSERT_EQ(fees[2], 270);
+  ASSERT_EQ(fees[3], 850000);
 
   fees.clear();
   cryptonote::Blockchain::get_dynamic_base_fee_estimate_2021_scaling(600000000000, 1500000, 1500000, fees);
   ASSERT_EQ(fees.size(), 4);
-  ASSERT_EQ(fees[0], 800);
-  ASSERT_EQ(fees[1], 3200);
-  ASSERT_EQ(fees[2], 64000);
+  ASSERT_EQ(fees[0], 3);
+  ASSERT_EQ(fees[1], 12);
+  ASSERT_EQ(fees[2], 260);
   ASSERT_EQ(fees[3], 800000);
 
   fees.clear();
   cryptonote::Blockchain::get_dynamic_base_fee_estimate_2021_scaling(600000000000, 75000000, 1500000, fees);
   ASSERT_EQ(fees.size(), 4);
-  ASSERT_EQ(fees[0], 800);
-  ASSERT_EQ(fees[1], 3200);
-  ASSERT_EQ(fees[2], 64000);
-  ASSERT_EQ(fees[3], 260000);
+  ASSERT_EQ(fees[0], 3);
+  ASSERT_EQ(fees[1], 12);
+  ASSERT_EQ(fees[2], 260);
+  ASSERT_EQ(fees[3], 16000);
 }
 
 TEST(fee_2021_scaling, rounding)

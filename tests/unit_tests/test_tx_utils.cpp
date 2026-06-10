@@ -74,17 +74,19 @@ TEST(parse_tx_extra, handles_padding_only_size_2)
 
 TEST(parse_tx_extra, handles_padding_only_max_size)
 {
-  std::vector<uint8_t> extra(TX_EXTRA_NONCE_MAX_COUNT, 0);
+  // HIDERING: padding cap is TX_EXTRA_PADDING_MAX_COUNT (2500), raised from Monero's 255 for
+  // the internal 2500-byte tx_extra padding privacy feature — not TX_EXTRA_NONCE_MAX_COUNT.
+  std::vector<uint8_t> extra(TX_EXTRA_PADDING_MAX_COUNT, 0);
   std::vector<cryptonote::tx_extra_field> tx_extra_fields;
   ASSERT_TRUE(cryptonote::parse_tx_extra(extra, tx_extra_fields));
   ASSERT_EQ(1, tx_extra_fields.size());
   ASSERT_EQ(typeid(cryptonote::tx_extra_padding), tx_extra_fields[0].type());
-  ASSERT_EQ(TX_EXTRA_NONCE_MAX_COUNT, boost::get<cryptonote::tx_extra_padding>(tx_extra_fields[0]).size);
+  ASSERT_EQ(TX_EXTRA_PADDING_MAX_COUNT, boost::get<cryptonote::tx_extra_padding>(tx_extra_fields[0]).size);
 }
 
 TEST(parse_tx_extra, handles_padding_only_exceed_max_size)
 {
-  std::vector<uint8_t> extra(TX_EXTRA_NONCE_MAX_COUNT + 1, 0);
+  std::vector<uint8_t> extra(TX_EXTRA_PADDING_MAX_COUNT + 1, 0);
   std::vector<cryptonote::tx_extra_field> tx_extra_fields;
   ASSERT_FALSE(cryptonote::parse_tx_extra(extra, tx_extra_fields));
 }

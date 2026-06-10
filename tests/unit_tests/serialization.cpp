@@ -660,8 +660,15 @@ TEST(Serialization, serializes_ringct_types)
   ASSERT_TRUE(clsag0.D == clsag1.D);
 }
 
+// HIDERING: this loads a Monero reference wallet file (data/wallet_9svHk1, testnet) and asserts
+// against hardcoded Monero addresses/keys. HRG's genesis and address prefix (60) differ, so the
+// fixture is rejected ("Genesis block mismatch") / addresses won't match. The fixture is Monero
+// reference data, not applicable to HRG; regenerating an HRG wallet blob would be a separate
+// fixture-authoring task. Skipped (GTEST_SKIP, not DISABLED_-renamed, to keep the friend access
+// that wallet2.h grants this test class by name). Fresh-wallet serialization stays covered.
 TEST(Serialization, portability_wallet)
 {
+  GTEST_SKIP() << "Monero reference wallet fixture (wallet_9svHk1) incompatible with HRG genesis/prefix";
   const cryptonote::network_type nettype = cryptonote::TESTNET;
   tools::wallet2 w(nettype);
   const boost::filesystem::path wallet_file = unit_test::data_dir / "wallet_9svHk1";
