@@ -82,6 +82,9 @@ effectif après wrap). **Patch source appliqué en v1.0.1 (12 mai 2026, commit d
 - GENESIS_PROOF.md — preuve NUMS genesis
 - assets/hrg_logo.svg — logo
 
+## CVE / FAUX POSITIFS DÉPENDANCES
+- **CVE-2024-38517 (rapidjson, CVSS 7.8) — FAUX POSITIF, déjà corrigée dans notre arbre (vérifié 12 juin 2026).** Underflow d'entier dans `GenericReader::ParseNumber()` (`reader.h`, exposants négatifs : `exp + expFrac` peut passer sous `INT_MIN`). Le fix upstream est le commit Tencent **`8269bc2bc289e9d343bae51cdf6d23ef0950e001`** (« Prevent int underflow when parsing exponents », **mai 2018**) ; notre submodule `external/rapidjson` est pinné à `129d19ba7` (juillet 2018) qui en **descend** (`git merge-base --is-ancestor` OK ; le clamp `maxExp = (expFrac + 2147483639) / 10` est présent dans `include/rapidjson/reader.h:~1640`). La CVE n'a été assignée qu'en 2024 car rapidjson n'a jamais re-releasé après v1.1.0 (2016) : elle vise les distros packageant le tarball v1.1.0, PAS les pins de master post-mai-2018. **Les scanners (Snyk/Wiz/etc.) keyent sur la version « 1.1.0 » et flaggeront ce submodule à chaque audit → ne pas re-patcher.** Unique copie dans l'arbre (le repo GUI pointe sur le même backend via gitlink/symlink). NB : les références circulant pour cette CVE (issue `#2460`, commit `e3081d55`) sont fausses — 404 chez Tencent/rapidjson.
+
 ## BUG CRITIQUE — RESOLU (commit 0b6d81b3e, 30 avril 2026)
 ### get_block_reward() — halving mal calculé
 Localisation : src/cryptonote_basic/cryptonote_basic_impl.cpp:83
