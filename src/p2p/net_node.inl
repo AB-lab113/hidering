@@ -794,13 +794,20 @@ namespace nodetool
       boost::thread th = boost::thread(thread_attributes, [=, &dns_results, &addr_str]
       {
         MDEBUG("dns_threads[" << result_index << "] created for: " << addr_str);
-        // TODO: care about dnssec avail/valid
         bool avail, valid;
         std::vector<std::string> addr_list;
 
         try
         {
           addr_list = tools::DNSResolver::instance().get_ipv4(addr_str, avail, valid);
+          // HIDERING M-6: hidering.org is DNSSEC-signed (DS published June 2026).
+          // Drop answers whose signature is actively bogus; unsigned zones
+          // (avail=false) keep resolving — see CLAUDE.md SÉCURITÉ M-6.
+          if (avail && !valid)
+          {
+            MWARNING("dns_threads[" << result_index << "] DNSSEC validation failed for " << addr_str << ", ignoring seed results");
+            addr_list.clear();
+          }
           MDEBUG("dns_threads[" << result_index << "] DNS resolve done");
           boost::this_thread::interruption_point();
         }
