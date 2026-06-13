@@ -4736,7 +4736,10 @@ void Blockchain::check_against_checkpoints(const checkpoints& points, bool enfor
       {
         LOG_ERROR("Local blockchain failed to pass a checkpoint, rolling back!");
         std::list<block> empty;
-        rollback_blockchain_switching(empty, pt.first - 2);
+        // HIDERING (audit M-1): guard the uint64 underflow when a failing
+        // checkpoint sits at height 0 or 1 (pt.first - 2 would wrap to ~2^64
+        // and request a rollback to a nonsensical height). Clamp to 0.
+        rollback_blockchain_switching(empty, pt.first >= 2 ? pt.first - 2 : 0);
       }
       else
       {

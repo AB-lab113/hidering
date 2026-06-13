@@ -201,17 +201,21 @@ namespace cryptonote
   {
     if (nettype == TESTNET)
     {
-      ADD_CHECKPOINT2(0,     "48ca7cd3c8de5b6a4d53d2861fbdaedca141553559f9be9520068053cda8430b", "0x1");
-      ADD_CHECKPOINT2(1000000, "46b690b710a07ea051bc4a6b6842ac37be691089c0f7758cfeec4d5fc0b4a258", "0x7aaad7153");
-      ADD_CHECKPOINT2(1058600, "12904f6b4d9e60fd875674e07147d2c83d6716253f046af7b894c3e81da7e1bd", "0x971efd119");
-      ADD_CHECKPOINT2(1450000, "87562ca6786f41556b8d5b48067303a57dc5ca77155b35199aedaeca1550f5a0", "0xa639e2930e");
+      // HIDERING runs no public testnet. The entries previously here were
+      // INHERITED MONERO testnet anchors (genesis + h=1000000/1058600/1450000)
+      // whose hashes do NOT match a HIDERING testnet → with hash enforcement
+      // active (934b43b01) any HRG testnet node was guaranteed to fail
+      // check_block and halt (audit M-1, 2026-06-10). Cleared. Add
+      // HRG-specific testnet anchors here only if/when a HIDERING testnet is
+      // launched, computed against the real HRG testnet chain.
       return true;
     }
     if (nettype == STAGENET)
     {
-      ADD_CHECKPOINT2(0,       "76ee3cc98646292206cd3e86f74d88b4dcc1d937088645e9b0cbca84b7ce74eb", "0x1");
-      ADD_CHECKPOINT2(10000,   "1f8b0ce313f8b9ba9a46108bfd285c45ad7c2176871fd41c3a690d4830ce2fd5", "0x1d73ba");
-      ADD_CHECKPOINT2(550000,  "409f68cddd8e74b37469b41c1e61250d81c5776b42264f416d5d27c4626383ed", "0x5f3d4d03e");
+      // HIDERING runs no public stagenet. The entries previously here were
+      // INHERITED MONERO stagenet anchors (genesis + h=10000/550000) — wrong
+      // hashes for HRG → guaranteed halt under hash enforcement (audit M-1).
+      // Cleared. Add HRG-specific stagenet anchors on launch if ever needed.
       return true;
     }
     // HIDERING mainnet checkpoints. Anchors prevent deep reorgs on the v2.0.0 chain
