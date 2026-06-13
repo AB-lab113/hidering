@@ -303,11 +303,11 @@ namespace nodetool
   private:
     const std::vector<std::string> m_seed_nodes_list =
     {
-      // Only DNS names that actually resolve: seed3/seed4 were NXDOMAIN
-      // (2026-06-06 audit) and burned a resolver thread + timeout each at
-      // every bootstrap. Re-add them only once the A records exist.
+      // seed3/seed4 A records created June 2026 (re-added 2026-06-13).
       "seed1.hidering.org",
       "seed2.hidering.org",
+      "seed3.hidering.org",
+      "seed4.hidering.org",
     };
 
     bool islimitup=false;
