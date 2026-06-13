@@ -10,9 +10,13 @@ construction below in under a minute.
 - Genesis amount is unchanged (157.14 HRG) — a legacy value preserved to
   keep the deployed chain hash valid. The current maximum supply is
   **18,000,000 HRG** (cap revised 2026-05-11; see whitepaper §4.4 and
-  `CLAUDE.md` BUG CRITIQUE MONEY_SUPPLY). The genesis output simply
-  burns 157.14 HRG forever, so the effective circulating max is
-  **17,999,842.86 HRG**.
+  `CLAUDE.md` BUG CRITIQUE MONEY_SUPPLY). The genesis output is
+  unspendable, but it is **not counted in `already_generated_coins`** —
+  the genesis block is short-circuited in `blockchain.cpp:4427` before the
+  emission tally — so it neither adds to nor subtracts from the cap. The
+  effective circulating/economic max is therefore **18,000,000.00 HRG
+  exact** (audit M-2, 2026-06-10). The 157.14 HRG NUMS output exists
+  on-chain but sits outside the 18M emission accounting.
 - The output one-time public key `P` and the transaction public key `R` were
   derived from a **public domain string + integer counter** via SHA-256
   try-and-increment until the result decodes as a valid Ed25519 point.
@@ -139,9 +143,11 @@ such that `x · G = P`. Two attack avenues exist:
    operations.
 
 No third path exists in current public knowledge. The 157.14 HRG sitting
-at this output are therefore permanently locked, reducing the effective
-maximum circulating supply to **17 999 842.86 HRG** (against the
-18,000,000 HRG hard cap set in `cryptonote_config.h` since v1.0.1).
+at this output are therefore permanently locked. They are **not** part of
+the economic emission — the genesis coinbase is excluded from
+`already_generated_coins` (`blockchain.cpp:4427`) — so they do **not**
+reduce the circulating maximum, which equals the **18,000,000.00 HRG**
+hard cap (`cryptonote_config.h`, since v1.0.1) exactly.
 
 ## Network-wide identity
 

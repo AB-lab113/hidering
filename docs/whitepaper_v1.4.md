@@ -96,7 +96,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|--------|
 | Ticker | HRG |
 | Supply maximum | **18,000,000 HRG (hard cap irrévocable)** |
-| Supply circulant max | 17,999,842.86 HRG (genesis NUMS 157.14 HRG déduit) |
+| Supply circulant max | **18,000,000.00 HRG exact** (le NUMS genesis 157.14 HRG est unspendable ET hors comptabilité d'émission — `already_generated_coins` exclut le coinbase genesis, `blockchain.cpp:4427` — donc NON déduit du cap) |
 | Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~2.66 ans) |
