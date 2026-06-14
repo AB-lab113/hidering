@@ -293,15 +293,24 @@ DISABLE_VS_WARNINGS(4244 4345)
     return m_keys;
   }
   //-----------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): attach a fresh ML-KEM-768 keypair to `keys`, turning its
-  // account_public_address into a BQ... (post-quantum) address. Additive and opt-in.
+  // HIDERING Phase 5 (HFv16): attach a ML-KEM-768 + ML-DSA-65 keypair to `keys`, turning
+  // its account_public_address into a BQ... (post-quantum) address. Additive and opt-in.
+  //
+  // audit M-4: the PQ keypair is derived DETERMINISTICALLY from the account's Ed25519
+  // spend secret key (already populated by account_base::generate before this is called,
+  // on both the create and the restore-from-mnemonic paths). Restoring a wallet from its
+  // 25-word seed therefore regenerates the exact same BQ... keys, instead of fresh random
+  // ones that would strand any BQ funds. The spend key flows through domain-separated
+  // SHAKE256 (see pqc_keygen_from_seed), so it is never recoverable from the PQ material.
   bool generate_pq_keys(account_keys& keys)
   {
     crypto::pqc::pq_public_key pq_pk;
     crypto::pqc::pq_secret_key pq_sk;
-    if (!crypto::pqc::pqc_keygen(pq_pk, pq_sk))
+    if (!crypto::pqc::pqc_keygen_from_seed(
+            reinterpret_cast<const uint8_t*>(&keys.m_spend_secret_key),
+            sizeof(crypto::secret_key), pq_pk, pq_sk))
     {
-      MERROR("generate_pq_keys: liboqs ML-KEM-768/ML-DSA-65 keygen failed");
+      MERROR("generate_pq_keys: liboqs ML-KEM-768/ML-DSA-65 seed-derived keygen failed");
       return false;
     }
 

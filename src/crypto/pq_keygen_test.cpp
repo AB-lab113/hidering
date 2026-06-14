@@ -68,11 +68,53 @@ static bool test_bq_keygen_and_address()
   return true;
 }
 
+// audit M-4: the BQ keypair must be DETERMINISTIC in the spend key, so a wallet
+// restored from its 25-word seed regenerates the exact same BQ... address (and can
+// therefore spend BQ funds again). Two accounts created from the same recovery key
+// must yield identical BQ keys; a different recovery key must yield a different one.
+static bool test_bq_keygen_is_deterministic()
+{
+  // Account `a`: a fresh (random) spend key, then derive its BQ keypair.
+  account_base a;
+  const crypto::secret_key recovery = a.generate();
+  if (!generate_pq_keys(a.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (a)\n"); return false; }
+  const std::string addr_a = get_pq_address_str(a.get_keys(), MAINNET);
+
+  // Account `b`: RESTORED from a's recovery key (the M-4 scenario). Its spend key
+  // is identical, so the seed-derived BQ keypair must be identical too.
+  account_base b;
+  b.generate(recovery, true /*recover*/);
+  if (memcmp(&b.get_keys().m_spend_secret_key, &a.get_keys().m_spend_secret_key, sizeof(crypto::secret_key)) != 0)
+  { printf("FAIL: restored account has a different spend key (test setup)\n"); return false; }
+  if (!generate_pq_keys(b.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (b)\n"); return false; }
+
+  const std::string addr_b = get_pq_address_str(b.get_keys(), MAINNET);
+  if (addr_a.empty() || addr_a != addr_b)
+  { printf("FAIL: restore produced a different BQ address (M-4 not fixed)\n"); return false; }
+  if (memcmp(a.get_keys().pq_keys->kyber_sk, b.get_keys().pq_keys->kyber_sk,
+             crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES) != 0)
+  { printf("FAIL: restore produced a different ML-KEM-768 secret key\n"); return false; }
+  if (memcmp(a.get_keys().pq_dilithium->dilithium_sk, b.get_keys().pq_dilithium->dilithium_sk,
+             crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES) != 0)
+  { printf("FAIL: restore produced a different ML-DSA-65 secret key\n"); return false; }
+
+  // A different spend key must yield a different BQ address.
+  account_base c;
+  c.generate();
+  if (!generate_pq_keys(c.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (c)\n"); return false; }
+  if (get_pq_address_str(c.get_keys(), MAINNET) == addr_a)
+  { printf("FAIL: a different spend key collided to the same BQ address\n"); return false; }
+
+  printf("PASS: BQ keygen deterministic in spend key (restore reproduces BQ, distinct seed → distinct BQ)\n");
+  return true;
+}
+
 int main()
 {
   bool ok = true;
   ok &= test_classic_account_is_not_pq();
   ok &= test_bq_keygen_and_address();
+  ok &= test_bq_keygen_is_deterministic();
   printf("\nRESULT: %s\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

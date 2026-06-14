@@ -41,6 +41,10 @@ namespace pqc
   constexpr size_t ML_KEM_768_SECRET_KEY_BYTES   = 2400;
   constexpr size_t ML_KEM_768_CIPHERTEXT_BYTES   = 1088;
   constexpr size_t ML_KEM_768_SHARED_SECRET_BYTES = 32;
+  // Seed length for ML-KEM-768's derandomised keygen (FIPS 203: d||z, 32+32 bytes).
+  constexpr size_t ML_KEM_768_KEYPAIR_SEED_BYTES = 64;
+  // Seed length (ξ) ML-DSA-65 keygen consumes from the RNG (FIPS 204: 32 bytes).
+  constexpr size_t ML_DSA_65_KEYGEN_SEED_BYTES = 32;
 
   // A combined post-quantum public key: a ML-DSA-65 verification key (for the
   // external signature) plus a ML-KEM-768 encapsulation key (for KEM-based address
@@ -80,6 +84,21 @@ namespace pqc
   // Generate a fresh post-quantum keypair (ML-DSA-65 + ML-KEM-768).
   // Returns false if liboqs lacks either algorithm or a primitive fails.
   bool pqc_keygen(pq_public_key &pk, pq_secret_key &sk);
+
+  // Phase 5 (HFv16, audit M-4) — DETERMINISTIC keygen from a wallet seed.
+  //
+  // Derives the ML-DSA-65 + ML-KEM-768 keypair deterministically from `seed`
+  // (the wallet spend secret key), so a restore-from-mnemonic regenerates the
+  // exact same BQ... keys instead of fresh random ones — fixing the M-4 loss of
+  // BQ funds on seed restore. `seed`/`seed_len` is hashed with domain-separated
+  // SHAKE256 into per-algorithm sub-seeds: ML-KEM-768 uses its derandomised
+  // keygen (OQS_KEM_keypair_derand, 64-byte seed); ML-DSA-65 has no derandomised
+  // keygen API, so OQS_SIG_keypair is driven by a deterministic SHAKE256 RNG
+  // installed over liboqs' process-global randombytes hook for the duration of
+  // the call (serialised by an internal mutex, default RNG restored on exit).
+  // Returns false on any liboqs failure or if seed_len == 0.
+  bool pqc_keygen_from_seed(const uint8_t *seed, size_t seed_len,
+                            pq_public_key &pk, pq_secret_key &sk);
 
   // Sign `msg` (length `msg_len`) with the ML-DSA-65 secret key. On success
   // fills `sig` and sets `sig_len` to the produced signature length. Returns false
