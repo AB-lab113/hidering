@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whitepaper v1.4 — HIDERING (HRG)</title>
+<meta name="description" content="HIDERING (HRG) whitepaper v1.4 — enhanced-privacy cryptocurrency with Bitcoin-style emission: 18M hard cap, 100% RandomX PoW, dynamic ring 32–64, post-quantum roadmap.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="logo1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wp-layout { display: grid; grid-template-columns: 220px 1fr; gap: 3rem; max-width: 1100px; margin: 0 auto; padding: 0 2rem 6rem; position: relative; z-index: 1; }
+  .wp-toc { position: sticky; top: calc(var(--nav-h) + 1.5rem); align-self: start; }
+  .wp-toc .panel-label { margin-bottom: 0.8rem; }
+  .wp-toc ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+  .wp-toc a { color: var(--text-dim); text-decoration: none; font-size: 0.8rem; padding: 0.35rem 0; display: block; border-left: 1px solid var(--border); padding-left: 0.9rem; transition: all 0.2s; }
+  .wp-toc a:hover { color: var(--gold); border-color: var(--border-bright); }
+
+  .wp-body h2 {
+    font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--white); font-weight: 600;
+    margin: 3rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); scroll-margin-top: calc(var(--nav-h) + 1rem);
+  }
+  .wp-body h2:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+  .wp-body h3 { font-family: 'Cinzel', serif; font-size: 1rem; color: var(--gold); margin: 1.75rem 0 0.6rem; }
+  .wp-body p { font-size: 0.9rem; color: var(--text); line-height: 1.8; margin-bottom: 1rem; }
+  .wp-body ul { margin: 0 0 1.25rem 1.25rem; }
+  .wp-body li { font-size: 0.9rem; color: var(--text); line-height: 1.8; margin-bottom: 0.35rem; }
+  .wp-body strong { color: var(--white); }
+
+  .note {
+    border-left: 2px solid var(--gold); background: rgba(201,168,76,0.04);
+    padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: 0.84rem; color: var(--text-dim); line-height: 1.7;
+  }
+  .note strong { color: var(--gold); }
+
+  .wp-meta {
+    display: flex; gap: 2rem; flex-wrap: wrap; font-family: 'Fira Mono', monospace;
+    font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.1em; margin-top: 1rem;
+  }
+  .wp-meta span { color: var(--gold-dim); }
+
+  @media (max-width: 900px) {
+    .wp-layout { grid-template-columns: 1fr; }
+    .wp-toc { position: static; display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo"><img src="logo1.png" alt="HRG">HIDERING</a>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html" class="active">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering" class="btn btn-outline btn-sm">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HEAD -->
+<div class="page-head">
+  <div class="hero-glow"></div>
+  <div class="section-label">Whitepaper</div>
+  <h1 class="section-title">HIDERING Whitepaper</h1>
+  <p class="section-sub">Enhanced-privacy cryptocurrency with Bitcoin-style emission. Fair launch · 100% PoW · RandomX CPU.</p>
+  <div class="wp-meta" style="justify-content:center;">
+    <div>VERSION <span>1.4</span></div>
+    <div>REVISED <span>JUN 2026</span></div>
+    <div>FORK BASE <span>MONERO v0.18.1</span></div>
+  </div>
+  <div style="margin-top:1.75rem;">
+    <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.4.md" class="btn btn-outline btn-sm">Source (Markdown)</a>
+  </div>
+</div>
+
+<div class="wp-layout">
+
+  <!-- TOC -->
+  <aside class="wp-toc">
+    <div class="panel-label">Contents</div>
+    <ul>
+      <li><a href="#abstract">1 · Abstract</a></li>
+      <li><a href="#vision">2 · Vision</a></li>
+      <li><a href="#architecture">3 · Architecture</a></li>
+      <li><a href="#tokenomics">4 · Tokenomics</a></li>
+      <li><a href="#emission">5 · Emission</a></li>
+      <li><a href="#quantum">6 · Post-Quantum</a></li>
+      <li><a href="#fairlaunch">7 · Fair Launch</a></li>
+      <li><a href="#pool">8 · Pool Mining</a></li>
+      <li><a href="#specs">9 · Specifications</a></li>
+      <li><a href="#resources">10 · Resources</a></li>
+    </ul>
+  </aside>
+
+  <!-- BODY -->
+  <article class="wp-body">
+
+    <h2 id="abstract">1 · Abstract</h2>
+    <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from Monero v0.18.1, combining advanced anonymity with a Bitcoin-style monetary model.</p>
+    <p><strong>Fair launch:</strong> 100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. v2.0.0 introduced a short private-network pre-mining phase as the response to the 51% attack of 16 May 2026 on the v1.x chain (at height ≈3577); see §7 for the full rationale and use of those funds.</p>
+    <p><strong>Key innovations:</strong></p>
+    <ul>
+      <li>Dynamic ring size 32–64 (vs Monero's fixed 16)</li>
+      <li>Network padding inherited from Monero (1024-byte granularity)</li>
+      <li>Fixed 2500-byte internal TX padding (<code class="inline">tx_extra</code>)</li>
+      <li>Transaction propagation via Dandelion++ stem/fluff (inherited from Monero)</li>
+      <li>Confidential amounts via RingCT (Pedersen commitments)</li>
+      <li>One-time stealth addresses (CryptoNote)</li>
+      <li>Post-quantum resistance scheduled for 2027</li>
+    </ul>
+
+    <h2 id="vision">2 · Vision &amp; Problem</h2>
+    <h3>The problem of financial privacy</h3>
+    <p>Traditional public blockchains (Bitcoin, Ethereum) fully expose transaction flows. Even Monero — the privacy benchmark — has limits: a fixed ring size of 16, exploitable network metadata, and possible timing attacks.</p>
+    <h3>The HIDERING vision</h3>
+    <ul>
+      <li><strong>On-chain anonymity:</strong> ring signatures 32–64, one-time stealth addresses, RingCT</li>
+      <li><strong>Network anonymity:</strong> Dandelion++ propagation and end-to-end encryption inherited from Monero</li>
+      <li><strong>Amount confidentiality:</strong> RingCT (Pedersen commitments), plus fixed 2500-byte internal <code class="inline">tx_extra</code> padding to uniformise auxiliary field sizes</li>
+      <li><strong>Future resistance:</strong> planned post-quantum migration via hard fork (2027)</li>
+    </ul>
+
+    <h2 id="architecture">3 · Technical Architecture</h2>
+    <p>HIDERING is a fork of <strong>Monero v0.18.1</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (CPU-only, ASIC-resistant PoW) and Dandelion++ (transaction diffusion).</p>
+    <table class="data-table" style="margin-top:1rem;">
+      <thead><tr><th>Component</th><th>Monero</th><th>HIDERING</th></tr></thead>
+      <tbody>
+        <tr><td>Ring size</td><td>16</td><td class="gold">32–64 (dynamic)</td></tr>
+        <tr><td>TX padding</td><td>Variable</td><td class="gold">2500 B internal (network: Monero 1024 B)</td></tr>
+        <tr><td>Network</td><td>Dandelion++</td><td>Dandelion++ (inherited)</td></tr>
+        <tr><td>Amounts</td><td>Hidden (RingCT)</td><td>Hidden (RingCT)</td></tr>
+        <tr><td>Stealth</td><td>One-time</td><td>One-time (CryptoNote)</td></tr>
+        <tr><td>PoW</td><td>RandomX</td><td>RandomX (identical)</td></tr>
+        <tr><td>Hard fork</td><td>HFv15</td><td>HFv15 from block 1</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Transparency note (June 2026 audit).</strong> The "best-effort multi-hop stem" routing bias announced earlier was <strong>removed</strong>: the on-wire hop counter leaked the distance to the transaction's origin (a peer receiving a zero counter could identify the sender), degrading the anonymity Dandelion++ protects. Propagation now relies on stock Dandelion++ inherited from Monero. The 2500-byte internal padding applies to the <code class="inline">tx_extra</code> field; the network-layer padding remains Monero's (1024-byte granularity).</div>
+
+    <h2 id="tokenomics">4 · Tokenomics (HRG)</h2>
+    <table class="data-table">
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Ticker</td><td class="gold">HRG</td></tr>
+        <tr><td>Maximum supply</td><td class="gold">18,000,000 HRG (irrevocable hard cap)</td></tr>
+        <tr><td>Max circulating supply</td><td>18,000,000.00 HRG exact — the genesis NUMS 157.14 HRG is unspendable and excluded from emission accounting, so it is not deducted from the cap</td></tr>
+        <tr><td>Emission</td><td>100% PoW (no seed round, no private sale) — see §7</td></tr>
+        <tr><td>Block time</td><td class="gold">120 seconds</td></tr>
+        <tr><td>Halving interval</td><td class="gold">210,000 blocks (~2.66 years)</td></tr>
+        <tr><td>PoW algorithm</td><td>RandomX (CPU-only)</td></tr>
+        <tr><td>Initial reward</td><td class="gold">42.86 HRG / block</td></tr>
+        <tr><td>Addresses</td><td>Begin with "B" (prefix 60)</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Why an 18M cap?</strong> The original 33M cap caused a uint64 overflow (33 × 10¹⁹ &gt; UINT64_MAX = 1.844 × 10¹⁹) with Monero's inherited 12 atomic decimals. The 18M cap (1.8 × 10¹⁹, ~2.5% uint64 headroom) was adopted on 11 May 2026 and shipped in release v1.0.1.</div>
+
+    <h2 id="emission">5 · Bitcoin-Style Emission</h2>
+    <table class="data-table">
+      <thead><tr><th>Period</th><th>Block height</th><th>Reward / block</th><th>Emitted (period)</th></tr></thead>
+      <tbody>
+        <tr><td>Genesis</td><td class="gold">0</td><td class="gold">157.14 HRG (NUMS-locked, unspendable)</td><td>0 circulating</td></tr>
+        <tr><td>Era 1</td><td class="gold">1 – 210,000</td><td class="gold">42.86 HRG</td><td>9,000,000 HRG</td></tr>
+        <tr><td>Era 2</td><td class="gold">210,001 – 420,000</td><td class="gold">21.43 HRG</td><td>4,500,000 HRG</td></tr>
+        <tr><td>Era 3</td><td class="gold">420,001 – 630,000</td><td class="gold">10.71 HRG</td><td>2,250,000 HRG</td></tr>
+        <tr><td>Era 4+</td><td class="gold">630,001+</td><td class="gold">½ per halving</td><td>→ 18M hard cap</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:1.25rem;">The geometric series converges exactly on the cap:</p>
+    <div class="code-block">Total = 42.86 × 210,000 × (1 + ½ + ¼ + ...) = 9,000,000 × 2 = <span class="cmd">18,000,000 HRG</span></div>
+    <p style="margin-top:1.25rem;">100% PoW emission, zero inflation, irrevocable cap. The genesis block contains 157.14 HRG locked under a Nothing-Up-My-Sleeve (NUMS) key — cryptographically unspendable and kept for deployed-chain compatibility. See <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md">GENESIS_PROOF.md</a>.</p>
+
+    <h2 id="quantum">6 · Quantum Resistance</h2>
+    <p>Post-quantum cryptography is introduced via a <strong>hard fork planned for 2027</strong>:</p>
+    <ul>
+      <li><strong>Signatures:</strong> ML-DSA-65 (FIPS 204, NIST PQC standard)</li>
+      <li><strong>Key exchange:</strong> ML-KEM-768 (FIPS 203, NIST PQC standard)</li>
+      <li><strong>New addresses:</strong> a dedicated BQ... format for ML-KEM-768 keys (the classic B... format is unchanged)</li>
+      <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
+      <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
+    </ul>
+    <div class="note"><strong>Status (June 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone an internal security audit. All PQ code remains <strong>inert</strong> until the hard fork (HFv16); the validator key-binding specification must be finalised before any activation. Mainnet target: <strong>Q2 2027</strong>.</div>
+
+    <h2 id="fairlaunch">7 · Fair Launch Distribution</h2>
+    <p><strong>Principle:</strong> 100% emission via RandomX PoW, no private sale, no seed round. Block 0 is a genesis with 157.14 HRG locked under a NUMS key (unspendable). From block 1 onward, rewards are distributed by pure PoW competition.</p>
+    <div class="note"><strong>Transparency (June 2026 revision).</strong> The v1.x "no team allocation" promise is <strong>no longer accurate since v2.0.0</strong>: the private-network pre-mining phase (§7.1) constitutes a <strong>mined reserve</strong> held by founder nodes before public re-opening. This reserve is not a private sale or seed round — it is produced by PoW under the same RandomX rules — but it exists, and its use is detailed below.</div>
+    <h3>7.1 · Pre-public phase v2.0.0 (post-attack)</h3>
+    <p>Shortly after the v1.x launch, HIDERING suffered a 51% attack (16 May 2026, v1.x chain at h≈3577): an external miner with more power than the rest of the network dominated the chain and caused a major reorganisation, orphaning every mined block. The v2.0.0 response is twofold:</p>
+    <ul>
+      <li><strong>Network hard fork:</strong> the Network ID moved from <code class="inline">HRG\x01HIDERINGMAIN</code> to <code class="inline">HRG\x02HIDERINGMAIN</code> (magic <code class="inline">0x48524701</code> → <code class="inline">0x48524702</code>), immediately isolating the malicious miner.</li>
+      <li><strong>Pre-mining phase:</strong> before public opening, founder nodes mine on a private network to (1) harden the network from day one, (2) fund development — GUI wallet testing and the post-quantum work need real on-chain transactions — and (3) build a community reserve that will be redistributed to launch participants or partially burned.</li>
+    </ul>
+    <p>The v2.0.0 pre-mining is a <strong>defensive shield and a development-funding lever</strong>, not an insider sale: all coins are produced by PoW. Once the network opens publicly, every miner competes under the same RandomX rules. The exact volume, duration and final destination of the reserve will be communicated publicly at launch.</p>
+
+    <h2 id="pool">8 · Pool Mining</h2>
+    <p>HIDERING operates a public RandomX mining pool in production to lower the barrier to CPU mining.</p>
+    <table class="data-table">
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Stratum endpoint</td><td class="gold">pool.hidering.org:3333</td></tr>
+        <tr><td>Algorithm</td><td>RandomX (rx/0)</td></tr>
+        <tr><td>Stack</td><td>cryptonote-nodejs-pool + Redis + Nginx</td></tr>
+        <tr><td>Starting difficulty</td><td>varDiff (auto-adjusted)</td></tr>
+        <tr><td>Block reward</td><td class="gold">42.857142857143 HRG (era 1)</td></tr>
+      </tbody>
+    </table>
+    <div class="code-block" style="margin-top:1.25rem;">xmrig -o pool.hidering.org:3333 -u <span class="cmd">&lt;your_B..._address&gt;</span> -p x -a rx/0</div>
+    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW.</p>
+
+    <h2 id="specs">9 · Technical Specifications</h2>
+    <table class="data-table">
+      <tbody>
+        <tr><td>Ticker</td><td class="gold">HRG</td></tr>
+        <tr><td>Fork base</td><td>Monero v0.18.1</td></tr>
+        <tr><td>Network ID</td><td class="gold">HRG\x02HIDERINGMAIN (v2.0.0)</td></tr>
+        <tr><td>Magic bytes</td><td class="gold">0x48524702 (v2.0.0)</td></tr>
+        <tr><td>P2P port</td><td>19740</td></tr>
+        <tr><td>RPC port</td><td>19741</td></tr>
+        <tr><td>Address prefix</td><td>60 → "B"</td></tr>
+        <tr><td>Decimals</td><td>12 (10¹²)</td></tr>
+        <tr><td>Block time</td><td>120 seconds</td></tr>
+        <tr><td>Ring size</td><td class="gold">32–64</td></tr>
+        <tr><td>Supply</td><td class="gold">18,000,000 HRG</td></tr>
+        <tr><td>Initial reward</td><td>42.857142857143 HRG / block</td></tr>
+        <tr><td>Halving</td><td>210,000 blocks (~2.66 years)</td></tr>
+        <tr><td>Unlock window</td><td>60 blocks</td></tr>
+        <tr><td>License</td><td>BSD 3-Clause (as Monero)</td></tr>
+        <tr><td>Repository</td><td>github.com/AB-lab113/hidering</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="resources">10 · Resources</h2>
+    <ul>
+      <li><strong>Website:</strong> <a href="https://hidering.org">hidering.org</a></li>
+      <li><strong>GitHub:</strong> <a href="https://github.com/AB-lab113/hidering">github.com/AB-lab113/hidering</a></li>
+      <li><strong>Releases:</strong> <a href="https://github.com/AB-lab113/hidering/releases">github.com/AB-lab113/hidering/releases</a></li>
+      <li><strong>Block explorer:</strong> <a href="https://explorer.hidering.org">explorer.hidering.org</a></li>
+      <li><strong>Pool:</strong> pool.hidering.org:3333</li>
+      <li><strong>OTC desk:</strong> <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a></li>
+      <li><strong>Seed nodes:</strong> seed1.hidering.org · seed2.hidering.org</li>
+    </ul>
+    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Fair by launch.</strong><br>Whitepaper v1.4 — June 2026 (revised after the June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
+
+  </article>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">HIDERING</div>
+  <div class="footer-sub">HRG · Privacy by Protocol</div>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
+    <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

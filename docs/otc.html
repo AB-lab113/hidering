@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTC Desk — HIDERING (HRG)</title>
+<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC peer-to-peer through @HideringOTCBot — an escrow-backed Telegram trading bot. No order book, no custody beyond escrow.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="logo1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .otc-hero-cta { margin-top: 2rem; }
+
+  .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 1rem; }
+  .flow-step { background: var(--dark); padding: 1.75rem 1.25rem; }
+  .flow-step .n { font-family: 'Cinzel', serif; font-size: 1.6rem; color: var(--border-bright); font-weight: 700; line-height: 1; margin-bottom: 0.8rem; }
+  .flow-step h3 { font-family: 'Cinzel', serif; font-size: 0.95rem; color: var(--white); margin-bottom: 0.5rem; }
+  .flow-step p { font-size: 0.8rem; color: var(--text-dim); line-height: 1.6; }
+
+  .cmd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 1rem; }
+  .cmd-card { border: 1px solid var(--border); background: var(--dark); padding: 1.75rem; }
+  .cmd-card h3 { font-family: 'Fira Mono', monospace; font-size: 0.95rem; color: var(--gold); margin-bottom: 0.6rem; }
+  .cmd-card p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.6; }
+
+  .feat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-top: 1rem; }
+  .feat-cell { background: var(--dark); padding: 1.5rem; }
+  .feat-cell h3 { font-family: 'Cinzel', serif; font-size: 0.92rem; color: var(--white); margin-bottom: 0.45rem; }
+  .feat-cell p { font-size: 0.82rem; color: var(--text-dim); line-height: 1.6; }
+
+  .warn {
+    border: 1px solid var(--border-bright); background: rgba(201,168,76,0.04);
+    padding: 1.5rem 1.75rem; border-radius: 2px; margin-top: 3rem;
+  }
+  .warn h3 { font-family: 'Cinzel', serif; font-size: 1rem; color: var(--gold); margin-bottom: 0.6rem; }
+  .warn p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; }
+
+  @media (max-width: 768px) {
+    .flow { grid-template-columns: 1fr 1fr; }
+    .cmd-grid { grid-template-columns: 1fr; }
+    .feat-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo"><img src="logo1.png" alt="HRG">HIDERING</a>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html" class="active">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering" class="btn btn-outline btn-sm">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HEAD -->
+<div class="page-head">
+  <div class="hero-glow"></div>
+  <div class="section-label">OTC Desk</div>
+  <h1 class="section-title">Swap HRG ⇄ USDT / USDC</h1>
+  <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No order book, no exchange listing required.</p>
+  <div class="otc-hero-cta">
+    <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Open @HideringOTCBot</a>
+  </div>
+</div>
+
+<section style="padding-top:0;">
+
+  <!-- HOW IT WORKS -->
+  <div class="section-label reveal">How it works</div>
+  <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">Escrow in four steps</h2>
+  <div class="flow reveal">
+    <div class="flow-step">
+      <div class="n">01</div>
+      <h3>Post an offer</h3>
+      <p>A seller runs <code class="inline">/sell</code> with the HRG amount, the asking price, and an HRG refund address. The bot generates a deposit address and holds the HRG in escrow.</p>
+    </div>
+    <div class="flow-step">
+      <div class="n">02</div>
+      <h3>Buyer matches</h3>
+      <p>A buyer runs <code class="inline">/buy</code> on the order and sends the agreed USDT / USDC. The buyer pays the on-chain settlement gas.</p>
+    </div>
+    <div class="flow-step">
+      <div class="n">03</div>
+      <h3>Bot settles</h3>
+      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller — each leg is idempotent so it never double-pays.</p>
+    </div>
+    <div class="flow-step">
+      <div class="n">04</div>
+      <h3>Done</h3>
+      <p>Both parties get an on-chain confirmation. Any leftover gas is refunded, and an unmatched order can be cancelled for a full HRG refund.</p>
+    </div>
+  </div>
+
+  <!-- COMMANDS -->
+  <div class="section-label reveal" style="margin-top:5rem;">Commands</div>
+  <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">Bot commands</h2>
+  <p class="section-sub reveal" style="margin-bottom:1.5rem;">Send these to <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a> directly. Run <code class="inline">/help</code> in the bot for the exact, up-to-date argument order — the bot always shows the current syntax.</p>
+  <div class="cmd-grid reveal">
+    <div class="cmd-card">
+      <h3>/sell</h3>
+      <p>Create a sell order: the amount of HRG, your asking price in USDT / USDC, and the HRG address to refund to if the order is cancelled. The bot returns a deposit address for your HRG escrow.</p>
+    </div>
+    <div class="cmd-card">
+      <h3>/buy</h3>
+      <p>Take an open order and pay the stablecoin leg. Optionally pass an ETH address so any leftover settlement gas is refunded to you.</p>
+    </div>
+    <div class="cmd-card">
+      <h3>/cancel</h3>
+      <p>Cancel an unmatched order you created. Escrowed HRG is automatically refunded to the address you provided when posting.</p>
+    </div>
+    <div class="cmd-card">
+      <h3>/help</h3>
+      <p>Show the full command list with the exact current arguments, plus the live fee and minimum-trade parameters.</p>
+    </div>
+  </div>
+
+  <!-- WHY -->
+  <div class="section-label reveal" style="margin-top:5rem;">Design</div>
+  <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">How the desk protects you</h2>
+  <div class="feat-row reveal">
+    <div class="feat-cell">
+      <h3>Escrow-backed</h3>
+      <p>HRG is locked by the bot before any stablecoin moves, so neither side can walk away mid-trade with the other's funds.</p>
+    </div>
+    <div class="feat-cell">
+      <h3>Idempotent settlement</h3>
+      <p>Each leg of the swap is settled exactly once. A retry or network hiccup can't cause a double payout.</p>
+    </div>
+    <div class="feat-cell">
+      <h3>Buyer-pays-gas</h3>
+      <p>The on-chain stablecoin gas is paid by the buyer; any unused gas is refunded to the buyer's ETH address.</p>
+    </div>
+    <div class="feat-cell">
+      <h3>Refund on cancel</h3>
+      <p>An order that never matches can be cancelled, returning the full escrowed HRG to the seller's refund address.</p>
+    </div>
+    <div class="feat-cell">
+      <h3>Stablecoin pairs</h3>
+      <p>Trade against USDT or USDC. Pricing is set per-order by the seller — you negotiate, the bot enforces.</p>
+    </div>
+    <div class="feat-cell">
+      <h3>No listing needed</h3>
+      <p>Move HRG in and out without waiting for an exchange listing. Peer-to-peer, directly inside Telegram.</p>
+    </div>
+  </div>
+
+  <!-- WARNING -->
+  <div class="warn reveal">
+    <h3>Trade safely</h3>
+    <p>The OTC desk is a peer-to-peer tool — always read the bot's <code class="inline">/help</code> output and confirm the order details before sending funds. Double-check addresses and amounts; on-chain transfers are irreversible. Only the official bot at <a href="https://t.me/HideringOTCBot">t.me/HideringOTCBot</a> is operated by HIDERING — beware of impersonators. HRG is an experimental asset; never trade more than you can afford to lose.</p>
+  </div>
+
+  <div style="text-align:center;margin-top:3.5rem;" class="reveal">
+    <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Start trading</a>
+    <a href="mining.html" class="btn btn-outline">Get HRG by mining</a>
+  </div>
+
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">HIDERING</div>
+  <div class="footer-sub">HRG · Privacy by Protocol</div>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
+    <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

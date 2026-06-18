@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Download — HIDERING (HRG)</title>
+<meta name="description" content="Download HIDERING (HRG): full node daemon, wallet CLI, and the desktop GUI wallet v2.0.2 for Linux, macOS ARM64 and Windows — all binaries SHA256-verified.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="logo1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .release-card {
+    border: 1px solid var(--border-bright); background: var(--dark);
+    padding: 2.5rem; margin-bottom: 3rem; position: relative; overflow: hidden;
+  }
+  .release-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(201,168,76,0.06), transparent 60%);
+    pointer-events: none;
+  }
+  .release-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2rem; position: relative;
+  }
+  .release-header h2 {
+    font-family: 'Cinzel', serif; font-size: 1.3rem; color: var(--white);
+    margin-bottom: 0.4rem; letter-spacing: 0.04em;
+  }
+  .release-tagline { font-family: 'Fira Mono', monospace; font-size: 0.78rem; color: var(--gold-dim); letter-spacing: 0.1em; }
+  .release-contents { list-style: none; margin-bottom: 2rem; padding-left: 0; position: relative; }
+  .release-contents li {
+    padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem;
+    color: var(--text); display: flex; align-items: center; gap: 0.8rem;
+  }
+  .release-contents li:last-child { border-bottom: none; }
+  .release-contents li::before { content: '▸'; color: var(--gold); font-size: 0.75rem; }
+  .release-contents code { font-family: 'Fira Mono', monospace; color: var(--gold); font-size: 0.85rem; }
+  .release-meta {
+    display: grid; grid-template-columns: 1fr; gap: 1.25rem; padding: 1.5rem;
+    background: var(--dark3); border: 1px solid var(--border); border-radius: 2px;
+    margin-bottom: 2rem; position: relative;
+  }
+  .meta-label {
+    font-family: 'Fira Mono', monospace; font-size: 0.68rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem;
+  }
+  .meta-value { font-family: 'Fira Mono', monospace; font-size: 0.82rem; color: var(--gold); word-break: break-all; line-height: 1.5; }
+  .meta-value.sha { font-size: 0.72rem; color: var(--gold-dim); }
+  .release-actions { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1.5rem; position: relative; }
+  .release-note {
+    font-size: 0.82rem; color: var(--text-dim); line-height: 1.7;
+    border-top: 1px solid var(--border); padding-top: 1.25rem; position: relative;
+  }
+  .release-note code {
+    font-family: 'Fira Mono', monospace; font-size: 0.78rem; color: var(--gold-dim);
+    background: var(--dark3); padding: 0.1rem 0.4rem; border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo"><img src="logo1.png" alt="HRG">HIDERING</a>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html" class="active">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering" class="btn btn-outline btn-sm">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HEAD -->
+<div class="page-head">
+  <div class="hero-glow"></div>
+  <div class="section-label">Downloads</div>
+  <h1 class="section-title">Get HIDERING</h1>
+  <p class="section-sub">Verified binaries for the full node, wallet CLI, and desktop GUI wallet — published on GitHub. Every asset ships with a SHA256 sidecar so you can confirm the file you downloaded is the one we built.</p>
+</div>
+
+<section style="padding-top:0;">
+
+  <!-- FULL NODE & WALLET CLI -->
+  <div class="release-card reveal">
+    <div class="release-header">
+      <div>
+        <h2>Full Node &amp; Wallet CLI — v2.0.2</h2>
+        <p class="release-tagline">Linux x86_64 · macOS ARM64 · Windows x64 · published 2 Jun 2026</p>
+      </div>
+      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-outline">View on GitHub</a>
+    </div>
+
+    <ul class="release-contents">
+      <li><code>hideringd</code> — full node daemon (P2P + RPC)</li>
+      <li><code>hidering-wallet-cli</code> — interactive wallet (send / receive / mine)</li>
+      <li><code>hidering-wallet-rpc</code> — headless wallet for integrations</li>
+    </ul>
+
+    <div class="release-meta">
+      <div>
+        <div class="meta-label">Linux x64 · hidering-linux-x64.tar.gz · 13.1 MB</div>
+        <div class="meta-value sha">844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30</div>
+      </div>
+      <div>
+        <div class="meta-label">macOS ARM64 · hidering-macos-arm64.tar.gz · 10.2 MB</div>
+        <div class="meta-value sha">5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22</div>
+      </div>
+      <div>
+        <div class="meta-label">Windows x64 · hidering-windows-x64.zip · 29.3 MB</div>
+        <div class="meta-value sha">0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3</div>
+      </div>
+    </div>
+
+    <div class="release-actions">
+      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-linux-x64.tar.gz" class="btn btn-primary">Download Linux x64</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-macos-arm64.tar.gz" class="btn btn-outline">Download macOS ARM64</a>
+      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-windows-x64.zip" class="btn btn-outline">Download Windows x64</a>
+    </div>
+
+    <p class="release-note">Native binaries for Linux x86_64, macOS ARM64, and Windows x64. Every asset ships with a matching <code>.sha256</code> sidecar — verify your download before extracting with <code>sha256sum -c &lt;file&gt;.sha256</code> (it should print <code>OK</code>).</p>
+  </div>
+
+  <!-- GUI WALLET -->
+  <div class="release-card reveal">
+    <div class="release-header">
+      <div>
+        <h2>Wallet GUI Desktop — v2.0.2-gui</h2>
+        <p class="release-tagline">macOS ARM64 · Windows x64 · Linux x86_64 · published 3 Jun 2026</p>
+      </div>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.2-gui" class="btn btn-outline">View on GitHub</a>
+    </div>
+
+    <ul class="release-contents">
+      <li><code>Hidering_Wallet-macos-arm64.tar.gz</code> — Apple Silicon <code>.app</code> bundle, Qt5 bundled (macOS 11+)</li>
+      <li><code>Hidering_Wallet-windows-x64.zip</code> — portable folder, Qt5 + runtime DLLs bundled (Windows 10/11)</li>
+      <li><code>Hidering_Wallet-v2.0.2-x86_64.AppImage</code> — one-file launch, bundles Qt5 + every system dep</li>
+      <li>Source repo: <a href="https://github.com/AB-lab113/hidering-gui">github.com/AB-lab113/hidering-gui</a></li>
+    </ul>
+
+    <div class="release-meta">
+      <div>
+        <div class="meta-label">macOS ARM64 SHA256</div>
+        <div class="meta-value sha">63b96e4c1dfe343f1d591a12171eb98af6331ac0e7b6f4344b4e5e7e9947c9da</div>
+      </div>
+      <div>
+        <div class="meta-label">Windows x64 SHA256</div>
+        <div class="meta-value sha">9cb4f9c39bb5db070ab293656d1b24a2d59a2ef6f2726d598398e63217a5e0ca</div>
+      </div>
+      <div>
+        <div class="meta-label">Linux AppImage SHA256 · Hidering_Wallet-v2.0.2-x86_64.AppImage · 57 MB</div>
+        <div class="meta-value sha">54ea3e936bb6a6b650a5ede347218aef3cd6696bae44532d36ff41eaec27f759</div>
+      </div>
+    </div>
+
+    <div class="release-actions">
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-macos-arm64.tar.gz" class="btn btn-primary">Download macOS (ARM64)</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-windows-x64.zip" class="btn btn-primary">Download Windows (x64)</a>
+      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-v2.0.2-x86_64.AppImage" class="btn btn-outline">Download Linux AppImage</a>
+    </div>
+
+    <p class="release-note"><strong style="color:var(--gold-dim);">macOS:</strong> <code>tar -xzf Hidering_Wallet-macos-arm64.tar.gz</code>, then move <code>hidering-wallet-gui.app</code> to Applications. It's ad-hoc signed (no Apple Developer ID), so the first launch needs right-click → Open. <strong style="color:var(--gold-dim);">Windows:</strong> unzip and run <code>hidering-wallet-gui.exe</code> from the extracted folder (keep the DLLs alongside it). <strong style="color:var(--gold-dim);">Linux:</strong> the AppImage is built from the v2.0.2-gui sources. <code>chmod +x</code> then run it; on distros without <code>libfuse2</code> use <code>--appimage-extract-and-run</code>. Requires glibc ≥ 2.39 (Ubuntu 24.04+, Debian 13+, Fedora 39+).</p>
+  </div>
+
+  <!-- VERIFY -->
+  <div class="panel reveal">
+    <div class="panel-label">Verify your download</div>
+    <p style="font-size:0.88rem;color:var(--text);line-height:1.7;margin-bottom:1rem;">Always confirm the SHA256 of any binary before running it. Download the asset and its <code class="inline">.sha256</code> sidecar into the same folder, then:</p>
+    <div class="code-block"><span class="cmd"># Linux / macOS — should print: OK</span><br>sha256sum -c hidering-linux-x64.tar.gz.sha256<br><br><span class="cmd"># Or compare the hash manually</span><br>sha256sum hidering-linux-x64.tar.gz<br><br><span class="cmd"># Windows (PowerShell)</span><br>Get-FileHash .\hidering-windows-x64.zip -Algorithm SHA256</div>
+    <p style="font-size:0.82rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;">The printed hash must match the value listed above (and on the GitHub release page). If it doesn't, do not run the binary.</p>
+  </div>
+
+  <div style="text-align:center;margin-top:3.5rem;" class="reveal">
+    <a href="mining.html" class="btn btn-primary">Next: Mining Guide</a>
+    <a href="https://github.com/AB-lab113/hidering/releases/latest" class="btn btn-outline">All releases on GitHub</a>
+  </div>
+
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">HIDERING</div>
+  <div class="footer-sub">HRG · Privacy by Protocol</div>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
+    <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

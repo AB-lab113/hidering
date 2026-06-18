@@ -4,93 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HIDERING (HRG) — Privacy Cryptocurrency</title>
+<meta name="description" content="HIDERING (HRG) is a maximum-privacy cryptocurrency forked from Monero with a Bitcoin-style 18M hard cap, 100% RandomX CPU PoW emission, and dynamic 32–64 ring signatures.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" href="logo1.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 <style>
-  :root {
-    --gold: #C9A84C;
-    --gold-bright: #E8C97A;
-    --gold-dim: #7A6230;
-    --black: #080808;
-    --dark: #0E0E0E;
-    --dark2: #161616;
-    --dark3: #1E1E1E;
-    --border: rgba(201,168,76,0.18);
-    --border-bright: rgba(201,168,76,0.5);
-    --text: #D4CFC0;
-    --text-dim: #7A7060;
-    --white: #F0ECE0;
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  html { scroll-behavior: smooth; }
-
-  body {
-    background: var(--black);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-weight: 300;
-    line-height: 1.7;
-    overflow-x: hidden;
-  }
-
-  /* NOISE TEXTURE */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.6;
-  }
-
-  /* NAV */
-  nav {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 3rem;
-    background: rgba(8,8,8,0.85);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .nav-logo {
-    font-family: 'Cinzel', serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--gold);
-    letter-spacing: 0.15em;
-    text-decoration: none;
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 2.5rem;
-    list-style: none;
-  }
-
-  .nav-links a {
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: 0.8rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    transition: color 0.2s;
-  }
-
-  .nav-links a:hover { color: var(--gold); }
-
-  /* HERO */
+  /* ---- home-only ---- */
   .hero {
     position: relative;
     min-height: 100vh;
@@ -102,724 +25,146 @@
     padding: 8rem 2rem 4rem;
     overflow: hidden;
   }
-
   .hero-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -60%);
-    width: 600px;
-    height: 600px;
+    width: 600px; height: 600px;
     background: radial-gradient(ellipse, rgba(201,168,76,0.08) 0%, transparent 70%);
     pointer-events: none;
   }
-
   .hero-ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -55%);
-    width: 480px;
-    height: 480px;
+    width: 480px; height: 480px;
     border-radius: 50%;
     border: 1px solid rgba(201,168,76,0.06);
     pointer-events: none;
     animation: rotate 60s linear infinite;
   }
-
   .hero-ring::after {
-    content: '';
-    position: absolute;
-    top: -1px; left: 30%;
-    width: 40%;
-    height: 2px;
+    content: ''; position: absolute; top: -1px; left: 30%;
+    width: 40%; height: 2px;
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
   }
-
   @keyframes rotate { to { transform: translate(-50%, -55%) rotate(360deg); } }
-
   .hero-badge {
     display: inline-block;
     border: 1px solid var(--border-bright);
     color: var(--gold);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    padding: 0.4rem 1.2rem;
-    border-radius: 2rem;
-    margin-bottom: 2.5rem;
+    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 0.4rem 1.2rem; border-radius: 2rem; margin-bottom: 2.5rem;
     font-family: 'Fira Mono', monospace;
     animation: fadeUp 0.8s ease both;
   }
-
   .hero h1 {
     font-family: 'Cinzel', serif;
     font-size: clamp(3.5rem, 10vw, 7rem);
-    font-weight: 700;
-    color: var(--white);
-    line-height: 1;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.2rem;
+    font-weight: 700; color: var(--white);
+    line-height: 1; letter-spacing: 0.05em; margin-bottom: 0.2rem;
     animation: fadeUp 0.8s 0.1s ease both;
   }
-
-  .hero h1 span {
-    color: var(--gold);
-  }
-
+  .hero h1 span { color: var(--gold); }
   .hero-ticker {
-    font-family: 'Fira Mono', monospace;
-    font-size: 1rem;
-    color: var(--gold-dim);
-    letter-spacing: 0.3em;
-    margin-bottom: 2rem;
+    font-family: 'Fira Mono', monospace; font-size: 1rem;
+    color: var(--gold-dim); letter-spacing: 0.3em; margin-bottom: 2rem;
     animation: fadeUp 0.8s 0.2s ease both;
   }
-
   .hero p {
-    max-width: 560px;
-    font-size: 1.05rem;
-    color: var(--text-dim);
-    margin-bottom: 3rem;
-    animation: fadeUp 0.8s 0.3s ease both;
+    max-width: 560px; font-size: 1.05rem; color: var(--text-dim);
+    margin-bottom: 3rem; animation: fadeUp 0.8s 0.3s ease both;
   }
-
   .hero-stats {
-    display: flex;
-    gap: 3rem;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 3rem;
-    animation: fadeUp 0.8s 0.4s ease both;
+    display: flex; gap: 3rem; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 3rem; animation: fadeUp 0.8s 0.4s ease both;
   }
-
-  .stat {
-    text-align: center;
-  }
-
+  .stat { text-align: center; }
   .stat-value {
-    font-family: 'Cinzel', serif;
-    font-size: 1.6rem;
-    color: var(--gold);
-    display: block;
-    font-weight: 600;
+    font-family: 'Cinzel', serif; font-size: 1.6rem; color: var(--gold);
+    display: block; font-weight: 600;
   }
-
   .stat-label {
-    font-size: 0.72rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
     color: var(--text-dim);
   }
-
   .hero-cta {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
     animation: fadeUp 0.8s 0.5s ease both;
   }
-
-  .btn {
-    display: inline-block;
-    padding: 0.85rem 2rem;
-    font-size: 0.8rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    text-decoration: none;
-    border-radius: 2px;
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-
-  .btn-primary {
-    background: var(--gold);
-    color: var(--black);
-    font-weight: 500;
-    border: 1px solid var(--gold);
-  }
-
-  .btn-primary:hover {
-    background: var(--gold-bright);
-    border-color: var(--gold-bright);
-    transform: translateY(-1px);
-  }
-
-  .btn-outline {
-    border: 1px solid var(--border-bright);
-    color: var(--gold);
-    background: transparent;
-  }
-
-  .btn-outline:hover {
-    background: rgba(201,168,76,0.07);
-    transform: translateY(-1px);
-  }
-
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* DIVIDER */
-  .divider {
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
-  }
-
-  /* SECTIONS */
-  section {
-    position: relative;
-    z-index: 1;
-    padding: 6rem 2rem;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
-
-  .section-label {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 0.75rem;
-  }
-
-  .section-title {
-    font-family: 'Cinzel', serif;
-    font-size: clamp(1.8rem, 4vw, 2.8rem);
-    color: var(--white);
-    font-weight: 600;
-    margin-bottom: 1rem;
-    line-height: 1.2;
-  }
-
-  .section-sub {
-    color: var(--text-dim);
-    max-width: 560px;
-    font-size: 0.95rem;
-    margin-bottom: 4rem;
-  }
-
-  /* PRIVACY FEATURES */
   .features-grid {
-    display: grid;
-    /* Exactly 6 feature cards: fixed 3-column layout so both rows fill completely.
-       Same fix as .token-grid — auto-fit left empty trailing cells on the last row at
-       4-column widths, which showed the gold --border grid background as blank gold
-       rectangles. 3 divides 6 evenly (mobile drops to 1 column below 768px). */
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--border); border: 1px solid var(--border);
   }
-
-  .feature {
-    background: var(--dark);
-    padding: 2rem;
-    transition: background 0.2s;
-  }
-
+  .feature { background: var(--dark); padding: 2rem; transition: background 0.2s; }
   .feature:hover { background: var(--dark2); }
-
   .feature-icon {
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border-bright);
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.25rem;
-    color: var(--gold);
-    font-size: 1rem;
+    width: 36px; height: 36px; border: 1px solid var(--border-bright);
+    border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1.25rem; color: var(--gold); font-size: 1rem;
   }
-
   .feature h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 0.95rem;
-    color: var(--white);
-    margin-bottom: 0.6rem;
-    letter-spacing: 0.05em;
+    font-family: 'Cinzel', serif; font-size: 0.95rem; color: var(--white);
+    margin-bottom: 0.6rem; letter-spacing: 0.05em;
   }
-
-  .feature p {
-    font-size: 0.85rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-
+  .feature p { font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; }
   .feature-tag {
-    display: inline-block;
-    margin-top: 1rem;
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--gold-dim);
-    letter-spacing: 0.1em;
-    border: 1px solid var(--border);
-    padding: 0.2rem 0.6rem;
-    border-radius: 2px;
+    display: inline-block; margin-top: 1rem; font-family: 'Fira Mono', monospace;
+    font-size: 0.7rem; color: var(--gold-dim); letter-spacing: 0.1em;
+    border: 1px solid var(--border); padding: 0.2rem 0.6rem; border-radius: 2px;
   }
 
-  /* TOKENOMICS */
-  .token-section {
-    background: var(--dark2);
-    border: 1px solid var(--border);
-    padding: 6rem 2rem;
-  }
-
-  .token-section > * {
-    max-width: 1100px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
+  .token-section { background: var(--dark2); border: 1px solid var(--border); padding: 6rem 2rem; }
+  .token-section > * { max-width: 1100px; margin-left: auto; margin-right: auto; }
   .token-grid {
-    display: grid;
-    /* Exactly 6 cards: use a fixed 3-column layout so both rows fill completely.
-       auto-fit left empty trailing cells on the last row, which showed the gold
-       --border grid background as blank gold rectangles next to the RandomX card. */
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
-    margin-top: 3rem;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border); margin-top: 3rem;
   }
-
-  .token-card {
-    background: var(--dark);
-    padding: 1.75rem 1.5rem;
-    text-align: center;
-  }
-
+  .token-card { background: var(--dark); padding: 1.75rem 1.5rem; text-align: center; }
   .token-card-value {
-    font-family: 'Cinzel', serif;
-    font-size: 1.4rem;
-    color: var(--gold);
-    font-weight: 600;
-    display: block;
-    margin-bottom: 0.4rem;
+    font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--gold);
+    font-weight: 600; display: block; margin-bottom: 0.4rem;
   }
-
   .token-card-label {
-    font-size: 0.72rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--text-dim);
+    font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim);
   }
 
-  /* EMISSION TABLE */
-  .emission-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 3rem;
-    font-size: 0.875rem;
-  }
-
-  .emission-table th {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    text-align: left;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-bright);
-  }
-
-  .emission-table td {
-    padding: 0.9rem 1rem;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
-  }
-
-  .emission-table tr:hover td { background: rgba(201,168,76,0.03); }
-
-  .emission-table .gold { color: var(--gold); font-family: 'Fira Mono', monospace; }
-
-  /* FAIR LAUNCH */
   .fairlaunch-box {
-    border: 1px solid var(--border-bright);
-    padding: 3rem;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    margin-top: 4rem;
+    border: 1px solid var(--border-bright); padding: 3rem; text-align: center;
+    position: relative; overflow: hidden; margin-top: 4rem;
   }
-
   .fairlaunch-box::before {
-    content: '';
-    position: absolute;
-    inset: 0;
+    content: ''; position: absolute; inset: 0;
     background: radial-gradient(ellipse at center, rgba(201,168,76,0.05), transparent 70%);
     pointer-events: none;
   }
+  .fairlaunch-box h3 { font-family: 'Cinzel', serif; font-size: 1.4rem; color: var(--white); margin-bottom: 1rem; }
+  .fairlaunch-box p { color: var(--text-dim); font-size: 0.9rem; max-width: 540px; margin: 0 auto 1.5rem; }
+  .fairlaunch-items { display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap; }
+  .fi { font-size: 0.8rem; color: var(--gold); font-family: 'Fira Mono', monospace; letter-spacing: 0.05em; }
+  .fi::before { content: '✓ '; color: var(--gold-dim); }
 
-  .fairlaunch-box h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 1.4rem;
-    color: var(--white);
-    margin-bottom: 1rem;
+  /* nav cards (links out to inner pages) */
+  .navcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1rem; }
+  .navcard {
+    border: 1px solid var(--border); background: var(--dark); padding: 2rem;
+    text-decoration: none; display: block; transition: all 0.2s;
   }
+  .navcard:hover { background: var(--dark2); border-color: var(--border-bright); transform: translateY(-2px); }
+  .navcard h3 { font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--white); margin-bottom: 0.5rem; }
+  .navcard p { font-size: 0.83rem; color: var(--text-dim); }
+  .navcard .arrow { color: var(--gold); font-family: 'Fira Mono', monospace; font-size: 0.8rem; margin-top: 0.8rem; display: inline-block; }
 
-  .fairlaunch-box p {
-    color: var(--text-dim);
-    font-size: 0.9rem;
-    max-width: 500px;
-    margin: 0 auto 1.5rem;
-  }
-
-  .fairlaunch-items {
-    display: flex;
-    gap: 2rem;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .fi {
-    font-size: 0.8rem;
-    color: var(--gold);
-    font-family: 'Fira Mono', monospace;
-    letter-spacing: 0.05em;
-  }
-
-  .fi::before {
-    content: '✓ ';
-    color: var(--gold-dim);
-  }
-
-  /* HOW TO MINE */
-  .steps {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .step {
-    display: grid;
-    grid-template-columns: 4rem 1fr;
-    gap: 1.5rem;
-    padding: 2rem 0;
-    border-bottom: 1px solid var(--border);
-    align-items: start;
-  }
-
-  .step-num {
-    font-family: 'Cinzel', serif;
-    font-size: 2rem;
-    color: var(--border-bright);
-    font-weight: 700;
-    line-height: 1;
-    padding-top: 0.2rem;
-    text-align: center;
-  }
-
-  .step h3 {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--white);
-    margin-bottom: 0.4rem;
-  }
-
-  .step p {
-    font-size: 0.85rem;
-    color: var(--text-dim);
-  }
-
-  .code-block {
-    margin-top: 0.75rem;
-    background: var(--dark3);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    padding: 0.75rem 1rem;
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--gold-dim);
-    line-height: 1.8;
-    overflow-x: auto;
-  }
-
-  .code-block .cmd { color: var(--gold); }
-
-  /* ROADMAP */
-  .roadmap {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .roadmap-item {
-    display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 2rem;
-    padding: 2rem 0;
-    border-bottom: 1px solid var(--border);
-    align-items: start;
-  }
-
-  .roadmap-phase {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.15em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    padding-top: 0.2rem;
-  }
-
-  .roadmap-status {
-    display: inline-block;
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 0.2rem 0.6rem;
-    border-radius: 2px;
-    margin-top: 0.5rem;
-    font-family: 'Fira Mono', monospace;
-  }
-
-  .status-done { background: rgba(201,168,76,0.1); color: var(--gold); border: 1px solid var(--border-bright); }
-  .status-active { background: rgba(201,168,76,0.05); color: var(--gold-dim); border: 1px solid var(--border); }
-  .status-upcoming { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
-
-  .roadmap-content h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 1rem;
-    color: var(--white);
-    margin-bottom: 0.5rem;
-  }
-
-  .roadmap-content p {
-    font-size: 0.83rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-
-  .roadmap-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.75rem;
-  }
-
-  .rtag {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    padding: 0.15rem 0.5rem;
-    border-radius: 2px;
-  }
-
-  /* RELEASES */
-  .release-card {
-    border: 1px solid var(--border-bright);
-    background: var(--dark);
-    padding: 2.5rem;
-    margin-top: 3rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .release-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at top right, rgba(201,168,76,0.06), transparent 60%);
-    pointer-events: none;
-  }
-
-  .release-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 2rem;
-    position: relative;
-  }
-
-  .release-header h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 1.3rem;
-    color: var(--white);
-    margin-bottom: 0.4rem;
-    letter-spacing: 0.04em;
-  }
-
-  .release-tagline {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--gold-dim);
-    letter-spacing: 0.1em;
-  }
-
-  .release-contents {
-    list-style: none;
-    margin-bottom: 2rem;
-    padding-left: 0;
-    position: relative;
-  }
-
-  .release-contents li {
-    padding: 0.6rem 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.88rem;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-  }
-
-  .release-contents li:last-child { border-bottom: none; }
-
-  .release-contents li::before {
-    content: '▸';
-    color: var(--gold);
-    font-size: 0.75rem;
-  }
-
-  .release-contents code {
-    font-family: 'Fira Mono', monospace;
-    color: var(--gold);
-    font-size: 0.85rem;
-  }
-
-  .release-meta {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-    padding: 1.5rem;
-    background: var(--dark3);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    margin-bottom: 2rem;
-    position: relative;
-  }
-
-  .meta-label {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 0.4rem;
-  }
-
-  .meta-value {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.82rem;
-    color: var(--gold);
-    word-break: break-all;
-    line-height: 1.5;
-  }
-
-  .meta-value.sha {
-    font-size: 0.72rem;
-    color: var(--gold-dim);
-  }
-
-  .release-actions {
-    display: flex;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
-    position: relative;
-  }
-
-  .release-note {
-    font-size: 0.82rem;
-    color: var(--text-dim);
-    line-height: 1.7;
-    border-top: 1px solid var(--border);
-    padding-top: 1.25rem;
-    position: relative;
-  }
-
-  .release-note code {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--gold-dim);
-    background: var(--dark3);
-    padding: 0.1rem 0.4rem;
-    border-radius: 2px;
-  }
-
-  /* FOOTER */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 3rem 2rem;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-  }
-
-  .footer-logo {
-    font-family: 'Cinzel', serif;
-    font-size: 1.5rem;
-    color: var(--gold);
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    margin-bottom: 0.5rem;
-  }
-
-  .footer-sub {
-    font-family: 'Fira Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    letter-spacing: 0.2em;
-    margin-bottom: 2rem;
-  }
-
-  .footer-links {
-    display: flex;
-    gap: 2rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    list-style: none;
-    margin-bottom: 2rem;
-  }
-
-  .footer-links a {
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition: color 0.2s;
-  }
-
-  .footer-links a:hover { color: var(--gold); }
-
-  .footer-copy {
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    opacity: 0.5;
-  }
-
-  /* SCROLL REVEAL */
-  .reveal {
-    opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.7s ease, transform 0.7s ease;
-  }
-
-  .reveal.visible {
-    opacity: 1;
-    transform: none;
-  }
-
-  /* RESPONSIVE */
   @media (max-width: 768px) {
-    nav { padding: 1rem 1.5rem; }
-    .nav-links { display: none; }
     .hero-stats { gap: 1.5rem; }
-    .roadmap-item { grid-template-columns: 1fr; gap: 0.5rem; }
-    .token-grid { grid-template-columns: repeat(2, 1fr); } /* 6 cards -> 3 full rows of 2, no empty gold cells */
-    .features-grid { grid-template-columns: 1fr; } /* 6 text cards -> single column on mobile, no empty gold cells */
+    .token-grid { grid-template-columns: repeat(2, 1fr); }
+    .features-grid { grid-template-columns: 1fr; }
     .token-section { padding: 4rem 1.5rem; }
     .fairlaunch-box { padding: 2rem 1.5rem; }
+    .navcards { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -827,15 +172,15 @@
 
 <!-- NAV -->
 <nav>
-  <a href="/chat" class="nav-logo" style="display:flex;align-items:center;gap:0.6rem;"><img src="logo1.png" style="height:32px;width:32px;border-radius:50%;object-fit:cover;" alt="HRG">HIDERING</a>
+  <a href="index.html" class="nav-logo"><img src="logo1.png" alt="HRG">HIDERING</a>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
   <ul class="nav-links">
-    <li><a href="#privacy">Privacy</a></li>
-    <li><a href="#tokenomics">Tokenomics</a></li>
-    <li><a href="#mine">Mine</a></li>
-    <li><a href="#releases">Releases</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#faq">FAQ</a></li>
-    <li><a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.4.md" class="btn btn-outline" style="padding:0.4rem 1rem;font-size:0.72rem;">Whitepaper</a></li>
+    <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering" class="btn btn-outline btn-sm">GitHub</a></li>
   </ul>
 </nav>
 
@@ -844,37 +189,49 @@
   <div class="hero-glow"></div>
   <div class="hero-ring"></div>
 
-  <a href="/chat" aria-label="Open Flash Chat"><img src="logo1.png" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:1.5rem;border:2px solid rgba(201,168,76,0.4);cursor:pointer;" alt="HRG Logo"></a><div class="hero-badge">Fair Launch · 100% PoW · RandomX CPU</div>
+  <a href="/chat" aria-label="Open Flash Chat"><img src="logo1.png" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:1.5rem;border:2px solid rgba(201,168,76,0.4);cursor:pointer;" alt="HRG Logo"></a>
+  <div class="hero-badge">Fair Launch · 100% PoW · RandomX CPU</div>
 
   <h1>HIDE<span>RING</span></h1>
   <div class="hero-ticker">HRG · MAINNET LIVE</div>
 
-  <p>Maximum privacy cryptocurrency. Bitcoin-style emission with Monero-grade anonymity — ring signatures, Dandelion++ propagation, and stealth addresses V2.</p>
+  <p>Maximum privacy cryptocurrency. Bitcoin-style emission with Monero-grade anonymity — dynamic ring signatures, Dandelion++ propagation, and one-time stealth addresses.</p>
 
   <div class="hero-stats">
-    <div class="stat">
-      <span class="stat-value">18M</span>
-      <span class="stat-label">Hard Cap</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">42.86</span>
-      <span class="stat-label">HRG / Block</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">32–64</span>
-      <span class="stat-label">Ring Size</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">CPU</span>
-      <span class="stat-label">RandomX Only</span>
-    </div>
+    <div class="stat"><span class="stat-value">18M</span><span class="stat-label">Hard Cap</span></div>
+    <div class="stat"><span class="stat-value">42.86</span><span class="stat-label">HRG / Block</span></div>
+    <div class="stat"><span class="stat-value">32–64</span><span class="stat-label">Ring Size</span></div>
+    <div class="stat"><span class="stat-value">CPU</span><span class="stat-label">RandomX Only</span></div>
   </div>
 
   <div class="hero-cta">
-    <a href="#mine" class="btn btn-primary">Start Mining</a>
-    <a href="#tokenomics" class="btn btn-outline">Tokenomics</a>
+    <a href="download.html" class="btn btn-primary">Download</a>
+    <a href="mining.html" class="btn btn-outline">Start Mining</a>
   </div>
 </div>
+
+<div class="divider"></div>
+
+<!-- QUICK NAV CARDS -->
+<section>
+  <div class="navcards reveal">
+    <a href="download.html" class="navcard">
+      <h3>Download</h3>
+      <p>Full node, wallet CLI, and the desktop GUI wallet (v2.0.2) for Linux, macOS and Windows — every asset SHA256-verified.</p>
+      <span class="arrow">Get the binaries →</span>
+    </a>
+    <a href="mining.html" class="navcard">
+      <h3>Mining Guide</h3>
+      <p>Solo mining or the public RandomX pool. Step-by-step setup with ready-to-paste XMRig commands.</p>
+      <span class="arrow">Start mining →</span>
+    </a>
+    <a href="otc.html" class="navcard">
+      <h3>OTC Desk</h3>
+      <p>Swap HRG ⇄ USDT / USDC peer-to-peer through the escrow Telegram bot, @HideringOTCBot.</p>
+      <span class="arrow">Trade HRG →</span>
+    </a>
+  </div>
+</section>
 
 <div class="divider"></div>
 
@@ -882,7 +239,7 @@
 <section id="privacy">
   <div class="section-label reveal">Privacy Stack</div>
   <h2 class="section-title reveal">Anonymity by Design</h2>
-  <p class="section-sub reveal">Five layered privacy enhancements beyond standard Monero, making transaction analysis computationally infeasible.</p>
+  <p class="section-sub reveal">Layered privacy on top of Monero's proven cryptography, making transaction analysis computationally infeasible.</p>
 
   <div class="features-grid reveal">
     <div class="feature">
@@ -911,15 +268,15 @@
     </div>
     <div class="feature">
       <div class="feature-icon">⟡</div>
-      <h3>Stealth Addresses V2</h3>
-      <p>Every payment is sent to a unique one-time address derived from the recipient's public keys, so on-chain observers cannot link transactions to a published address.</p>
-      <span class="feature-tag">stealth-v2</span>
+      <h3>Stealth Addresses</h3>
+      <p>Every payment is sent to a unique one-time address derived from the recipient's public keys, so observers cannot link transactions to a published address.</p>
+      <span class="feature-tag">stealth one-time</span>
     </div>
     <div class="feature">
       <div class="feature-icon">⊛</div>
       <h3>Post-Quantum Ready</h3>
-      <p>ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signature upgrade, now in development via a non-destructive hard fork targeted for 2027 — liboqs already integrated. Existing blockchain history is fully preserved.</p>
-      <span class="feature-tag">ML-DSA-65 (FIPS 204) · In Progress</span>
+      <p>ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signature upgrade in development via a non-destructive hard fork targeted for 2027 — liboqs already integrated. Existing history is fully preserved.</p>
+      <span class="feature-tag">ML-DSA-65 · In Progress</span>
     </div>
   </div>
 </section>
@@ -933,79 +290,17 @@
   <p class="section-sub reveal">Fixed supply, predictable halvings, pure PoW emission. The same monetary properties that made Bitcoin trusted — with Monero-grade privacy.</p>
 
   <div class="token-grid reveal">
-    <div class="token-card">
-      <span class="token-card-value">18,000,000</span>
-      <span class="token-card-label">Hard Cap (HRG)</span>
-    </div>
-    <div class="token-card">
-      <span class="token-card-value">42.86</span>
-      <span class="token-card-label">Initial Block Reward</span>
-    </div>
-    <div class="token-card">
-      <span class="token-card-value">210,000</span>
-      <span class="token-card-label">Halving Interval</span>
-    </div>
-    <div class="token-card">
-      <span class="token-card-value">~2.66 yrs</span>
-      <span class="token-card-label">Per Halving</span>
-    </div>
-    <div class="token-card">
-      <span class="token-card-value">120s</span>
-      <span class="token-card-label">Block Time</span>
-    </div>
-    <div class="token-card">
-      <span class="token-card-value">RandomX</span>
-      <span class="token-card-label">CPU-only PoW</span>
-    </div>
+    <div class="token-card"><span class="token-card-value">18,000,000</span><span class="token-card-label">Hard Cap (HRG)</span></div>
+    <div class="token-card"><span class="token-card-value">42.86</span><span class="token-card-label">Initial Block Reward</span></div>
+    <div class="token-card"><span class="token-card-value">210,000</span><span class="token-card-label">Halving Interval</span></div>
+    <div class="token-card"><span class="token-card-value">~2.66 yrs</span><span class="token-card-label">Per Halving</span></div>
+    <div class="token-card"><span class="token-card-value">120s</span><span class="token-card-label">Block Time</span></div>
+    <div class="token-card"><span class="token-card-value">RandomX</span><span class="token-card-label">CPU-only PoW</span></div>
   </div>
-
-  <table class="emission-table reveal">
-    <thead>
-      <tr>
-        <th>Period</th>
-        <th>Block Height</th>
-        <th>Reward / Block</th>
-        <th>Total Emitted</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Genesis<sup style="color:var(--gold-dim);">*</sup></td>
-        <td class="gold">0</td>
-        <td class="gold">157.14 HRG (NUMS-locked, unspendable)</td>
-        <td>0 HRG circulating (cryptographically unspendable)</td>
-      </tr>
-      <tr>
-        <td>Era 1</td>
-        <td class="gold">1 – 210,000</td>
-        <td class="gold">42.86 HRG</td>
-        <td>9,000,000 HRG</td>
-      </tr>
-      <tr>
-        <td>Era 2</td>
-        <td class="gold">210,001 – 420,000</td>
-        <td class="gold">21.43 HRG</td>
-        <td>4,500,000 HRG</td>
-      </tr>
-      <tr>
-        <td>Era 3</td>
-        <td class="gold">420,001 – 630,000</td>
-        <td class="gold">10.71 HRG</td>
-        <td>2,250,000 HRG</td>
-      </tr>
-      <tr>
-        <td>Era 4+</td>
-        <td class="gold">630,001+</td>
-        <td class="gold">½ per halving</td>
-        <td>→ 18M hard cap</td>
-      </tr>
-    </tbody>
-  </table>
-  <p style="font-size:0.75rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;"><sup style="color:var(--gold-dim);">*</sup> Genesis block reward is 0 HRG spendable — the NUMS-locked 157.14 HRG at height 0 is cryptographically unspendable. Full genesis proof in <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md" style="color:var(--gold);">GENESIS_PROOF.md</a>.</p>
 
   <div class="fairlaunch-box reveal">
     <h3>Fair Launch · PoW Only</h3>
-    <p>Genesis (block 0) carries zero spendable reward. Emission follows a pure proof-of-work schedule with no seed round and no private sale. After the v1.x 51% attack, v2.0.0 includes a short pre-public mining phase to harden the network before opening — once public, every miner competes under the same RandomX rules. See the FAQ for the full v2.0.0 rationale.</p>
+    <p>Genesis (block 0) carries zero spendable reward. Emission follows a pure proof-of-work schedule with no seed round and no private sale. After the v1.x 51% attack, v2.0.0 includes a short pre-public mining phase to harden the network before opening — once public, every miner competes under the same RandomX rules.</p>
     <div class="fairlaunch-items">
       <span class="fi">Pure PoW</span>
       <span class="fi">No Private Sale</span>
@@ -1013,337 +308,10 @@
       <span class="fi">RandomX CPU</span>
       <span class="fi">Verifiable Genesis</span>
     </div>
-  </div>
-</div>
-
-<!-- HOW TO MINE -->
-<section id="mine">
-  <div class="section-label reveal">Mining</div>
-  <h2 class="section-title reveal">Start Mining HRG</h2>
-  <p class="section-sub reveal">RandomX is CPU-optimised. Any modern processor can mine HIDERING. No ASICs, no GPU farms — just your CPU. Solo mining and the public pool both work today — pick whichever you prefer.</p>
-
-  <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
-    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Requirements</div>
-    <ul style="list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem 1.5rem;font-size:0.85rem;color:var(--text);padding:0;">
-      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">OS</span> &nbsp; Linux x86_64 · macOS ARM64 · Windows x64 (see Releases below)</li>
-      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">RAM</span> &nbsp; ≥ 2 GB free per mining thread (RandomX dataset)</li>
-      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
-      <li><span style="color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
-    </ul>
-    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;">Optional: enable Linux huge pages for higher hashrate — <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">echo 1280 | sudo tee /proc/sys/vm/nr_hugepages</code></p>
-  </div>
-
-  <!-- MINING POOL -->
-  <div class="reveal" style="border:1px solid var(--border);background:var(--dark);padding:1.5rem 1.75rem;margin-bottom:3rem;">
-    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;">Mining Pool</div>
-    <p style="font-size:0.85rem;color:var(--text);line-height:1.7;margin:0 0 1.25rem;">Prefer pooled mining? Point any RandomX miner (e.g. <a href="https://github.com/xmrig/xmrig" style="color:var(--gold);">XMRig</a>) at the HIDERING public pool for steady PPLNS payouts instead of waiting on a solo block. You still need a B-address to receive payouts — create one with steps 01 &amp; 03 below.</p>
-    <ul style="list-style:none;display:flex;flex-direction:column;gap:0.65rem;font-size:0.85rem;color:var(--text);padding:0;margin:0 0 1.25rem;">
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">STRATUM</span><code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.8rem;word-break:break-all;">stratum+tcp://pool.hidering.org:3333</code></li>
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">STATS API</span><a href="http://pool.hidering.org:8117/stats" style="color:var(--gold);font-family:'Fira Mono',monospace;font-size:0.8rem;word-break:break-all;">pool.hidering.org:8117/stats</a></li>
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">FEE</span><span>1%</span></li>
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">MIN PAYOUT</span><span>1 HRG</span></li>
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">ALGO</span><span>RandomX (rx/0)</span></li>
-      <li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:0.4rem 0.75rem;"><span style="flex:none;min-width:108px;color:var(--gold-dim);font-family:'Fira Mono',monospace;font-size:0.78rem;">PAYOUTS</span><span>PPLNS</span></li>
-    </ul>
-    <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:0.6rem;">XMRig config example</div>
-    <div class="code-block"><span class="cmd">// pools[] entry in your XMRig config.json</span><br>{<br>&nbsp;&nbsp;"url": "pool.hidering.org:3333",<br>&nbsp;&nbsp;"user": "YOUR_HRG_ADDRESS",<br>&nbsp;&nbsp;"pass": "x"<br>}</div>
-    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Replace <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">YOUR_HRG_ADDRESS</code> with your own B-address. From the command line that is: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">xmrig -o pool.hidering.org:3333 -u YOUR_HRG_ADDRESS -p x -a rx/0</code></p>
-  </div>
-
-  <div class="steps reveal">
-    <div class="step">
-      <div class="step-num">01</div>
-      <div>
-        <h3>Download, verify, and extract</h3>
-        <p>Grab the latest HIDERING release (v2.0.2) from <a href="#releases" style="color:var(--gold);">the releases section below</a> or directly on <a href="https://github.com/AB-lab113/hidering/releases/latest" style="color:var(--gold);">GitHub</a>. Download both the archive and the matching <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">.sha256</code> file into the same folder, then run the three commands below in order. Pick the archive for your platform: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-linux-x64.tar.gz</code> (Linux x86_64), <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-macos-arm64.tar.gz</code> (macOS ARM64), or <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-windows-x64.zip</code> (Windows x64).</p>
-        <div class="code-block"><span class="cmd"># 1. Verify the archive (must print: OK)</span><br>sha256sum -c hidering-linux-x64.tar.gz.sha256<br><br><span class="cmd"># 2. Extract the archive</span><br>tar -xzf hidering-linux-x64.tar.gz<br><br><span class="cmd"># 3. Move into the extracted folder</span><br>cd hidering-linux-x64/</div>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;"><strong style="color:var(--gold-dim);">Windows users:</strong> replace <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">tar -xzf</code> with a standard unzip or right-click → Extract All on the <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">.zip</code> file.</p>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">You are now inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">hidering-linux-x64/</code>, which contains the two binaries you will use in the next steps: <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hideringd</code> (full node daemon) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">./hidering-wallet-cli</code> (wallet CLI). Stay in this folder.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">02</div>
-      <div>
-        <h3>Launch the daemon &amp; sync</h3>
-        <p>Still inside <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-linux-x64/</code> from step 01, start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining — initial sync takes a few minutes on the current chain height.</p>
-        <div class="code-block"><span class="cmd"># Run from the hidering-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740 \<br>&nbsp;&nbsp;--add-priority-node seed2.hidering.org:19740</div>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
-        <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Both seed nodes run on dedicated VPS infrastructure with fixed IPs (<code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed1</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">135.125.243.137</code>, <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">seed2</code> → <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.78rem;">207.180.211.96</code>) and are managed by systemd for automatic restart on failure.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">03</div>
-      <div>
-        <h3>Create your wallet</h3>
-        <p>Open a <strong>second terminal</strong> (leave the daemon running in the first one) and <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">cd</code> into the same <code style="font-family:'Fira Mono',monospace;color:var(--gold-dim);font-size:0.82rem;">hidering-linux-x64/</code> folder from step 01. Your address will start with <strong style="color:var(--gold)">B</strong>. Write down your 25-word seed phrase and keep it offline — without it your HRG cannot be recovered.</p>
-        <div class="code-block"><span class="cmd"># In the second terminal, move into the extracted folder</span><br>cd hidering-linux-x64/<br><br><span class="cmd"># Create a new wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --generate-new-wallet my-wallet<br><br><span class="cmd"># Or open an existing wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --wallet-file my-wallet</div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">04</div>
-      <div>
-        <h3>Start mining</h3>
-        <p>Inside the wallet CLI, launch the miner. Replace <code style="color:var(--gold)">4</code> with the number of CPU threads to allocate.</p>
-        <div class="code-block"><span class="cmd">start_mining</span> 4</div>
-        <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Each block = <span style="color:var(--gold)">42.86 HRG</span> credited to your wallet.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">05</div>
-      <div>
-        <h3>Stop mining &amp; check balance</h3>
-        <p>To stop at any time, use the commands below inside the wallet CLI. Mined HRG unlocks after 60 confirmations (~2 hours).</p>
-        <div class="code-block"><span class="cmd">stop_mining</span>         <span style="color:var(--text-dim)"># stop the miner</span><br><span class="cmd">balance</span>              <span style="color:var(--text-dim)"># view balance + unlocked</span><br><span class="cmd">exit</span>                 <span style="color:var(--text-dim)"># close wallet safely</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">06</div>
-      <div>
-        <h3>Send HRG to another wallet</h3>
-        <p>Once your balance is unlocked, transfer HRG to any B-address. The fee is a fraction of a cent.</p>
-        <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><br><span class="cmd">show_transfers</span>       <span style="color:var(--text-dim)"># transaction history</span></div>
-      </div>
+    <div style="margin-top:2rem;">
+      <a href="whitepaper.html" class="btn btn-outline">Read the Whitepaper</a>
     </div>
   </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- RELEASES -->
-<section id="releases">
-  <div class="section-label reveal">Downloads</div>
-  <h2 class="section-title reveal">Latest Releases · v2.0.2 &amp; v2.0.2-gui</h2>
-  <p class="section-sub reveal">Verified binaries for the HIDERING full node and wallet, published on GitHub. Every asset ships with a SHA256 sidecar so you can confirm the file you downloaded is the one we built.</p>
-
-  <div class="release-card reveal">
-    <div class="release-header">
-      <div>
-        <h3>Full Node &amp; Wallet CLI — v2.0.2</h3>
-        <p class="release-tagline">Linux x86_64 · macOS ARM64 · Windows x64 · published 2 Jun 2026</p>
-      </div>
-      <a href="https://github.com/AB-lab113/hidering/releases/tag/v2.0.2" class="btn btn-outline">View on GitHub</a>
-    </div>
-
-    <ul class="release-contents">
-      <li><code>hideringd</code> — full node daemon (P2P + RPC)</li>
-      <li><code>hidering-wallet-cli</code> — interactive wallet (send / receive / mine)</li>
-      <li><code>hidering-wallet-rpc</code> — headless wallet for integrations</li>
-    </ul>
-
-    <div class="release-meta">
-      <div>
-        <div class="meta-label">Linux x64 · hidering-linux-x64.tar.gz · 13.1 MB</div>
-        <div class="meta-value sha">844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30</div>
-      </div>
-      <div>
-        <div class="meta-label">macOS ARM64 · hidering-macos-arm64.tar.gz · 10.2 MB</div>
-        <div class="meta-value sha">5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22</div>
-      </div>
-      <div>
-        <div class="meta-label">Windows x64 · hidering-windows-x64.zip · 29.3 MB</div>
-        <div class="meta-value sha">0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3</div>
-      </div>
-    </div>
-
-    <div class="release-actions">
-      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-linux-x64.tar.gz" class="btn btn-primary">Download Linux x64</a>
-      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-macos-arm64.tar.gz" class="btn btn-outline">Download macOS ARM64</a>
-      <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.2/hidering-windows-x64.zip" class="btn btn-outline">Download Windows x64</a>
-    </div>
-
-    <p class="release-note">Native binaries for Linux x86_64, macOS ARM64, and Windows x64. Every asset ships with a matching <code>.sha256</code> sidecar — verify your download before extracting with <code>sha256sum -c &lt;file&gt;.sha256</code> (it should print <code>OK</code>).</p>
-  </div>
-
-  <div class="release-card reveal">
-    <div class="release-header">
-      <div>
-        <h3>Wallet GUI Desktop — v2.0.2-gui</h3>
-        <p class="release-tagline">macOS ARM64 · Windows x64 · Linux x86_64 · published 3 Jun 2026</p>
-      </div>
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/tag/v2.0.2-gui" class="btn btn-outline">View on GitHub</a>
-    </div>
-
-    <ul class="release-contents">
-      <li><code>Hidering_Wallet-macos-arm64.tar.gz</code> — Apple Silicon <code>.app</code> bundle, Qt5 bundled (macOS 11+)</li>
-      <li><code>Hidering_Wallet-windows-x64.zip</code> — portable folder, Qt5 + runtime DLLs bundled (Windows 10/11)</li>
-      <li><code>Hidering_Wallet-v2.0.2-x86_64.AppImage</code> — one-file launch, bundles Qt5 + every system dep</li>
-      <li>Source repo: <a href="https://github.com/AB-lab113/hidering-gui" style="color:var(--gold);">github.com/AB-lab113/hidering-gui</a></li>
-    </ul>
-
-    <div class="release-meta">
-      <div>
-        <div class="meta-label">macOS ARM64 SHA256</div>
-        <div class="meta-value sha">63b96e4c1dfe343f1d591a12171eb98af6331ac0e7b6f4344b4e5e7e9947c9da</div>
-      </div>
-      <div>
-        <div class="meta-label">Windows x64 SHA256</div>
-        <div class="meta-value sha">9cb4f9c39bb5db070ab293656d1b24a2d59a2ef6f2726d598398e63217a5e0ca</div>
-      </div>
-      <div>
-        <div class="meta-label">Linux AppImage SHA256</div>
-        <div class="meta-value sha">54ea3e936bb6a6b650a5ede347218aef3cd6696bae44532d36ff41eaec27f759</div>
-      </div>
-    </div>
-
-    <div class="release-actions">
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-macos-arm64.tar.gz" class="btn btn-primary">Download macOS (ARM64)</a>
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-windows-x64.zip" class="btn btn-primary">Download Windows (x64)</a>
-      <a href="https://github.com/AB-lab113/hidering-gui/releases/download/v2.0.2-gui/Hidering_Wallet-v2.0.2-x86_64.AppImage" class="btn btn-outline">Download Linux AppImage</a>
-    </div>
-
-    <p class="release-note"><strong>macOS:</strong> <code>tar -xzf Hidering_Wallet-macos-arm64.tar.gz</code>, then move <code>hidering-wallet-gui.app</code> to Applications. It's ad-hoc signed (no Apple Developer ID), so the first launch needs right-click → Open. <strong>Windows:</strong> unzip and run <code>hidering-wallet-gui.exe</code> from the extracted folder (keep the DLLs alongside it). <strong>Linux:</strong> the AppImage is built from the v2.0.2-gui sources. <code>chmod +x</code> then run it; on distros without <code>libfuse2</code> use <code>--appimage-extract-and-run</code>. Requires glibc ≥ 2.39 (Ubuntu 24.04+, Debian 13+, Fedora 39+).</p>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- ROADMAP -->
-<section id="roadmap">
-  <div class="section-label reveal">Roadmap</div>
-  <h2 class="section-title reveal">Development Timeline</h2>
-  <p class="section-sub reveal">Phase-by-phase delivery from fork to post-quantum upgrade. Each phase validated before the next begins.</p>
-
-  <div class="roadmap reveal">
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 0–3C</div>
-        <div class="roadmap-status status-done">Complete</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Foundation &amp; Privacy Stack</h3>
-        <p>Fork Monero v0.18.1, implement all five privacy patches, full rebrand, emission curve, mainnet genesis, seed node infrastructure, DNS bootstrapping.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">RandomX</span><span class="rtag">Ring 32–64</span><span class="rtag">Dandelion++</span><span class="rtag">Mainnet Live</span>
-        </div>
-      </div>
-    </div>
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 4A</div>
-        <div class="roadmap-status status-done">Complete</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Transaction Validation</h3>
-        <p>End-to-end transfer test on live mainnet. Wallet-to-wallet HRG transactions confirmed, ring signatures and fee structure verified.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">Transfers</span><span class="rtag">Fees Tuned</span>
-        </div>
-      </div>
-    </div>
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 4B–4E</div>
-        <div class="roadmap-status status-done">Complete</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Pre-Launch Infrastructure</h3>
-        <p>Redundant seed nodes on dedicated VPS (OVH + Contabo) with fixed IPs and systemd-managed restart, public block explorer, public binaries, and RandomX-compatible mining pool.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">seed1 (OVH)</span><span class="rtag">seed2 (Contabo)</span><span class="rtag">systemd</span><span class="rtag">Block Explorer</span><span class="rtag">Binaries</span><span class="rtag">Mining Pool</span>
-        </div>
-      </div>
-    </div>
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 4G</div>
-        <div class="roadmap-status status-active">In Progress</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Public Launch</h3>
-        <p>Opening the network to public mining after the v2.0.0 pre-public hardening phase, with public announcement and community mining to follow. See the Fair Launch FAQ for the v2.0.0 rationale.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">Launch</span><span class="rtag">Community</span>
-        </div>
-      </div>
-    </div>
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 4H</div>
-        <div class="roadmap-status status-done">Complete</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Wallet GUI Desktop</h3>
-        <p>Fork of monero-gui rebranded for HIDERING (ports, addresses, logo). Available now for macOS (ARM64), Windows (x64) and Linux (AppImage). Interface covers Send, Receive, Mine, and History.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">Fork monero-gui</span><span class="rtag">Rebrand</span><span class="rtag">Win/macOS/Linux</span><span class="rtag">Send/Receive/Mine</span>
-        </div>
-      </div>
-    </div>
-    <div class="roadmap-item">
-      <div>
-        <div class="roadmap-phase">Phase 5</div>
-        <div class="roadmap-status status-active">In Progress</div>
-      </div>
-      <div class="roadmap-content">
-        <h3>Post-Quantum Upgrade</h3>
-        <p>Hard fork introducing ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signatures. Non-destructive — existing blockchain history is fully preserved. Only transactions beyond fork height use new scheme. Steps 1–7 complete: liboqs integrated, PQ key types, ML-DSA-65 (FIPS 204) TX signing, ML-KEM-768 (FIPS 203) stealth addresses (BQ... format), wallet key persistence — all inactive until HFv16 at block ~2,000,000. Security audit completed June 2026. Mainnet hard fork targeted for Q2 2027.</p>
-        <div class="roadmap-tags">
-          <span class="rtag">ML-DSA-65 (FIPS 204)</span><span class="rtag">ML-KEM-768 (FIPS 203)</span><span class="rtag">Hard Fork</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<div style="background:var(--dark2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
-<section id="faq">
-  <div class="section-label reveal">FAQ</div>
-  <h2 class="section-title reveal">Frequently Asked Questions</h2>
-
-  <div style="display:flex;flex-direction:column;gap:0;" class="reveal">
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">What is HIDERING?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">HIDERING (HRG) is a privacy-focused cryptocurrency forked from Monero v0.18.1. It combines a Bitcoin-style fixed supply of 18 million coins with five enhanced privacy layers, making it one of the most private and auditable digital currencies available.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Why only CPU mining? No GPU or ASIC?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">HIDERING uses RandomX, a proof-of-work algorithm specifically designed to be efficient on standard CPUs and inefficient on GPUs and ASICs. This ensures mining remains accessible to anyone with a regular computer, preventing the centralisation of mining power seen in Bitcoin and Ethereum.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">What does "fair launch" mean?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Genesis (block 0) carries zero spendable reward, and emission follows a pure PoW schedule with no private sale and no seed round. After the 51% attack on the v1.x chain (see below), v2.0.0 introduces a short pre-public mining phase on a private network — founder nodes mine to harden the network before public opening, fund ongoing development (infrastructure, post-quantum upgrade). Once the network opens publicly, every miner competes under the same rules: same RandomX algorithm, same block reward, same difficulty. No insider has access to coins that the public cannot also mine after launch.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">How does the supply cap work?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">The total supply is hard-capped at exactly 18,000,000 HRG. Mining starts at 42.86 HRG per block and halves every 210,000 blocks (~2.66 years). This is mathematically identical to Bitcoin's emission model, just with different parameters. Once the cap is reached, no new HRG can ever be created.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">How do I store my HRG safely?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">When you create a wallet with <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">hidering-wallet-cli</code>, you receive a 25-word seed phrase. Write it down on paper and store it in a secure, offline location. Anyone with access to your seed phrase can access your funds. Never store it on a connected device or share it with anyone.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Why are my mined coins locked?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Freshly mined coins require 60 block confirmations before they can be spent (~2 hours at 120 seconds per block). This is a standard blockchain security measure that prevents double-spending attacks. Your balance will show the total and the unlocked portion separately.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">What is the post-quantum upgrade?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">HIDERING is adding ML-DSA-65 (FIPS 204) and ML-KEM-768 (FIPS 203) signatures via a non-destructive hard fork, targeted for 2027. Work is already under way — the liboqs library is integrated, PQ key types are defined, ML-DSA-65 (FIPS 204) TX signing and ML-KEM-768 (FIPS 203) stealth addresses (BQ... format) are implemented and committed (May–June 2026) — all dormant until the HFv16 activation height. A full security audit was completed in June 2026. All existing coins and transaction history are fully preserved — only new transactions after the fork height will use the quantum-resistant scheme. No action is required from holders; simply updating the software is enough.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;border-bottom:1px solid var(--border);"><h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">How do I choose my ring size?</h3><p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">By default, every transaction uses ring size 32 — the minimum on HIDERING, already 2× Monero's default of 16. For enhanced privacy, specify a larger ring size: <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 48</code> or <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">transfer &lt;address&gt; &lt;amount&gt; 64</code>. Higher ring sizes increase anonymity but slightly increase transaction size and fees.</p></div>
-
-<div style="padding:1.75rem 0;border-bottom:1px solid var(--border);">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Is HIDERING open source?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Yes. HIDERING is fully open source, forked from Monero v0.18.1. The complete source code, commit history, and genesis block are publicly verifiable on GitHub. Transparency is a core principle — anyone can audit the code, the supply, and every transaction on the network.</p>
-    </div>
-
-    <div style="padding:1.75rem 0;">
-      <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--white);margin-bottom:0.6rem;">Why a v2.0.0? What happened?</h3>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;">Shortly after the v1.x launch, on 16 May 2026, the HIDERING network suffered a 51% attack — an external miner with greater hashing power than the rest of the network dominated the chain (then at height ~3577) and caused a major reorganisation, orphaning every block mined up to that point.</p>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;margin-top:0.9rem;">The main factor that made this attack possible was the absence of a stable, permanent public seed node. Without a fixed entry point with an invariant IP address, coordination between legitimate miners was fragile and the network was vulnerable to isolation.</p>
-      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.7;margin-top:0.9rem;">v2.0.0 addresses this on two fronts: the Network ID changes from <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">HRG\x01HIDERINGMAIN</code> (magic <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">0x48524701</code>) to <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">HRG\x02HIDERINGMAIN</code> (magic <code style="font-family:'Fira Mono',monospace;color:var(--gold);font-size:0.82rem;">0x48524702</code>), immediately isolating the malicious miner. And a permanent seed node with a fixed IP is now operational, ensuring network stability for any new miner joining HIDERING.</p>
-    </div>
-
-  </div>
-</section>
 </div>
 
 <!-- FOOTER -->
@@ -1351,27 +319,17 @@
   <div class="footer-logo">HIDERING</div>
   <div class="footer-sub">HRG · Privacy by Protocol</div>
   <ul class="footer-links">
-    <li><a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.4.md">Whitepaper</a></li>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
     <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
-    <li><a href="https://github.com/AB-lab113/hidering/releases/latest">Latest Release</a></li>
     <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
-    <li><a href="#mine">Mining Guide</a></li>
   </ul>
   <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
 </footer>
 
-<script>
-const reveals = document.querySelectorAll('.reveal');
-const observer = new IntersectionObserver(entries => {
-  entries.forEach((e, i) => {
-    if (e.isIntersecting) {
-      setTimeout(() => e.target.classList.add('visible'), i * 80);
-      observer.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.1 });
-reveals.forEach(el => observer.observe(el));
-</script>
-
+<script src="site.js"></script>
 </body>
 </html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mining — HIDERING (HRG)</title>
+<meta name="description" content="How to mine HIDERING (HRG) on any CPU with RandomX — solo mining with hideringd, or pooled mining at pool.hidering.org:3333 with XMRig. Step-by-step commands.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="logo1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .req-list {
+    list-style: none; display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+    gap: 0.7rem 1.5rem; font-size: 0.85rem; color: var(--text); padding: 0;
+  }
+  .req-list .k { color: var(--gold-dim); font-family: 'Fira Mono', monospace; font-size: 0.78rem; }
+
+  .pool-list { list-style: none; display: flex; flex-direction: column; gap: 0.65rem; font-size: 0.85rem; color: var(--text); padding: 0; margin: 0 0 1.25rem; }
+  .pool-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.75rem; }
+  .pool-list .k { flex: none; min-width: 108px; color: var(--gold-dim); font-family: 'Fira Mono', monospace; font-size: 0.78rem; }
+  .pool-list code, .pool-list a { font-family: 'Fira Mono', monospace; color: var(--gold-dim); font-size: 0.8rem; word-break: break-all; }
+
+  /* tab toggle */
+  .tabs { display: flex; gap: 0.6rem; margin-bottom: 2.5rem; flex-wrap: wrap; }
+  .tab-btn {
+    font-family: 'Fira Mono', monospace; font-size: 0.78rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-dim); background: transparent;
+    border: 1px solid var(--border); padding: 0.6rem 1.4rem; border-radius: 2px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--gold); }
+  .tab-btn.active { color: var(--black); background: var(--gold); border-color: var(--gold); font-weight: 500; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step { display: grid; grid-template-columns: 4rem 1fr; gap: 1.5rem; padding: 2rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+  .step-num { font-family: 'Cinzel', serif; font-size: 2rem; color: var(--border-bright); font-weight: 700; line-height: 1; padding-top: 0.2rem; text-align: center; }
+  .step h3 { font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 500; color: var(--white); margin-bottom: 0.4rem; }
+  .step p { font-size: 0.85rem; color: var(--text-dim); }
+  .step p code, .step code.inline { font-family: 'Fira Mono', monospace; color: var(--gold-dim); font-size: 0.82rem; }
+
+  @media (max-width: 768px) {
+    .step { grid-template-columns: 1fr; gap: 0.4rem; }
+    .step-num { text-align: left; font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="index.html" class="nav-logo"><img src="logo1.png" alt="HRG">HIDERING</a>
+  <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html" class="active">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering" class="btn btn-outline btn-sm">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HEAD -->
+<div class="page-head">
+  <div class="hero-glow"></div>
+  <div class="section-label">Mining</div>
+  <h1 class="section-title">Mine HIDERING</h1>
+  <p class="section-sub">RandomX is CPU-optimised — any modern processor can mine HRG. No ASICs, no GPU farms, just your CPU. Pick solo mining or the public pool below; both work today.</p>
+</div>
+
+<section style="padding-top:0;">
+
+  <!-- REQUIREMENTS -->
+  <div class="panel reveal" style="margin-bottom:3rem;">
+    <div class="panel-label">Requirements</div>
+    <ul class="req-list">
+      <li><span class="k">OS</span> &nbsp; Linux x86_64 · macOS ARM64 · Windows x64</li>
+      <li><span class="k">RAM</span> &nbsp; ≥ 2 GB free per mining thread (RandomX dataset)</li>
+      <li><span class="k">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
+      <li><span class="k">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
+    </ul>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;">Optional: enable Linux huge pages for higher hashrate — <code class="inline">echo 1280 | sudo tee /proc/sys/vm/nr_hugepages</code>. Get the binaries first on the <a href="download.html">Download</a> page.</p>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs reveal">
+    <button class="tab-btn active" data-tab="pool">Pool Mining</button>
+    <button class="tab-btn" data-tab="solo">Solo Mining</button>
+  </div>
+
+  <!-- POOL PANEL -->
+  <div class="tab-panel active" id="tab-pool">
+    <div class="panel reveal" style="margin-bottom:2rem;">
+      <div class="panel-label">Public Pool</div>
+      <p style="font-size:0.85rem;color:var(--text);line-height:1.7;margin:0 0 1.25rem;">Pooled mining gives steady PPLNS payouts instead of waiting on a solo block. Point any RandomX miner (e.g. <a href="https://github.com/xmrig/xmrig">XMRig</a>) at the HIDERING public pool. You still need a B-address to receive payouts — create one with the wallet CLI (see the Solo tab, steps 1 & 3).</p>
+      <ul class="pool-list">
+        <li><span class="k">STRATUM</span><code>stratum+tcp://pool.hidering.org:3333</code></li>
+        <li><span class="k">STATS API</span><a href="http://pool.hidering.org:8117/stats">pool.hidering.org:8117/stats</a></li>
+        <li><span class="k">ALGO</span><span style="color:var(--text);">RandomX (rx/0)</span></li>
+        <li><span class="k">FEE</span><span style="color:var(--text);">1%</span></li>
+        <li><span class="k">MIN PAYOUT</span><span style="color:var(--text);">1 HRG</span></li>
+        <li><span class="k">PAYOUTS</span><span style="color:var(--text);">PPLNS</span></li>
+      </ul>
+      <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:0.6rem;">One-line command (XMRig)</div>
+      <div class="code-block">xmrig -o pool.hidering.org:3333 -u <span class="cmd">YOUR_HRG_ADDRESS</span> -p x -a rx/0</div>
+      <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin:1.25rem 0 0.6rem;">config.json pool entry</div>
+      <div class="code-block"><span class="dim">// pools[] entry in your XMRig config.json</span><br>{<br>&nbsp;&nbsp;"url": "pool.hidering.org:3333",<br>&nbsp;&nbsp;"user": "YOUR_HRG_ADDRESS",<br>&nbsp;&nbsp;"pass": "x",<br>&nbsp;&nbsp;"rig-id": "rig1"<br>}</div>
+      <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;">Replace <code class="inline">YOUR_HRG_ADDRESS</code> with your own B-address. Watch your worker and the pool hashrate live at the stats API above.</p>
+    </div>
+  </div>
+
+  <!-- SOLO PANEL -->
+  <div class="tab-panel" id="tab-solo">
+    <div class="steps reveal">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div>
+          <h3>Download, verify, and extract</h3>
+          <p>Grab the latest release (v2.0.2) from the <a href="download.html">Download page</a>. Download the archive and the matching <code class="inline">.sha256</code> into the same folder, then run the three commands below. Pick the archive for your platform: <code class="inline">hidering-linux-x64.tar.gz</code>, <code class="inline">hidering-macos-arm64.tar.gz</code>, or <code class="inline">hidering-windows-x64.zip</code>.</p>
+          <div class="code-block"><span class="cmd"># 1. Verify the archive (must print: OK)</span><br>sha256sum -c hidering-linux-x64.tar.gz.sha256<br><br><span class="cmd"># 2. Extract</span><br>tar -xzf hidering-linux-x64.tar.gz<br><br><span class="cmd"># 3. Move into the extracted folder</span><br>cd hidering-linux-x64/</div>
+          <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;line-height:1.6;"><strong style="color:var(--gold-dim);">Windows:</strong> use right-click → Extract All on the <code class="inline">.zip</code> instead of <code class="inline">tar</code>. You'll use <code class="inline">./hideringd</code> (node) and <code class="inline">./hidering-wallet-cli</code> (wallet) from this folder.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div>
+          <h3>Launch the daemon &amp; sync</h3>
+          <p>Start the daemon. It connects to seed nodes and syncs automatically. Keep this terminal open while mining.</p>
+          <div class="code-block"><span class="cmd"># Run from the hidering-linux-x64/ folder</span><br><span class="cmd">./hideringd</span> \<br>&nbsp;&nbsp;--add-priority-node seed1.hidering.org:19740 \<br>&nbsp;&nbsp;--add-priority-node seed2.hidering.org:19740</div>
+          <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Wait for: <span style="color:var(--gold);font-family:'Fira Mono',monospace;">You are now synchronized with the network.</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div>
+          <h3>Create your wallet</h3>
+          <p>Open a <strong>second terminal</strong> (leave the daemon running) and <code class="inline">cd</code> into the same folder. Your address starts with <strong style="color:var(--gold)">B</strong>. Write down the 25-word seed phrase and keep it offline — without it your HRG cannot be recovered.</p>
+          <div class="code-block"><span class="cmd"># Create a new wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --generate-new-wallet my-wallet<br><br><span class="cmd"># Or open an existing wallet</span><br><span class="cmd">./hidering-wallet-cli</span> --wallet-file my-wallet</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div>
+          <h3>Start mining</h3>
+          <p>Inside the wallet CLI, launch the miner. Replace <code class="inline" style="color:var(--gold);">4</code> with the number of CPU threads to allocate.</p>
+          <div class="code-block"><span class="cmd">start_mining</span> 4</div>
+          <p style="font-size:0.8rem;color:var(--text-dim);margin-top:0.6rem;">Each block = <span style="color:var(--gold)">42.86 HRG</span> credited to your wallet.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">05</div>
+        <div>
+          <h3>Stop mining &amp; check balance</h3>
+          <p>Stop any time from inside the wallet CLI. Mined HRG unlocks after 60 confirmations (~2 hours).</p>
+          <div class="code-block"><span class="cmd">stop_mining</span>         <span class="dim"># stop the miner</span><br><span class="cmd">balance</span>              <span class="dim"># view balance + unlocked</span><br><span class="cmd">exit</span>                 <span class="dim"># close wallet safely</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">06</div>
+        <div>
+          <h3>Send HRG to another wallet</h3>
+          <p>Once your balance is unlocked, transfer HRG to any B-address. Append a ring size (48 or 64) for extra privacy.</p>
+          <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><span class="cmd">transfer</span> B5xxx...address 10 64   <span class="dim"># larger ring</span><br><br><span class="cmd">show_transfers</span>       <span class="dim"># transaction history</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:3.5rem;" class="reveal">
+    <a href="download.html" class="btn btn-primary">Download Binaries</a>
+    <a href="https://explorer.hidering.org" class="btn btn-outline">Block Explorer</a>
+  </div>
+
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">HIDERING</div>
+  <div class="footer-sub">HRG · Privacy by Protocol</div>
+  <ul class="footer-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="download.html">Download</a></li>
+    <li><a href="mining.html">Mining</a></li>
+    <li><a href="otc.html">OTC</a></li>
+    <li><a href="whitepaper.html">Whitepaper</a></li>
+    <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
+    <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
+</footer>
+
+<script src="site.js"></script>
+<script>
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tab = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
