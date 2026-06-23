@@ -1,7 +1,7 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
-**Version 1.4 (révisée 6 Juin 2026 — post-audit sécurité juin 2026)**  
+**Version 1.4 (révisée 22 Juin 2026 — post-audit sécurité juin 2026)**  
 **Juin 2026**
 
 ---
@@ -239,7 +239,7 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 **PHASE 4 : MAINNET LAUNCH (En cours)**
 - ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
 - ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (pré-launch, ~h≈3577) retirée au profit du nouveau réseau v2.0.0.
-- ✅ **Release v2.0.2 (1 juin 2026)** — dernière publique, bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
+- ✅ **Release v2.0.3 (19 juin 2026)** — dernière publique, ajoute checkpoint h=25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
 - ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256
 - ✅ Wallet GUI Desktop multi-plateformes (v2.0.2-gui : Linux AppImage, macOS ARM64, Windows x64)
 - ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333` — voir §9)
@@ -274,7 +274,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 
@@ -334,6 +334,7 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 - **Pool mining** : pool.hidering.org:3333
 - **DNS Seed 1** : seed1.hidering.org
 - **DNS Seed 2** : seed2.hidering.org
+- **OTC Trading Bot** : @HideringOTCBot (Telegram) — échange P2P HRG ⇄ USDT/USDC via escrow automatique
 
 ---
 
@@ -348,8 +349,8 @@ Le fair launch garantit une distribution par compétition PoW pure. La phase pr�
 ---
 
 *Whitepaper v1.4 — Juin 2026 (révisé 6 juin 2026 après l'audit sécurité de juin 2026 : corrections privacy, transparence réserve minée, ajout pool mining + checkpoints)*  
-*SHA256 release v2.0.2 (dernière publique) :*  
-*  Linux x64 : `844b0cac1cb3192c9d616dffa50da538399447c05e8086a44447adccf5bd3f30`*  
-*  macOS ARM64 : `5215a59ec18d444f7565d3351276049b39565e253b98875f733068d2e7e48a22`*  
-*  Windows x64 : `0f687dc8bd84a0cdd3a7b0f631c79201ba0a8f0a0c869a15f6a1e8950b884cf3`*  
+*SHA256 release v2.0.3 (dernière publique) :*  
+*  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
+*  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
+*  Windows x64 : `f8dfc4447b69b7fa75083da55be4925a11f35cc5c35888b2d47c8d08c0a9bfb3`*  
 *SHA256 release v1.0.2 (historique, pré-HF) : `da92781f5e0d085a08a656b48ea49be3d54201b3db32b736204266ea89fd2b8b`*
