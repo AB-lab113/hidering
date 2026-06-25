@@ -557,6 +557,21 @@ namespace cryptonote
   // parser is therefore deliberately left as the stock greedy-padding behaviour: the PQ tx
   // never feeds it a 0x00-padding-then-0x06 sequence, and changing the padding parser to
   // tolerate trailing data would relax a live-chain consensus rule. Do not "fix" it here.
+  crypto::key_image get_pq_input_key_image(const crypto::public_key& real_output_key)
+  {
+    static const char domain[] = "HRG_PQ_KI_v1";
+    std::string buf;
+    buf.reserve((sizeof(domain) - 1) + sizeof(real_output_key));
+    buf.append(domain, sizeof(domain) - 1);
+    buf.append(reinterpret_cast<const char*>(&real_output_key), sizeof(real_output_key));
+    crypto::hash h;
+    cn_fast_hash(buf.data(), buf.size(), h);
+    crypto::key_image ki;
+    static_assert(sizeof(ki) == sizeof(h), "key_image/hash size mismatch");
+    memcpy(&ki, &h, sizeof(ki));
+    return ki;
+  }
+  //---------------------------------------------------------------
   bool parse_tx_extra(const std::vector<uint8_t>& tx_extra, std::vector<tx_extra_field>& tx_extra_fields)
   {
     tx_extra_fields.clear();
@@ -843,6 +858,12 @@ namespace cryptonote
     money = 0;
     for(const auto& in: tx.vin)
     {
+      // HIDERING Phase 5 (HFv16): a transparent PQ input reveals its amount directly.
+      if (in.type() == typeid(txin_to_key_pq))
+      {
+        money += boost::get<txin_to_key_pq>(in).amount;
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
       money += tokey_in.amount;
     }
@@ -860,7 +881,10 @@ namespace cryptonote
   {
     for(const auto& in: tx.vin)
     {
-      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key), false, "wrong variant type: "
+      // HIDERING Phase 5 (HFv16): also accept the transparent post-quantum input type.
+      // Its semantics are gated by hf_version in the consensus validator (check_tx_inputs);
+      // here we only whitelist the variant so PQ txs are not rejected at the type check.
+      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_to_key_pq), false, "wrong variant type: "
         << in.type().name() << ", expected " << typeid(txin_to_key).name()
         << ", in transaction id=" << get_transaction_hash(tx));
 

@@ -186,5 +186,28 @@ namespace pqc
   // ML-KEM-768 keypair, recovering the shared secret (matches the sender's on success).
   bool pqc_stealth_decaps(const pq_stealth_keys &keys, const kyber_ciphertext &ct,
                           kyber_shared_secret &ss);
+
+  // Phase 5 (HFv16, Option-2-transparent / A1) — compute the per-output post-quantum
+  // BINDING tag committing a (revealed) BQ output key to its per-output ML-DSA-65 public key:
+  //
+  //   bind_tag = Keccak( "HRG_PQ_BIND_v1" || real_output_key || dsa_pk )
+  //
+  // using the Monero-variant Keccak-256 (crypto::cn_fast_hash), so it is consistent with
+  // the rest of the codebase's "Keccak". Published at output creation in a
+  // TX_EXTRA_TAG_PQ_BIND field and recomputed by the validator at spend time to verify a
+  // transparent txin_to_key_pq carries the ML-DSA key that was actually bound to the output.
+  // `out_tag` receives 32 bytes. Raw byte pointers keep this header free of cryptonote
+  // type dependencies (the caller passes &public_key / dsa pk bytes + their lengths).
+  void pqc_compute_bind_tag(const uint8_t *real_output_key, size_t rk_len,
+                            const uint8_t *dsa_pk, size_t pk_len,
+                            uint8_t out_tag[32]);
+
+  // Phase 5 (HFv16) — derive the PER-OUTPUT ML-DSA-65 keypair for a BQ output,
+  // deterministically from that output's KEM shared secret and its index:
+  //   sub_seed = SHAKE256("HRG_PQ_OUT_DSA_v1" || ss || index_le8)  (via pqc_keygen_from_seed)
+  // Both the sender (at output creation, to build bind_tag) and the receiver (at spend, to
+  // sign) reproduce the same keypair from the same (ss, index). Returns false on failure.
+  bool pqc_keygen_output_dsa(const kyber_shared_secret &ss, uint64_t output_index,
+                             pq_public_key &pk, pq_secret_key &sk);
 }
 }

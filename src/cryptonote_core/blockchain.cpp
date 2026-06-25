@@ -2894,6 +2894,17 @@ bool Blockchain::check_for_double_spend(const transaction& tx, key_images_contai
       return true;
     }
 
+    // HIDERING Phase 5 (HFv16): transparent PQ input — double-spend tracked via the
+    // synthetic key image derived from the revealed output key, in the SAME spent-key DB.
+    bool operator()(const txin_to_key_pq& in) const
+    {
+      const crypto::key_image ki = get_pq_input_key_image(in.real_output_key);
+      auto r = m_spent_keys.insert(ki);
+      if(!r.second || m_db->has_key_image(ki))
+        return false;
+      return true;
+    }
+
     bool operator()(const txin_gen& tx) const
     {
       return true;
@@ -3339,6 +3350,121 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     // crypto::pqc::pqc_stealth_decaps on output scan (see wallet2.cpp).
   }
 
+  // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): validate every TRANSPARENT
+  // post-quantum input (txin_to_key_pq). For each such input the validator enforces:
+  //   (a) the referenced output exists and is not already spent,
+  //   (b) the revealed real_output_key matches the on-chain output key,
+  //   (c) the binding tag published when that output was CREATED commits real_output_key
+  //       to the supplied per-output ML-DSA-65 public key, and
+  //   (d) the ML-DSA-65 signature verifies over the tx prefix hash.
+  // Wholly skipped below HF_VERSION_PQ → the live chain is untouched. NOTE (residual, see
+  // A2 report): money-conservation for transparent inputs vs. the RingCT output commitments
+  // is NOT yet enforced here — that consensus rule (sum of revealed PQ-input amounts ==
+  // committed outputs + fee) is the remaining piece before HFv16 activation.
+  if (hf_version >= HF_VERSION_PQ)
+  {
+    bool any_pq = false;
+    for (const auto& txin : tx.vin)
+      if (txin.type() == typeid(txin_to_key_pq)) { any_pq = true; break; }
+
+    if (any_pq)
+    {
+      // The per-input ML-DSA-65 signatures sign the tx prefix hash computed with ALL
+      // txin_to_key_pq.dsa.sig fields zeroed (a signature cannot cover itself). Zero them in
+      // place (tx is non-const), hash, restore — same technique as the extra-sig stripping
+      // above. The dsa public keys are retained, so the signed message commits to them.
+      std::vector<std::pair<size_t, std::vector<uint8_t>>> saved_sigs;
+      for (size_t n = 0; n < tx.vin.size(); ++n)
+      {
+        if (tx.vin[n].type() != typeid(txin_to_key_pq)) continue;
+        txin_to_key_pq& in = boost::get<txin_to_key_pq>(tx.vin[n]);
+        saved_sigs.emplace_back(n, std::vector<uint8_t>(in.dsa.sig, in.dsa.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
+        memset(in.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
+      }
+      const crypto::hash pq_in_hash = get_transaction_prefix_hash(tx);
+      for (const auto& sv : saved_sigs)
+        memcpy(boost::get<txin_to_key_pq>(tx.vin[sv.first]).dsa.sig, sv.second.data(), sv.second.size());
+
+      for (const auto& txin : tx.vin)
+      {
+        if (txin.type() != typeid(txin_to_key_pq)) continue;
+        const txin_to_key_pq& in = boost::get<txin_to_key_pq>(txin);
+
+        // (a) referenced output exists (BQ outputs are rct → DB amount bucket 0) ...
+        output_data_t od;
+        try
+        {
+          od = m_db->get_output_key((uint64_t)0, in.spent_output_index, true);
+        }
+        catch (const std::exception &e)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input references nonexistent output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        // ... and is not already spent (synthetic key image in the shared spent-key DB)
+        if (have_tx_keyimg_as_spent(get_pq_input_key_image(in.real_output_key)))
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input double-spends output " << in.spent_output_index);
+          tvc.m_double_spend = true;
+          return false;
+        }
+        // (b) revealed key matches the on-chain output key
+        if (od.pubkey != in.real_output_key)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input real_output_key mismatch for output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        // (c) the on-chain binding tag commits real_output_key to this dsa_pk. Retrieve the
+        // bind_tag published in the output's CREATING tx (TX_EXTRA_TAG_PQ_BIND, that output's
+        // local index) and compare to the recomputed expected value.
+        crypto::hash stored_bind;
+        bool found_bind = false;
+        try
+        {
+          const tx_out_index toi = m_db->get_output_tx_and_index((uint64_t)0, in.spent_output_index);
+          transaction origin_tx = m_db->get_pruned_tx(toi.first);
+          std::vector<tx_extra_field> origin_fields;
+          if (parse_tx_extra(origin_tx.extra, origin_fields))
+          {
+            for (const tx_extra_field &f : origin_fields)
+            {
+              if (f.type() == typeid(tx_extra_pq_bind))
+              {
+                const tx_extra_pq_bind &b = boost::get<tx_extra_pq_bind>(f);
+                if (b.output_index == toi.second) { stored_bind = b.bind_tag; found_bind = true; break; }
+              }
+            }
+          }
+        }
+        catch (const std::exception &e) { found_bind = false; }
+        if (!found_bind)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input: no on-chain binding tag for output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        uint8_t expect_bind[32];
+        crypto::pqc::pqc_compute_bind_tag(reinterpret_cast<const uint8_t*>(&in.real_output_key), sizeof(in.real_output_key),
+                                          in.dsa.pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES, expect_bind);
+        if (memcmp(expect_bind, &stored_bind, 32) != 0)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input binding-tag mismatch for output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        // (d) the ML-DSA-65 signature verifies over the (sig-stripped) prefix hash
+        if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_in_hash), sizeof(pq_in_hash), in.dsa))
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input has invalid ML-DSA-65 signature for output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+      }
+    }
+  }
+
   if (hf_version >= HF_VERSION_MIN_2_OUTPUTS)
   {
     if (tx.version >= 2)
@@ -3495,6 +3621,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     pmax_used_block_height = &max_used_block_height;
   for (const auto& txin : tx.vin)
   {
+    // HIDERING Phase 5 (HFv16): transparent post-quantum inputs (txin_to_key_pq) are NOT
+    // ring inputs — they were already fully validated (checks a/b/c/d) in the dedicated PQ
+    // pass above. Skip them here so the classic ring/CLSAG path is untouched, and DO NOT
+    // advance sig_index (it indexes ring inputs only). Only reachable at/after HF_VERSION_PQ.
+    if (txin.type() == typeid(txin_to_key_pq))
+      continue;
+
     // make sure output being spent is of type txin_to_key, rather than
     // e.g. txin_gen, which is only used for miner transactions
     CHECK_AND_ASSERT_MES(txin.type() == typeid(txin_to_key), false, "wrong type id in tx input at Blockchain::check_tx_inputs");

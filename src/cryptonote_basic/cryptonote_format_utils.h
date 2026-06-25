@@ -73,6 +73,13 @@ namespace cryptonote
 
   bool parse_tx_extra(const std::vector<uint8_t>& tx_extra, std::vector<tx_extra_field>& tx_extra_fields);
   bool sort_tx_extra(const std::vector<uint8_t>& tx_extra, std::vector<uint8_t> &sorted_tx_extra, bool allow_partial = false);
+  // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): a txin_to_key_pq carries no
+  // key_image (it is a transparent input). Its double-spend marker is a SYNTHETIC key image
+  // derived deterministically from the revealed output key — unique per output, recorded in
+  // and checked against the very same spent-key DB the ring inputs use, so no new DB index
+  // is needed. ki = Keccak("HRG_PQ_KI_v1" || real_output_key) reinterpreted as a key_image
+  // (used purely as 32 opaque bytes; it need not be a valid curve point).
+  crypto::key_image get_pq_input_key_image(const crypto::public_key& real_output_key);
   crypto::public_key get_tx_pub_key_from_extra(const std::vector<uint8_t>& tx_extra, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction_prefix& tx, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction& tx, size_t pk_index = 0);

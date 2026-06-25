@@ -216,11 +216,30 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  // HIDERING Phase 5 (HFv16, Option-2-transparent / A1) — per-output post-quantum
+  // binding tag. For a BQ... output at local index `output_index` in this tx, bind_tag
+  // commits the one-time output key P'_i to the per-output ML-DSA-65 public key that
+  // will authorise its (transparent) spend: bind_tag = Keccak("HRG_PQ_BIND_v1" || P'_i
+  // || dsa_pk_i). Stored at output CREATION, looked up by the validator at SPEND time
+  // (see blockchain.cpp check_tx_inputs, check c). Variable-length leading varint, so it
+  // takes the generic [tag|size|data] tx_extra encoding (unlike the fixed-size pq_sig /
+  // kyber_ct blobs). Only present once hf_version >= HF_VERSION_PQ.
+  struct tx_extra_pq_bind
+  {
+    uint64_t output_index;
+    crypto::hash bind_tag;
+
+    BEGIN_SERIALIZE()
+      VARINT_FIELD(output_index)
+      FIELD(bind_tag)
+    END_SERIALIZE()
+  };
+
   // tx_extra_field format, except tx_extra_padding and tx_extra_pub_key:
   //   varint tag;
   //   varint size;
   //   varint data[];
-  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate, tx_extra_pq_sig, tx_extra_kyber_ct> tx_extra_field;
+  typedef boost::variant<tx_extra_padding, tx_extra_pub_key, tx_extra_nonce, tx_extra_merge_mining_tag, tx_extra_additional_pub_keys, tx_extra_mysterious_minergate, tx_extra_pq_sig, tx_extra_kyber_ct, tx_extra_pq_bind> tx_extra_field;
 }
 
 BLOB_SERIALIZER(crypto::pqc::pq_tx_sig);
@@ -235,3 +254,4 @@ VARIANT_TAG(binary_archive, cryptonote::tx_extra_mysterious_minergate, TX_EXTRA_
 // HIDERING Phase 5 (HFv16): tags 0x06 / 0x07 (free in the classic tx_extra tag space).
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_pq_sig, 0x06);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_kyber_ct, 0x07);
+VARIANT_TAG(binary_archive, cryptonote::tx_extra_pq_bind, 0x08); // ::config::TX_EXTRA_TAG_PQ_BIND

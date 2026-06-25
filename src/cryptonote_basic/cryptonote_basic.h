@@ -49,6 +49,7 @@
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
+#include "crypto/pqc.h" // HIDERING Phase 5 (HFv16): txin_to_key_pq carries an ML-DSA-65 pk+sig
 #include "misc_language.h"
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
@@ -152,7 +153,37 @@ namespace cryptonote
   };
 
 
-  typedef boost::variant<txin_gen, txin_to_script, txin_to_scripthash, txin_to_key> txin_v;
+  // HIDERING Phase 5 (HFv16, Option-2-transparent / A1) — post-quantum TRANSPARENT input.
+  //
+  // A BQ... output is spent WITHOUT a ring: the input directly references the spent output
+  // (revealing it, hence "transparent" — the opt-in trade-off for real ML-DSA-65 quantum
+  // resistance) and carries a per-output ML-DSA-65 verification key + signature over the tx
+  // prefix hash. The validator (blockchain.cpp check_tx_inputs) checks the referenced output
+  // exists/unspent, the revealed key matches the chain, the on-chain binding tag commits this
+  // dsa_pk to that key, and the signature verifies. There is NO key_image field: double-spend
+  // is prevented by a synthetic key image derived from real_output_key (get_pq_input_key_image),
+  // recorded in the same spent-key DB. Only ever produced/accepted once hf_version >= HF_VERSION_PQ;
+  // classic B... transactions keep using txin_to_key untouched.
+  struct txin_to_key_pq
+  {
+    uint64_t amount;
+    uint64_t spent_output_index;        // direct global-output reference (no ring)
+    crypto::public_key real_output_key; // P'_i revealed (32 bytes)
+    crypto::pqc::pq_tx_sig dsa;         // ML-DSA-65 pk(1952) || sig(3309), per-output
+
+    BEGIN_SERIALIZE_OBJECT()
+      VARINT_FIELD(amount)
+      VARINT_FIELD(spent_output_index)
+      FIELD(real_output_key)
+      // dsa is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
+      // (no BLOB_SERIALIZER registration needed in this TU — that lives in tx_extra.h).
+      ar.serialize_blob(&dsa, sizeof(dsa));
+      if (!ar.good()) return false;
+    END_SERIALIZE()
+  };
+
+
+  typedef boost::variant<txin_gen, txin_to_script, txin_to_scripthash, txin_to_key, txin_to_key_pq> txin_v;
 
   typedef boost::variant<txout_to_script, txout_to_scripthash, txout_to_key, txout_to_tagged_key> txout_target_v;
 
@@ -474,6 +505,9 @@ namespace cryptonote
       size_t operator()(const txin_to_script& txin) const{return 0;}
       size_t operator()(const txin_to_scripthash& txin) const{return 0;}
       size_t operator()(const txin_to_key& txin) const {return txin.key_offsets.size();}
+      // HIDERING Phase 5: a PQ transparent input carries its ML-DSA-65 signature inside the
+      // input struct itself, not in the v1 ring-signature vector → zero v1 signatures.
+      size_t operator()(const txin_to_key_pq& txin) const {return 0;}
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);
@@ -657,6 +691,7 @@ VARIANT_TAG(binary_archive, cryptonote::txin_gen, 0xff);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_script, 0x0);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_scripthash, 0x1);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_key, 0x2);
+VARIANT_TAG(binary_archive, cryptonote::txin_to_key_pq, 0x3); // HIDERING Phase 5 (HFv16)
 VARIANT_TAG(binary_archive, cryptonote::txout_to_script, 0x0);
 VARIANT_TAG(binary_archive, cryptonote::txout_to_scripthash, 0x1);
 VARIANT_TAG(binary_archive, cryptonote::txout_to_key, 0x2);
@@ -668,6 +703,7 @@ VARIANT_TAG(json_archive, cryptonote::txin_gen, "gen");
 VARIANT_TAG(json_archive, cryptonote::txin_to_script, "script");
 VARIANT_TAG(json_archive, cryptonote::txin_to_scripthash, "scripthash");
 VARIANT_TAG(json_archive, cryptonote::txin_to_key, "key");
+VARIANT_TAG(json_archive, cryptonote::txin_to_key_pq, "key_pq");
 VARIANT_TAG(json_archive, cryptonote::txout_to_script, "script");
 VARIANT_TAG(json_archive, cryptonote::txout_to_scripthash, "scripthash");
 VARIANT_TAG(json_archive, cryptonote::txout_to_key, "key");
@@ -679,6 +715,7 @@ VARIANT_TAG(debug_archive, cryptonote::txin_gen, "gen");
 VARIANT_TAG(debug_archive, cryptonote::txin_to_script, "script");
 VARIANT_TAG(debug_archive, cryptonote::txin_to_scripthash, "scripthash");
 VARIANT_TAG(debug_archive, cryptonote::txin_to_key, "key");
+VARIANT_TAG(debug_archive, cryptonote::txin_to_key_pq, "key_pq");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_script, "script");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_scripthash, "scripthash");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_key, "key");

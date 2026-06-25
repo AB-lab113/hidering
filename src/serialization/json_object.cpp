@@ -352,6 +352,10 @@ void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::t
     {
       INSERT_INTO_JSON_OBJECT(dest, to_key, input);
     }
+    void operator()(cryptonote::txin_to_key_pq const& input) const
+    {
+      INSERT_INTO_JSON_OBJECT(dest, to_key_pq, input);
+    }
     void operator()(cryptonote::txin_gen const& input) const
     {
       INSERT_INTO_JSON_OBJECT(dest, gen, input);
@@ -387,6 +391,12 @@ void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_v& txin)
     if (elem.name == "to_key")
     {
       cryptonote::txin_to_key tmpVal;
+      fromJsonValue(elem.value, tmpVal);
+      txin = std::move(tmpVal);
+    }
+    else if (elem.name == "to_key_pq")
+    {
+      cryptonote::txin_to_key_pq tmpVal;
       fromJsonValue(elem.value, tmpVal);
       txin = std::move(tmpVal);
     }
@@ -502,6 +512,40 @@ void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key& txin)
   GET_FROM_JSON_OBJECT(val, txin.amount, amount);
   GET_FROM_JSON_OBJECT(val, txin.key_offsets, key_offsets);
   GET_FROM_JSON_OBJECT(val, txin.k_image, key_image);
+}
+
+void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::txin_to_key_pq& txin)
+{
+  dest.StartObject();
+
+  INSERT_INTO_JSON_OBJECT(dest, amount, txin.amount);
+  INSERT_INTO_JSON_OBJECT(dest, spent_output_index, txin.spent_output_index);
+  INSERT_INTO_JSON_OBJECT(dest, real_output_key, txin.real_output_key);
+  // dsa is a 5261-byte POD (pk||sig) — too large for the stack-based to_hex::array generic
+  // serializer, so emit it as a heap-allocated hex string.
+  {
+    const std::string dsa_hex = epee::to_hex::string(epee::as_byte_span(txin.dsa));
+    dest.Key("dsa");
+    dest.String(dsa_hex.data(), dsa_hex.size());
+  }
+
+  dest.EndObject();
+}
+
+void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key_pq& txin)
+{
+  if (!val.IsObject())
+  {
+    throw WRONG_TYPE("json object");
+  }
+
+  GET_FROM_JSON_OBJECT(val, txin.amount, amount);
+  GET_FROM_JSON_OBJECT(val, txin.spent_output_index, spent_output_index);
+  GET_FROM_JSON_OBJECT(val, txin.real_output_key, real_output_key);
+  const auto dsa_it = val.FindMember("dsa");
+  if (dsa_it == val.MemberEnd())
+    throw MISSING_KEY("dsa");
+  json::read_hex(dsa_it->value, epee::as_mut_byte_span(txin.dsa));
 }
 
 

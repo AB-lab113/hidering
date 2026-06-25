@@ -53,6 +53,15 @@ namespace cryptonote
     rct::key mask;                      //ringct amount mask
     rct::multisig_kLRki multisig_kLRki; //multisig info
 
+    // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): set when this source is a
+    // post-quantum BQ... output being spent TRANSPARENTLY (no ring; a txin_to_key_pq is
+    // emitted instead of a txin_to_key, see cryptonote_tx_utils.cpp). NOT serialised
+    // (construction-time hint only, recoverable by the wallet). Defaults false → every
+    // current caller and the live chain are unaffected. The wallet sets it (with pq_ss,
+    // the per-output ML-KEM shared secret recovered at scan) once the BQ spend path lands.
+    bool is_pq = false;
+    boost::optional<crypto::pqc::kyber_shared_secret> pq_ss;
+
     void push_output(uint64_t idx, const crypto::public_key &k, uint64_t amount) { outputs.push_back(std::make_pair(idx, rct::ctkey({rct::pk2rct(k), rct::zeroCommit(amount)}))); }
 
     BEGIN_SERIALIZE_OBJECT()

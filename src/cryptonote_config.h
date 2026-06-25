@@ -239,6 +239,16 @@ static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 // pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;
 
+// Phase 5 (HFv16, Option-2-transparent / A1): tx_extra tag carrying a post-quantum
+// BINDING tag for a BQ... output. Layout: [ 0x08 | output_index:varint | bind_tag:32 ].
+// bind_tag = Keccak("HRG_PQ_BIND_v1" || P'_i || dsa_pk_i), where dsa_pk_i is the
+// per-output ML-DSA-65 public key derived from the KEM shared secret. It commits the
+// (transparent, later-revealed) output key P'_i to the ML-DSA key that will be required
+// to authorise its spend, so a transparent txin_to_key_pq cannot substitute an
+// attacker-chosen ML-DSA key. Tag 0x08 is unused by the classic tx_extra tags. Only
+// emitted/validated once hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
+static const uint8_t TX_EXTRA_TAG_PQ_BIND = 0x08;
+
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
 #define CRYPTONOTE_SCALING_2021_FEE_ROUNDING_PLACES 2
 

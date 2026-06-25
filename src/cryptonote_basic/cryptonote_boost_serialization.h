@@ -150,6 +150,17 @@ namespace boost
     a & x.k_image;
   }
 
+  // HIDERING Phase 5 (HFv16): transparent post-quantum input. dsa (pk||sig) is a fixed-size
+  // POD, serialised as a raw byte array like the crypto::public_key / key_image above.
+  template <class Archive>
+  inline void serialize(Archive &a, cryptonote::txin_to_key_pq &x, const boost::serialization::version_type ver)
+  {
+    a & x.amount;
+    a & x.spent_output_index;
+    a & x.real_output_key;
+    a & reinterpret_cast<char (&)[sizeof(crypto::pqc::pq_tx_sig)]>(x.dsa);
+  }
+
   template <class Archive>
   inline void serialize(Archive &a, cryptonote::tx_out &x, const boost::serialization::version_type ver)
   {

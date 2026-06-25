@@ -216,6 +216,10 @@ void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_scripthash& 
 void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::txin_to_key& txin);
 void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key& txin);
 
+// HIDERING Phase 5 (HFv16): transparent post-quantum input.
+void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::txin_to_key_pq& txin);
+void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key_pq& txin);
+
 void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::txout_target_v& txout);
 void fromJsonValue(const rapidjson::Value& val, cryptonote::txout_target_v& txout);
 

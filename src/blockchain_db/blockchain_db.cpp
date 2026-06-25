@@ -208,6 +208,13 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
     {
       add_spent_key(boost::get<txin_to_key>(tx_input).k_image);
     }
+    else if (tx_input.type() == typeid(txin_to_key_pq))
+    {
+      // HIDERING Phase 5 (HFv16): transparent PQ inputs have no real key_image; record a
+      // synthetic one derived from the revealed output key so double-spends are caught by
+      // the same spent-key DB. Only present once hf_version >= HF_VERSION_PQ.
+      add_spent_key(get_pq_input_key_image(boost::get<txin_to_key_pq>(tx_input).real_output_key));
+    }
     else if (tx_input.type() == typeid(txin_gen))
     {
       /* nothing to do here */
@@ -342,6 +349,10 @@ void BlockchainDB::remove_transaction(const crypto::hash& tx_hash)
     if (tx_input.type() == typeid(txin_to_key))
     {
       remove_spent_key(boost::get<txin_to_key>(tx_input).k_image);
+    }
+    else if (tx_input.type() == typeid(txin_to_key_pq))
+    {
+      remove_spent_key(get_pq_input_key_image(boost::get<txin_to_key_pq>(tx_input).real_output_key));
     }
   }
 

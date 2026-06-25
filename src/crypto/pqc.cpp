@@ -12,9 +12,11 @@
 // liboqs object so a future liboqs bump that changed a size fails loudly here.
 
 #include "pqc.h"
+#include "hash.h" // crypto::cn_fast_hash (Monero-variant Keccak) for the PQ binding tag
 
 #include <cstring>
 #include <mutex>
+#include <string>
 
 #include <oqs/oqs.h>
 #include <oqs/sha3.h> // incremental SHAKE256 API (not pulled in by oqs.h)
@@ -284,6 +286,38 @@ namespace pqc
     }
     if (kem != nullptr) OQS_KEM_free(kem);
     return ok;
+  }
+
+  void pqc_compute_bind_tag(const uint8_t *real_output_key, size_t rk_len,
+                            const uint8_t *dsa_pk, size_t pk_len,
+                            uint8_t out_tag[32])
+  {
+    static const char domain[] = "HRG_PQ_BIND_v1";
+    std::string buf;
+    buf.reserve((sizeof(domain) - 1) + rk_len + pk_len);
+    buf.append(domain, sizeof(domain) - 1);
+    buf.append(reinterpret_cast<const char*>(real_output_key), rk_len);
+    buf.append(reinterpret_cast<const char*>(dsa_pk), pk_len);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf.data(), buf.size(), h); // Monero-variant Keccak-256
+    std::memcpy(out_tag, &h, 32);
+  }
+
+  bool pqc_keygen_output_dsa(const kyber_shared_secret &ss, uint64_t output_index,
+                             pq_public_key &pk, pq_secret_key &sk)
+  {
+    // sub-seed = "HRG_PQ_OUT_DSA_v1" || ss || index_le8 → fed to the deterministic keygen,
+    // so sender and receiver derive the identical per-output ML-DSA-65 (and ML-KEM-768) pair.
+    static const char domain[] = "HRG_PQ_OUT_DSA_v1";
+    std::string seed;
+    seed.reserve((sizeof(domain) - 1) + sizeof(ss.ss) + 8);
+    seed.append(domain, sizeof(domain) - 1);
+    seed.append(reinterpret_cast<const char*>(ss.ss), sizeof(ss.ss));
+    for (int i = 0; i < 8; ++i)
+      seed.push_back(static_cast<char>((output_index >> (8 * i)) & 0xff));
+    const bool r = pqc_keygen_from_seed(reinterpret_cast<const uint8_t*>(seed.data()), seed.size(), pk, sk);
+    if (!seed.empty()) std::memset(&seed[0], 0, seed.size());
+    return r;
   }
 }
 }

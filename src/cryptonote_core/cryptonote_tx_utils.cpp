@@ -30,6 +30,7 @@
 
 #include <unordered_set>
 #include <random>
+#include <sstream>
 #include "include_base_utils.h"
 #include "string_tools.h"
 using namespace epee;
@@ -40,6 +41,7 @@ using namespace epee;
 #include "blockchain.h"
 #include "cryptonote_basic/miner.h"
 #include "cryptonote_basic/tx_extra.h"
+#include "serialization/string.h" // std::string do_serialize, needed to serialize tx_extra_field variant
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/pqc.h"
@@ -72,6 +74,27 @@ namespace cryptonote
   {
     extra.push_back(TX_EXTRA_TAG_KYBER_CT);
     extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES);
+  }
+  //---------------------------------------------------------------
+  // HIDERING Phase 5 (HFv16, A1): serialise a per-output binding tag into tx.extra using the
+  // generic [ TX_EXTRA_TAG_PQ_BIND | size:varint | output_index:varint | bind_tag:32 ]
+  // encoding (variable-length, unlike the fixed-size pq_sig/kyber_ct blobs), via the
+  // canonical tx_extra_pq_bind variant so parse_tx_extra round-trips it. Only emitted for
+  // BQ... outputs once hf_version >= HF_VERSION_PQ (inactive on the live chain).
+  void add_pq_bind_to_extra(std::vector<uint8_t>& extra, uint64_t output_index, const crypto::hash& bind_tag)
+  {
+    // Same mechanism as add_additional_tx_pub_keys_to_extra: serialise the variant (which
+    // writes [tag][output_index varint][bind_tag 32]) and append. parse_tx_extra round-trips it.
+    tx_extra_field field = tx_extra_pq_bind{output_index, bind_tag};
+    std::ostringstream oss;
+    binary_archive<true> ar(oss);
+    if (!::do_serialize(ar, field))
+    {
+      LOG_ERROR("Failed to serialise tx_extra_pq_bind");
+      return;
+    }
+    const std::string s = oss.str();
+    extra.insert(extra.end(), s.begin(), s.end());
   }
   //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16, audit E-4): see cryptonote_tx_utils.h. The tweak is
@@ -256,6 +279,34 @@ namespace cryptonote
     {
       LOG_ERROR("Empty sources");
       return false;
+    }
+
+    // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): SPEND side of BQ outputs.
+    //
+    // A source flagged is_pq must be spent as a TRANSPARENT txin_to_key_pq (no ring), with a
+    // per-output ML-DSA-65 signature whose public key matches the on-chain binding tag. The
+    // structures, validator (blockchain.cpp check_tx_inputs checks a/b/c/d) and the per-output
+    // key derivation (crypto::pqc::pqc_keygen_output_dsa) all exist, BUT splicing transparent
+    // inputs into this RingCT construction is NOT yet done: in_contexts[] / inSk / mixRing are
+    // built one-to-one with `sources` assuming every source is a ring input, and money
+    // conservation here is enforced by RingCT commitments — a transparent input needs the new
+    // rule (sum of revealed PQ-input amounts == committed outputs + fee) plus a per-input
+    // signing pass over the (external-sig-stripped, input-sig-zeroed) prefix hash. That is the
+    // wallet2-driven A3 work. Until then, refuse to build a BQ-spend rather than emit a
+    // malformed transaction. Gated on hf_version, and no current caller sets is_pq, so the
+    // live B... chain is wholly unaffected.
+    if (hf_version >= HF_VERSION_PQ)
+    {
+      for (const tx_source_entry& s : sources)
+      {
+        if (s.is_pq)
+        {
+          LOG_ERROR("Transparent post-quantum (BQ...) spend is not yet wired into the RingCT "
+                    "money path (HIDERING A3). Structures + validator are in place; refusing to "
+                    "construct a malformed transaction.");
+          return false;
+        }
+      }
     }
 
     std::vector<rct::key> amount_keys;
@@ -450,6 +501,10 @@ namespace cryptonote
     // here and appended to tx.extra after the classic fields are sorted (below).
     // Stays empty on the live chain (no destination is flagged is_pq pre-fork).
     std::vector<crypto::pqc::kyber_ciphertext> kyber_cts;
+    // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): per-output binding tags for BQ...
+    // outputs — (local output_index, bind_tag) — appended to tx.extra alongside the KEM
+    // ciphertexts. Empty on the live chain (no destination is_pq pre-fork).
+    std::vector<std::pair<uint64_t, crypto::hash>> pq_binds;
 
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): mark each post-quantum
     // BQ... destination from its parsed address. is_pq() is false for every classic
@@ -509,6 +564,28 @@ namespace cryptonote
         crypto::secret_key_to_public_key(kyber_tweak, tweak_pub);
         out_eph_public_key = rct::rct2pk(rct::addKeys(rct::pk2rct(out_eph_public_key), rct::pk2rct(tweak_pub)));
         kyber_cts.push_back(kct);
+
+        // Phase 5 (A1): derive the per-output ML-DSA-65 keypair from the SAME KEM shared
+        // secret (and this output's index) and publish the binding tag committing the final
+        // on-chain output key P'_i (already tweaked above) to dsa_pk_i. At spend time the BQ
+        // owner re-derives the same keypair (it decapsulates to the same ss) and signs; the
+        // validator recomputes this tag from the revealed P'_i + dsa_pk to authorise the spend.
+        crypto::pqc::pq_public_key out_dsa_pk;
+        crypto::pqc::pq_secret_key out_dsa_sk;
+        if (!crypto::pqc::pqc_keygen_output_dsa(kss, output_index, out_dsa_pk, out_dsa_sk))
+        {
+          LOG_ERROR("Failed to derive per-output ML-DSA-65 key for BQ output");
+          memwipe(&kss, sizeof(kss));
+          memwipe(&kyber_tweak, sizeof(kyber_tweak));
+          return false;
+        }
+        crypto::hash bind_tag;
+        crypto::pqc::pqc_compute_bind_tag(reinterpret_cast<const uint8_t*>(&out_eph_public_key), sizeof(out_eph_public_key),
+                                          out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                          reinterpret_cast<uint8_t*>(&bind_tag));
+        pq_binds.emplace_back(static_cast<uint64_t>(output_index), bind_tag);
+        memwipe(&out_dsa_sk, sizeof(out_dsa_sk)); // the per-output signing key is re-derived at spend, never stored here
+
         // audit M-3: wipe the ML-KEM shared secret and the derived tweak scalar.
         memwipe(&kss, sizeof(kss));
         memwipe(&kyber_tweak, sizeof(kyber_tweak));
@@ -543,6 +620,12 @@ namespace cryptonote
     // no-op there.
     for (const auto& kct : kyber_cts)
       add_kyber_ct_to_extra(tx.extra, kct);
+
+    // HIDERING Phase 5 (HFv16, A1): write the per-output binding tags (TX_EXTRA_TAG_PQ_BIND)
+    // after the KEM ciphertexts and BEFORE the trailing ML-DSA-65 signature, so that signature
+    // stays the last field. pq_binds is empty on the live chain → no-op there.
+    for (const auto& b : pq_binds)
+      add_pq_bind_to_extra(tx.extra, b.first, b.second);
 
     // HIDERING privacy padding (audit F-4): normalise every transaction's tx_extra to a
     // FIXED target of 2500 bytes, per the HIDERING spec (Patch 2: fixed 2500-byte TX
