@@ -478,8 +478,18 @@ namespace cryptonote
   {
     for(const auto& in: tx.vin)
     {
-      CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, txin, false);
-      std::unordered_set<crypto::hash>& kei_image_set = m_spent_key_images[txin.k_image];
+      // HIDERING Phase 5 (HFv16): a transparent PQ input carries no Ed25519 key image — its
+      // mempool double-spend marker is the SYNTHETIC key image derived from the revealed output
+      // key (the same value the consensus layer tracks). Only present at/after HFv16.
+      crypto::key_image k_image;
+      if (in.type() == typeid(txin_to_key_pq))
+        k_image = get_pq_input_key_image(boost::get<txin_to_key_pq>(in).real_output_key);
+      else
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, txin, false);
+        k_image = txin.k_image;
+      }
+      std::unordered_set<crypto::hash>& kei_image_set = m_spent_key_images[k_image];
 
       // Only allow multiple txes per key-image if kept-by-block. Only allow
       // the same txid if going from local/stem->fluff.
@@ -489,7 +499,7 @@ namespace cryptonote
         const bool one_txid =
           (kei_image_set.empty() || (kei_image_set.size() == 1 && *(kei_image_set.cbegin()) == id));
         CHECK_AND_ASSERT_MES(one_txid, false, "internal error: tx_relay=" << unsigned(tx_relay)
-                                           << ", kei_image_set.size()=" << kei_image_set.size() << ENDL << "txin.k_image=" << txin.k_image << ENDL
+                                           << ", kei_image_set.size()=" << kei_image_set.size() << ENDL << "k_image=" << k_image << ENDL
                                            << "tx_id=" << id);
       }
 
@@ -512,16 +522,25 @@ namespace cryptonote
     // ND: Speedup
     for(const txin_v& vi: tx.vin)
     {
-      CHECKED_GET_SPECIFIC_VARIANT(vi, const txin_to_key, txin, false);
-      auto it = m_spent_key_images.find(txin.k_image);
-      CHECK_AND_ASSERT_MES(it != m_spent_key_images.end(), false, "failed to find transaction input in key images. img=" << txin.k_image << ENDL
+      // HIDERING Phase 5 (HFv16): mirror insert_key_images — a transparent PQ input is tracked by
+      // its synthetic key image (derived from the revealed output key). Only present at/after HFv16.
+      crypto::key_image k_image;
+      if (vi.type() == typeid(txin_to_key_pq))
+        k_image = get_pq_input_key_image(boost::get<txin_to_key_pq>(vi).real_output_key);
+      else
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(vi, const txin_to_key, txin, false);
+        k_image = txin.k_image;
+      }
+      auto it = m_spent_key_images.find(k_image);
+      CHECK_AND_ASSERT_MES(it != m_spent_key_images.end(), false, "failed to find transaction input in key images. img=" << k_image << ENDL
                                     << "transaction id = " << actual_hash);
       std::unordered_set<crypto::hash>& key_image_set =  it->second;
-      CHECK_AND_ASSERT_MES(key_image_set.size(), false, "empty key_image set, img=" << txin.k_image << ENDL
+      CHECK_AND_ASSERT_MES(key_image_set.size(), false, "empty key_image set, img=" << k_image << ENDL
         << "transaction id = " << actual_hash);
 
       auto it_in_set = key_image_set.find(actual_hash);
-      CHECK_AND_ASSERT_MES(it_in_set != key_image_set.end(), false, "transaction id not found in key_image set, img=" << txin.k_image << ENDL
+      CHECK_AND_ASSERT_MES(it_in_set != key_image_set.end(), false, "transaction id not found in key_image set, img=" << k_image << ENDL
         << "transaction id = " << actual_hash);
       key_image_set.erase(it_in_set);
       if(!key_image_set.size())
@@ -1347,6 +1366,13 @@ namespace cryptonote
     CRITICAL_REGION_LOCAL1(m_blockchain);
     for(const auto& in: tx.vin)
     {
+      // HIDERING Phase 5 (HFv16): a transparent PQ input is tracked by its synthetic key image.
+      if (in.type() == typeid(txin_to_key_pq))
+      {
+        if(have_tx_keyimg_as_spent(get_pq_input_key_image(boost::get<txin_to_key_pq>(in).real_output_key), txid))
+          return true;
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
       if(have_tx_keyimg_as_spent(tokey_in.k_image, txid))
          return true;
@@ -1451,6 +1477,13 @@ namespace cryptonote
   {
     for(size_t i = 0; i!= tx.vin.size(); i++)
     {
+      // HIDERING Phase 5 (HFv16): transparent PQ input → synthetic key image.
+      if (tx.vin[i].type() == typeid(txin_to_key_pq))
+      {
+        if(k_images.count(get_pq_input_key_image(boost::get<txin_to_key_pq>(tx.vin[i]).real_output_key)))
+          return true;
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(tx.vin[i], const txin_to_key, itk, false);
       if(k_images.count(itk.k_image))
         return true;
@@ -1462,6 +1495,14 @@ namespace cryptonote
   {
     for(size_t i = 0; i!= tx.vin.size(); i++)
     {
+      // HIDERING Phase 5 (HFv16): transparent PQ input → synthetic key image.
+      if (tx.vin[i].type() == typeid(txin_to_key_pq))
+      {
+        const crypto::key_image ki = get_pq_input_key_image(boost::get<txin_to_key_pq>(tx.vin[i]).real_output_key);
+        auto r = k_images.insert(ki);
+        CHECK_AND_ASSERT_MES(r.second, false, "internal error: key images pool cache - inserted duplicate PQ image in set: " << ki);
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(tx.vin[i], const txin_to_key, itk, false);
       auto i_res = k_images.insert(itk.k_image);
       CHECK_AND_ASSERT_MES(i_res.second, false, "internal error: key images pool cache - inserted duplicate image in set: " << itk.k_image);
@@ -1477,8 +1518,21 @@ namespace cryptonote
     LockedTXN lock(m_blockchain.get_db());
     for(size_t i = 0; i!= tx.vin.size(); i++)
     {
-      CHECKED_GET_SPECIFIC_VARIANT(tx.vin[i], const txin_to_key, itk, void());
-      const key_images_container::const_iterator it = m_spent_key_images.find(itk.k_image);
+      // HIDERING Phase 5 (HFv16): transparent PQ input → synthetic key image.
+      crypto::key_image pq_ki_storage;
+      const crypto::key_image *kip = nullptr;
+      if (tx.vin[i].type() == typeid(txin_to_key_pq))
+      {
+        pq_ki_storage = get_pq_input_key_image(boost::get<txin_to_key_pq>(tx.vin[i]).real_output_key);
+        kip = &pq_ki_storage;
+      }
+      else
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(tx.vin[i], const txin_to_key, itk, void());
+        kip = &itk.k_image;
+      }
+      const crypto::key_image &k_image = *kip;
+      const key_images_container::const_iterator it = m_spent_key_images.find(k_image);
       if (it != m_spent_key_images.end())
       {
         for (const crypto::hash &txid: it->second)
@@ -1492,7 +1546,7 @@ namespace cryptonote
           }
           if (!meta.double_spend_seen)
           {
-            MDEBUG("Marking " << txid << " as double spending " << itk.k_image);
+            MDEBUG("Marking " << txid << " as double spending " << k_image);
             meta.double_spend_seen = true;
             changed = true;
             try

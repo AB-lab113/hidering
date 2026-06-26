@@ -8109,6 +8109,12 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
     std::string key_images;
     bool all_are_txin_to_key = std::all_of(ptx.tx.vin.begin(), ptx.tx.vin.end(), [&](const txin_v& s_e) -> bool
     {
+      // HIDERING Phase 5 (HFv16): transparent PQ input → synthetic key image (no Ed25519 KI).
+      if (s_e.type() == typeid(txin_to_key_pq))
+      {
+        key_images += boost::to_string(get_pq_input_key_image(boost::get<txin_to_key_pq>(s_e).real_output_key)) + " ";
+        return true;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(s_e, const txin_to_key, in, false);
       key_images += boost::to_string(in.k_image) + " ";
       return true;
@@ -10097,6 +10103,14 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   std::string key_images;
   bool all_are_txin_to_key = std::all_of(tx.vin.begin(), tx.vin.end(), [&](const txin_v& s_e) -> bool
   {
+    // HIDERING Phase 5 (HFv16): a transparent PQ input has no Ed25519 key image — record its
+    // synthetic key image (same value the daemon tracks) so the pending tx still carries a
+    // key-image string. Only present at/after HFv16; classic txs unchanged.
+    if (s_e.type() == typeid(txin_to_key_pq))
+    {
+      key_images += boost::to_string(get_pq_input_key_image(boost::get<txin_to_key_pq>(s_e).real_output_key)) + " ";
+      return true;
+    }
     CHECKED_GET_SPECIFIC_VARIANT(s_e, const txin_to_key, in, false);
     key_images += boost::to_string(in.k_image) + " ";
     return true;
@@ -10472,6 +10486,14 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   std::string key_images;
   bool all_are_txin_to_key = std::all_of(tx.vin.begin(), tx.vin.end(), [&](const txin_v& s_e) -> bool
   {
+    // HIDERING Phase 5 (HFv16): a transparent PQ input has no Ed25519 key image — record its
+    // synthetic key image (same value the daemon tracks) so the pending tx still carries a
+    // key-image string. Only present at/after HFv16; classic txs unchanged.
+    if (s_e.type() == typeid(txin_to_key_pq))
+    {
+      key_images += boost::to_string(get_pq_input_key_image(boost::get<txin_to_key_pq>(s_e).real_output_key)) + " ";
+      return true;
+    }
     CHECKED_GET_SPECIFIC_VARIANT(s_e, const txin_to_key, in, false);
     key_images += boost::to_string(in.k_image) + " ";
     return true;

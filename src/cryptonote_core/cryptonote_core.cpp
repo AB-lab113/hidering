@@ -855,7 +855,18 @@ namespace cryptonote
       tvc.m_invalid_output = true;
       return false;
     }
-    if (tx.version > 1)
+    // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with NO
+    // RingCT signature (RCTTypeNull) and revealed output amounts → it has no outPk commitments. The
+    // outPk/vout count match only applies to real RingCT txs; detect a PQ transparent tx by a
+    // txin_to_key_pq input and skip the check for it. Only present at/after HFv16; classic txs
+    // unaffected.
+    bool pq_transparent = false;
+    if (hf_version >= HF_VERSION_PQ)
+    {
+      for (const auto& in: tx.vin)
+        if (in.type() == typeid(txin_to_key_pq)) { pq_transparent = true; break; }
+    }
+    if (tx.version > 1 && !pq_transparent)
     {
       if (tx.rct_signatures.outPk.size() != tx.vout.size())
       {
@@ -1022,6 +1033,17 @@ namespace cryptonote
     std::unordered_set<crypto::key_image> ki;
     for(const auto& in: tx.vin)
     {
+      // HIDERING Phase 5 (HFv16): a transparent post-quantum input (txin_to_key_pq) carries no
+      // Ed25519 key image — its per-tx uniqueness marker is the SYNTHETIC key image derived from
+      // the revealed output key (same value the consensus double-spend check uses). Include it so
+      // a tx spending the same BQ output twice is caught. Only present at/after HFv16.
+      if (in.type() == typeid(txin_to_key_pq))
+      {
+        const crypto::key_image ki_pq = get_pq_input_key_image(boost::get<txin_to_key_pq>(in).real_output_key);
+        if(!ki.insert(ki_pq).second)
+          return false;
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
       if(!ki.insert(tokey_in.k_image).second)
         return false;
@@ -1035,6 +1057,10 @@ namespace cryptonote
     {
       for(const auto& in: tx.vin)
       {
+        // HIDERING Phase 5 (HFv16): transparent PQ inputs have no ring members / key_offsets;
+        // this ring-member-distinctness check does not apply to them. Skip (only at/after HFv16).
+        if (in.type() == typeid(txin_to_key_pq))
+          continue;
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
         for (size_t n = 1; n < tokey_in.key_offsets.size(); ++n)
           if (tokey_in.key_offsets[n] == 0)
@@ -1049,6 +1075,11 @@ namespace cryptonote
     std::unordered_set<crypto::key_image> ki;
     for(const auto& in: tx.vin)
     {
+      // HIDERING Phase 5 (HFv16): a transparent PQ input's synthetic key image is an opaque
+      // 32-byte hash (Keccak of the revealed output key), NOT a valid curve point, so the
+      // subgroup/identity domain check does not apply. Skip it (only present at/after HFv16).
+      if (in.type() == typeid(txin_to_key_pq))
+        continue;
       CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
       if (rct::ki2rct(tokey_in.k_image) == rct::identity())
         return false;

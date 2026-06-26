@@ -439,6 +439,20 @@ namespace cryptonote
   {
     CHECK_AND_ASSERT_MES(tx.pruned, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support non pruned txes");
     CHECK_AND_ASSERT_MES(tx.version >= 2, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support v1 txes");
+    // HIDERING Phase 5 (HFv16): a transparent PQ spend is a v2 RCTTypeNull tx — it carries NO
+    // prunable RingCT data, so its pruned weight is simply its serialized size. Handle it before
+    // the BP/CLSAG type assert below (which would otherwise reject RCTTypeNull). Only at/after HFv16.
+    {
+      bool has_pq = false;
+      for (const auto& in : tx.vin) if (in.type() == typeid(txin_to_key_pq)) { has_pq = true; break; }
+      if (has_pq && tx.rct_signatures.type == rct::RCTTypeNull)
+      {
+        std::ostringstream s2;
+        binary_archive<true> a2(s2);
+        ::serialization::serialize(a2, const_cast<transaction&>(tx));
+        return s2.str().size();
+      }
+    }
     CHECK_AND_ASSERT_MES(tx.rct_signatures.type == rct::RCTTypeBulletproof2 || tx.rct_signatures.type == rct::RCTTypeCLSAG || tx.rct_signatures.type == rct::RCTTypeBulletproofPlus,
         std::numeric_limits<uint64_t>::max(), "Unsupported rct_signatures type in get_pruned_transaction_weight");
     CHECK_AND_ASSERT_MES(!tx.vin.empty(), std::numeric_limits<uint64_t>::max(), "empty vin");
@@ -942,6 +956,15 @@ namespace cryptonote
     uint64_t money = 0;
     for(const auto& in: tx.vin)
     {
+      // HIDERING Phase 5 (HFv16): a transparent PQ input reveals its amount directly (no ring).
+      if (in.type() == typeid(txin_to_key_pq))
+      {
+        const uint64_t amt = boost::get<txin_to_key_pq>(in).amount;
+        if(money > amt + money)
+          return false;
+        money += amt;
+        continue;
+      }
       CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
       if(money > tokey_in.amount + money)
         return false;

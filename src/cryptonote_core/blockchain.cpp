@@ -3587,6 +3587,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
     MDEBUG("Mixin: " << min_actual_mixin << "-" << max_actual_mixin);
 
+    // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend has NO ring (txin_to_key)
+    // inputs, so min_actual_mixin stays SIZE_MAX and the ring-size rules below do not apply — they
+    // would otherwise spuriously reject it (SIZE_MAX != 0 "varying ring size"). Such inputs are
+    // fully validated by the dedicated PQ pass (checks a–e). Run the ring-size rules only when at
+    // least one ring input is present; classic and mixed-A4 txs keep the exact same checks.
+    if (min_actual_mixin != std::numeric_limits<size_t>::max())
+    {
     if (hf_version >= HF_VERSION_SAME_MIXIN)
     {
       if (min_actual_mixin != max_actual_mixin)
@@ -3630,6 +3637,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       tvc.m_low_mixin = true;
       return false;
     }
+    } // end ring-size rules (skipped when there are no ring inputs — HFv16 transparent PQ spend)
 
     // min/max tx version based on HF, and we accept v1 txes if having a non mixable
     const size_t max_tx_version = (hf_version <= 3) ? 1 : 2;
@@ -5465,6 +5473,10 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
       // get all amounts from tx.vin(s)
       for (const auto &txin : tx.vin)
       {
+        // HIDERING Phase 5 (HFv16): transparent PQ inputs have no ring offsets/amount buckets to
+        // prefetch and no Ed25519 key image; they are validated directly in check_tx_inputs. Skip.
+        if (txin.type() == typeid(txin_to_key_pq))
+          continue;
         const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
 
         // check for duplicate
@@ -5493,6 +5505,9 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
       // add new absolute_offsets to offset_map
       for (const auto &txin : tx.vin)
       {
+        // HIDERING Phase 5 (HFv16): transparent PQ inputs have no ring offsets. Skip.
+        if (txin.type() == typeid(txin_to_key_pq))
+          continue;
         const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
         // no need to check for duplicate here.
         auto absolute_offsets = relative_output_offsets_to_absolute(in_to_key.key_offsets);
@@ -5559,6 +5574,9 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
 
       for (const auto &txin : tx.vin)
       {
+        // HIDERING Phase 5 (HFv16): transparent PQ inputs are not in the scan table (no ring). Skip.
+        if (txin.type() == typeid(txin_to_key_pq))
+          continue;
         const txin_to_key &in_to_key = boost::get < txin_to_key > (txin);
         auto needed_offsets = relative_output_offsets_to_absolute(in_to_key.key_offsets);
 
