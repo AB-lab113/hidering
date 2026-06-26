@@ -186,6 +186,10 @@ namespace
   const command_line::arg_descriptor<std::string> arg_restore_date = {"restore-date", sw::tr("Restore from estimated blockchain height on specified date"), ""};
   const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the HIDERING network"), false};
   const command_line::arg_descriptor<bool> arg_create_address_file = {"create-address-file", sw::tr("Create an address file for new wallets"), false};
+  // HIDERING Phase 5 (HFv16): create a post-quantum BQ... wallet (ML-KEM-768 + ML-DSA-65 keys
+  // derived deterministically from the spend key). Such a wallet additionally exposes a BQ...
+  // address and can receive/spend transparent post-quantum (BQ) outputs once HFv16 is active.
+  const command_line::arg_descriptor<bool> arg_bq_wallet = {"bq-wallet", sw::tr("Create a post-quantum BQ... wallet (ML-KEM-768 + ML-DSA-65), in addition to the classic B... address"), false};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
@@ -4645,6 +4649,7 @@ bool simple_wallet::handle_command_line(const boost::program_options::variables_
   m_non_deterministic             = command_line::get_arg(vm, arg_non_deterministic);
   m_restore_height                = command_line::get_arg(vm, arg_restore_height);
   m_restore_date                  = command_line::get_arg(vm, arg_restore_date);
+  m_generate_bq                   = command_line::get_arg(vm, arg_bq_wallet); // HIDERING Phase 5
   m_do_not_relay                  = command_line::get_arg(vm, arg_do_not_relay);
   m_subaddress_lookahead          = command_line::get_arg(vm, arg_subaddress_lookahead);
   m_use_english_language_names    = command_line::get_arg(vm, arg_use_english_language_names);
@@ -4822,9 +4827,16 @@ boost::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::pr
   crypto::secret_key recovery_val;
   try
   {
-    recovery_val = m_wallet->generate(m_wallet_file, std::move(rc.second).password(), recovery_key, recover, two_random, create_address_file);
+    // HIDERING Phase 5 (HFv16): --bq-wallet derives a post-quantum BQ... keypair in addition to
+    // the classic Ed25519 keys (off by default → classic wallets byte-identical).
+    recovery_val = m_wallet->generate(m_wallet_file, std::move(rc.second).password(), recovery_key, recover, two_random, create_address_file, m_generate_bq);
     message_writer(console_color_white, true) << tr("Generated new wallet: ")
       << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+    if (m_generate_bq && m_wallet->get_account().get_keys().m_account_address.is_pq())
+    {
+      message_writer(console_color_white, true) << tr("Post-quantum BQ... address: ")
+        << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
+    }
     PAUSE_READLINE();
     std::cout << tr("View key: ");
     print_secret_key(m_wallet->get_account().get_keys().m_view_secret_key);
@@ -9361,6 +9373,21 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
   if (local_args.empty())
   {
     print_address_sub(index);
+    // HIDERING Phase 5 (HFv16): if this is a BQ... wallet, also show its post-quantum address so
+    // it can be handed out to receive BQ outputs. is_pq() is false for every classic wallet.
+    if (m_wallet->get_account().get_keys().m_account_address.is_pq())
+      success_msg_writer() << tr("Post-quantum BQ... address: ")
+        << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
+  }
+  else if (local_args.size() == 1 && local_args[0] == "bq")
+  {
+    // HIDERING Phase 5 (HFv16): print the post-quantum BQ... address (ML-KEM-768).
+    if (!m_wallet->get_account().get_keys().m_account_address.is_pq())
+    {
+      fail_msg_writer() << tr("This is not a post-quantum (BQ...) wallet. Create one with --bq-wallet.");
+      return true;
+    }
+    success_msg_writer() << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
   }
   else if (local_args.size() == 1 && local_args[0] == "all")
   {
@@ -10369,6 +10396,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_restore_date);
   command_line::add_arg(desc_params, arg_do_not_relay);
   command_line::add_arg(desc_params, arg_create_address_file);
+  command_line::add_arg(desc_params, arg_bq_wallet); // HIDERING Phase 5
   command_line::add_arg(desc_params, arg_subaddress_lookahead);
   command_line::add_arg(desc_params, arg_use_english_language_names);
 

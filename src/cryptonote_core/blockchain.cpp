@@ -3006,6 +3006,22 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 
+  // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with NO
+  // RingCT signature (RCTTypeNull) and REVEALED output amounts. Every rule in this function below
+  // is RingCT-specific — the "v2 outputs must be 0-amount" rule (amounts are hidden in commitments)
+  // and the rct_signatures.type allowance ladder (which forbids type <= BulletproofproofN, including
+  // RCTTypeNull=0, from v14 on). None of them apply to a transparent PQ spend: its output amounts
+  // are public and its balance is enforced by the revealed-amount conservation rule in
+  // check_tx_inputs (check e); output *types* (view-tagged) are validated by check_output_types.
+  // Detect such a tx by a txin_to_key_pq input and accept it here. Only possible at/after HFv16;
+  // every classic v2 tx (including a B...→BQ output-creating RingCT tx) keeps all rules below.
+  if (hf_version >= HF_VERSION_PQ)
+  {
+    for (const auto& in : tx.vin)
+      if (in.type() == typeid(txin_to_key_pq))
+        return true;
+  }
+
   // from hard fork 2, we forbid dust and compound outputs
   if (hf_version >= 2) {
     for (auto &o: tx.vout) {
@@ -3019,7 +3035,8 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     }
   }
 
-  // in a v2 tx, all outputs must have 0 amount
+  // in a v2 tx, all outputs must have 0 amount (transparent PQ spends, which reveal amounts, were
+  // already accepted-and-returned at the top of this function, so they never reach here).
   if (hf_version >= 3) {
     if (tx.version >= 2) {
       for (auto &o: tx.vout) {
@@ -3276,9 +3293,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   // Wholly skipped below HF_VERSION_PQ, so the live chain stays untouched.
   if (hf_version >= HF_VERSION_PQ)
   {
-    // HIDERING Phase 5 (HFv16): every tx must carry a valid external ML-DSA-65
-    // signature (the LAST tx_extra field) covering the prefix hash with that field
-    // stripped — exactly what construct_tx_with_tx_key signed before appending it.
+    // HIDERING Phase 5 (HFv16, A4): the external account-level ML-DSA-65 signature (the LAST
+    // tx_extra field) is OPT-IN — required ONLY for a transparent BQ spend (a tx with a
+    // txin_to_key_pq input). A classic B... transaction (ring inputs), including one that merely
+    // CREATES a BQ output (B...→BQ), is authorised by its Ed25519 ring/CLSAG signature and must
+    // NOT carry — nor be required to carry — an ML-DSA-65 signature (VERROU 1). General tx_extra
+    // well-formedness (size ceiling, canonical parse, ML-KEM-768 ciphertext count) is still
+    // enforced for every HFv16 tx.
 
     // audit E-5: PQ transactions legitimately exceed the classic 3000-byte extra cap
     // (ML-DSA pk+sig 5246 B + one ML-KEM-768 ciphertext per BQ output), so enforce the
@@ -3294,9 +3315,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     // audit E-3/M-1: parse tx.extra CANONICALLY via the typed TLV parser rather than a
     // raw trailing-byte slice (which an attacker could make ambiguous, since 0x06/0x07
     // bytes occur freely inside other fields' payloads). Enforce: extra is fully
-    // well-formed (parse consumes every byte — no trailing garbage, no unknown tags),
-    // EXACTLY ONE ML-DSA-65 signature field, it is the LAST field, and the number of
-    // ML-KEM-768 ciphertext fields does not exceed the number of outputs.
+    // well-formed (parse consumes every byte — no trailing garbage, no unknown tags) and
+    // the number of ML-KEM-768 ciphertext fields does not exceed the number of outputs.
     std::vector<tx_extra_field> pq_fields;
     if (!parse_tx_extra(tx.extra, pq_fields) || pq_fields.empty())
     {
@@ -3310,43 +3330,65 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       if (f.type() == typeid(tx_extra_pq_sig)) ++pq_sig_count;
       else if (f.type() == typeid(tx_extra_kyber_ct)) ++kyber_ct_count;
     }
-    if (pq_sig_count != 1 || pq_fields.back().type() != typeid(tx_extra_pq_sig))
-    {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " must carry exactly one ML-DSA-65 signature as the LAST tx_extra field at/after HFv16");
-      tvc.m_verifivation_failed = true;
-      return false;
-    }
     if (kyber_ct_count > tx.vout.size())
     {
       MERROR_VER("Tx " << get_transaction_hash(tx) << " has more ML-KEM-768 ciphertexts (" << kyber_ct_count << ") than outputs (" << tx.vout.size() << ")");
       tvc.m_verifivation_failed = true;
       return false;
     }
-    const crypto::pqc::pq_tx_sig &pq_sig = boost::get<tx_extra_pq_sig>(pq_fields.back()).sig;
 
-    // Recover the signed message: the prefix hash with the trailing PQ signature field
-    // removed. audit M-2: avoid deep-copying the whole transaction — truncate tx.extra
-    // in place (tx is non-const here), hash, then restore. The PQ sig is the last field
-    // and wire-identical to its raw [tag|pk|sig] blob, so dropping its trailing bytes is
-    // exactly the pre-append extra.
-    const size_t pq_field_len = 1 + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
-    CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len, false, "PQ sig field shorter than expected");
-    const std::vector<uint8_t> saved_pq_tail(tx.extra.end() - pq_field_len, tx.extra.end());
-    tx.extra.resize(tx.extra.size() - pq_field_len);
-    const crypto::hash pq_prefix_hash = get_transaction_prefix_hash(tx);
-    tx.extra.insert(tx.extra.end(), saved_pq_tail.begin(), saved_pq_tail.end());
+    bool has_pq_input = false;
+    for (const auto& txin : tx.vin)
+      if (txin.type() == typeid(txin_to_key_pq)) { has_pq_input = true; break; }
 
-    if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash), pq_sig))
+    if (has_pq_input)
     {
-      MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (ML-DSA-65) signature");
-      tvc.m_verifivation_failed = true;
-      return false;
+      // Transparent BQ spend: require EXACTLY ONE ML-DSA-65 signature, it must be the LAST field,
+      // and it must verify against the prefix hash with that field stripped — exactly what
+      // construct_tx_with_tx_key signed before appending it.
+      if (pq_sig_count != 1 || pq_fields.back().type() != typeid(tx_extra_pq_sig))
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " (BQ spend) must carry exactly one ML-DSA-65 signature as the LAST tx_extra field");
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
+      const crypto::pqc::pq_tx_sig &pq_sig = boost::get<tx_extra_pq_sig>(pq_fields.back()).sig;
+
+      // Recover the signed message: the prefix hash with the trailing PQ signature field
+      // removed. audit M-2: avoid deep-copying the whole transaction — truncate tx.extra
+      // in place (tx is non-const here), hash, then restore. The PQ sig is the last field
+      // and wire-identical to its raw [tag|pk|sig] blob, so dropping its trailing bytes is
+      // exactly the pre-append extra.
+      const size_t pq_field_len = 1 + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
+      CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len, false, "PQ sig field shorter than expected");
+      const std::vector<uint8_t> saved_pq_tail(tx.extra.end() - pq_field_len, tx.extra.end());
+      tx.extra.resize(tx.extra.size() - pq_field_len);
+      const crypto::hash pq_prefix_hash = get_transaction_prefix_hash(tx);
+      tx.extra.insert(tx.extra.end(), saved_pq_tail.begin(), saved_pq_tail.end());
+
+      if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash), pq_sig))
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " has an invalid post-quantum (ML-DSA-65) signature");
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
+    }
+    else
+    {
+      // Classic B... tx or B...→BQ output creation: no external account ML-DSA-65 signature is
+      // emitted (PQ spend authority is opt-in). Reject a stray one to avoid tx malleability.
+      if (pq_sig_count != 0)
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " carries an unexpected ML-DSA-65 signature without any post-quantum input");
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
     }
 
     // The ML-KEM-768 ciphertext fields (now bounded above) are intentionally NOT validated
     // here: consensus holds no recipient key and cannot decapsulate. They ARE covered by
-    // the ML-DSA-65 signature (they precede the stripped field) and by the ring/rct
-    // signatures (which commit to the full extra). Recovery is wallet-side, via
+    // the ring/rct signatures (which commit to the full extra), and — for a BQ spend — by the
+    // ML-DSA-65 signature (they precede the stripped field). Recovery is wallet-side, via
     // crypto::pqc::pqc_stealth_decaps on output scan (see wallet2.cpp).
   }
 

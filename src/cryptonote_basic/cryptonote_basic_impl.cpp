@@ -250,10 +250,26 @@ namespace cryptonote {
         // Disambiguate by decoded payload size (subaddress = 64 bytes; BQ = 1249 bytes,
         // see get_account_address_from_str_pq). parse_binary does not reject trailing
         // bytes, so without this guard a BQ blob would silently parse as a subaddress.
+        const size_t pq_payload_size = 1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES;
+        if (data.size() == pq_payload_size)
+        {
+          // BQ... post-quantum address: parse the ML-KEM-768 key into info.address (is_pq()==true)
+          // so a sender can encapsulate to it. The dedicated parser also checks the marker byte.
+          // Short-circuit: the generic two-Ed25519-key parse_binary below only knows the 64-byte
+          // layout and would reject the 1249-byte BQ blob.
+          if (!get_account_address_from_str_pq(info.address, str))
+          {
+            LOG_PRINT_L1("Failed to parse BQ... post-quantum address");
+            return false;
+          }
+          info.is_subaddress = false;
+          info.has_payment_id = false;
+          return true;
+        }
         if (data.size() != 2 * sizeof(crypto::public_key))
         {
           LOG_PRINT_L2("Prefix " << prefix << " with payload size " << data.size()
-            << " is not a classic subaddress (likely a BQ... post-quantum address)");
+            << " is not a classic subaddress nor a BQ... post-quantum address");
           return false;
         }
         info.is_subaddress = true;

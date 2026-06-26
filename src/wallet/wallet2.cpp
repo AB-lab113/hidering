@@ -2266,7 +2266,29 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
   }
   else
   {
-    bool r = cryptonote::generate_key_image_helper_precomp(m_account.get_keys(), output_public_key, tx_scan_info.received->derivation, i, tx_scan_info.received->index, tx_scan_info.in_ephemeral, tx_scan_info.ki, m_account.get_device());
+    // HIDERING Phase 5 (HFv16): for a BQ... output the on-chain one-time key is TWEAKED,
+    // P' = P + t*G (t = derive_bq_output_tweak(ss, i)). generate_key_image_helper_precomp
+    // re-derives the standard (un-tweaked) key P and asserts it equals the output key it is
+    // given — so it must be fed P, not P', or it fails ("given output pubkey doesn't match").
+    // Compute P = P' - t*G here for a BQ output, run the helper on P, then apply_pq_output_tweak
+    // folds t back into the secret so in_ephemeral matches the on-chain P'. For a classic output
+    // (received_via_pq_untweak == false) helper_out_key stays P' and nothing changes — no-op on
+    // the live chain.
+    crypto::public_key helper_out_key = output_public_key;
+    if (tx_scan_info.received_via_pq_untweak)
+    {
+      crypto::secret_key t;
+      if (cryptonote::derive_bq_output_tweak(tx_scan_info.pq_ss, i, t))
+      {
+        crypto::public_key tG;
+        crypto::secret_key_to_public_key(t, tG);
+        rct::key untweaked;
+        rct::subKeys(untweaked, rct::pk2rct(output_public_key), rct::pk2rct(tG));
+        helper_out_key = rct::rct2pk(untweaked);
+      }
+      memwipe(&t, sizeof(t));
+    }
+    bool r = cryptonote::generate_key_image_helper_precomp(m_account.get_keys(), helper_out_key, tx_scan_info.received->derivation, i, tx_scan_info.received->index, tx_scan_info.in_ephemeral, tx_scan_info.ki, m_account.get_device());
     THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
     // HIDERING Phase 5 (HFv16): for a BQ... output the one-time key was tweaked by the
     // sender's ML-KEM-768 KEM; fold the recovered tweak into in_ephemeral so the secret
@@ -2372,7 +2394,21 @@ void wallet2::verify_pq_tx_well_formed(const cryptonote::transaction &tx, const 
     else if (f.type() == typeid(cryptonote::tx_extra_pq_sig)) ++n_sig;
   }
   THROW_WALLET_EXCEPTION_IF(n_ct != n_bq, error::wallet_internal_error, "BQ tx integrity: ML-KEM-768 ciphertext count does not match BQ destination count");
-  THROW_WALLET_EXCEPTION_IF(n_sig != 1, error::wallet_internal_error, "BQ tx integrity: expected exactly one ML-DSA-65 signature");
+  // HIDERING Phase 5 (HFv16, A4): the external account-level ML-DSA-65 signature is emitted ONLY
+  // when the tx SPENDS a transparent BQ (txin_to_key_pq) input — NOT merely when it CREATES a BQ
+  // output. A B...→BQ tx (classic ring inputs paying a BQ output) carries the ML-KEM-768
+  // ciphertext(s) but no ML-DSA-65 signature, matching what the consensus validator now requires.
+  bool has_pq_input = false;
+  for (const auto &in : tx.vin)
+    if (in.type() == typeid(cryptonote::txin_to_key_pq)) { has_pq_input = true; break; }
+  if (has_pq_input)
+  {
+    THROW_WALLET_EXCEPTION_IF(n_sig != 1, error::wallet_internal_error, "BQ spend integrity: expected exactly one ML-DSA-65 signature");
+  }
+  else
+  {
+    THROW_WALLET_EXCEPTION_IF(n_sig != 0, error::wallet_internal_error, "BQ tx integrity: unexpected ML-DSA-65 signature on a tx with no post-quantum input");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_pq_output_shared_secrets(const cryptonote::transaction &tx, std::vector<crypto::pqc::kyber_shared_secret> &ss_list) const
@@ -11383,6 +11419,21 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, c
   THROW_WALLET_EXCEPTION_IF(!subtract_fee_from_outputs.empty() && ptx_vector.size() != 1,
     error::wallet_internal_error, "feature subtractfeefrom not supported for split transactions");
 
+  // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a RCTTypeNull tx whose
+  // output amounts are REVEALED on-chain (no Pedersen commitments / ecdh info). This sanity check
+  // verifies recipient amounts via get_tx_proof/check_tx_proof, which read the RingCT ecdh data and
+  // therefore return 0 for a transparent output — so it cannot apply here. Such a spend's amounts
+  // are public and balance is enforced by the consensus validator (revealed-amount conservation).
+  // Skip the proof-based sanity check for any transaction that spends a txin_to_key_pq input.
+  // No classic B... transaction has such an input, so the live chain is unaffected.
+  for (const pending_tx &ptx : ptx_vector)
+    for (const auto &in : ptx.tx.vin)
+      if (in.type() == typeid(cryptonote::txin_to_key_pq))
+      {
+        MDEBUG("sanity_check: skipping proof-based check for a transparent post-quantum (BQ) spend");
+        return true;
+      }
+
   // For destinations from where the fee is subtracted, the required amount has to be at least
   // target amount - (tx fee / num_subtractable + 1). +1 since fee might not be evenly divisble by
   // the number of subtractble destinations. For non-subtractable destinations, we need at least
@@ -11396,6 +11447,14 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, c
   for (size_t i = 0; i < dsts.size(); ++i)
   {
     const cryptonote::tx_destination_entry& d = dsts[i];
+    // HIDERING Phase 5 (HFv16): a BQ... output's one-time key is tweaked by the ML-KEM-768 KEM
+    // (P' = P + t*G), so the classic tx-proof this sanity check relies on (get_tx_proof /
+    // check_tx_proof, which derive the UN-tweaked key) would compute 0 received and falsely fail.
+    // The BQ recipient verifies receipt via its own ML-KEM scan, and the consensus validator
+    // checks the output; skip BQ destinations from this classic-derivation sanity check. is_pq()
+    // is false for every classic B... destination, so this is a no-op on the live chain.
+    if (d.addr.is_pq())
+      continue;
     const bool dest_is_subtractable = subtract_fee_from_outputs.count(i);
     const uint64_t fee_deduction = dest_is_subtractable ? subtractable_fee_deduction : 0;
     const uint64_t required_amount = d.amount - std::min(fee_deduction, d.amount);

@@ -177,8 +177,14 @@ static bool ver_non_input_consensus_templated(TxForwardIt tx_begin, TxForwardIt 
         if (!Blockchain::check_tx_outputs(tx, tvc, hf_version) || tvc.m_verifivation_failed)
             return false;
 
-        // We only want to check RingCT semantics if this is actually a RingCT transaction
-        if (tx.version >= 2)
+        // We only want to check RingCT semantics if this is actually a RingCT transaction.
+        // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with
+        // NO RingCT signature (rct_signatures.type == RCTTypeNull) — its amounts are revealed and
+        // balanced by the consensus revealed-amount conservation rule, and its inputs are authorised
+        // by per-input ML-DSA-65 signatures. It carries no commitments/range proofs, so it must NOT
+        // be fed to ver_mixed_rct_semantics (which would fail it). Exclude RCTTypeNull v2 txs (only
+        // produced at/after HFv16); every classic RingCT v2 tx is still batch-verified as before.
+        if (tx.version >= 2 && tx.rct_signatures.type != rct::RCTTypeNull)
             rvv.push_back(&tx.rct_signatures);
     }
 

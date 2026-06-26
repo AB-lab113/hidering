@@ -730,17 +730,19 @@ namespace cryptonote
       pq_input_signing_keys.clear();
     }
 
-    // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): attach an external
-    // ML-DSA-65 signature over the tx prefix as the LAST field of tx.extra. Gated on
-    // hf_version, which is 0 on the live chain (get_pq_hf_version()) / at every other
-    // call site, so hf < HF_VERSION_PQ is never touched. The signature covers the prefix
-    // hash as it stands here — i.e. with the ML-KEM-768 ciphertexts already appended but
-    // BEFORE the PQ field itself, and (audit H2) with NO trailing 0x00 padding, which is
-    // omitted above on the PQ path so that this signature can be the canonically-parseable
-    // terminal field. The validator recovers the signed message by stripping the trailing
-    // PQ field; the ring/rct signatures generated below still commit to the full extra
-    // (PQ field included).
-    if (hf_version >= HF_VERSION_PQ)
+    // HIDERING Phase 5 (HFv16, A4): attach an external account-level ML-DSA-65 signature over
+    // the tx prefix as the LAST field of tx.extra — but ONLY for a transparent BQ spend (a tx
+    // that spends is_pq sources). Post-quantum spend authority is OPT-IN: it is the BQ address
+    // owner who carries an ML-DSA-65 key. A classic B... transaction (ring inputs) — including
+    // one that merely CREATES a BQ output (B...→BQ) — is authorised entirely by its Ed25519
+    // ring/CLSAG signature and must NOT require the sender to hold an ML-DSA-65 key. This keeps
+    // B... usable at HFv16 with no PQ key (VERROU 1). The signature covers the prefix hash with
+    // the ML-KEM-768 ciphertexts already appended but BEFORE the PQ field itself, and (audit H2)
+    // with NO trailing 0x00 padding (omitted on the PQ path). The validator recovers the signed
+    // message by stripping the trailing PQ field; the ring/rct signatures below still commit to
+    // the full extra (PQ field included). Gated on hf_version (0 on the live chain) AND on the
+    // presence of a transparent PQ input, so it is doubly inert pre-fork and for classic txs.
+    if (hf_version >= HF_VERSION_PQ && pq_transparent_tx)
     {
       crypto::hash pq_prefix_hash;
       get_transaction_prefix_hash(tx, pq_prefix_hash);
@@ -749,12 +751,11 @@ namespace cryptonote
       // signature real authority — one that still holds when the Ed25519 ring signature is
       // quantum-broken (the whole point of Phase 5). The ring/rct signatures generated
       // below commit to the full extra (this PQ field included), so the ML-DSA public
-      // key cannot be stripped/replaced without invalidating the spend. Full PQ-era
-      // sender-identity binding (a BQ-address PQ-key registry the validator can check) is
-      // deferred to the finalised Phase 5 spec — a self-contained per-tx signature on a
-      // privacy chain cannot be tied to a hidden spender by the validator alone.
+      // key cannot be stripped/replaced without invalidating the spend. A BQ wallet always
+      // holds pq_dilithium (generate_pq_keys), so this assert only fires on a misconstructed
+      // BQ spend, never on a classic B... transaction.
       CHECK_AND_ASSERT_MES(sender_account_keys.pq_dilithium, false,
-          "HFv16 transaction requires the sender's persistent ML-DSA-65 key (account has no pq_dilithium)");
+          "Transparent BQ spend requires the sender's persistent ML-DSA-65 key (account has no pq_dilithium)");
       crypto::pqc::pq_tx_sig pq_sig;
       if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
                                     sender_account_keys.pq_dilithium->dilithium_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
