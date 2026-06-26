@@ -34,8 +34,13 @@
 
 #include "common/util.h"
 #include "cryptonote_basic/cryptonote_basic.h"
+#include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
+#include "cryptonote_core/blockchain.h"
+#include "cryptonote_basic/verification_context.h"
+#include "cryptonote_config.h"
+#include "crypto/pqc.h"
 
 namespace
 {
@@ -144,8 +149,27 @@ TEST(parse_tx_extra, handles_pub_key_and_padding)
 // parse layer: padding-then-pq_sig must NOT parse; pq_sig-as-terminal must parse cleanly.
 namespace
 {
-  // tx_extra_pq_sig is a BLOB_SERIALIZER: on the wire it is [0x06][pk(1952)||sig(3309)] = 5262 bytes.
-  const size_t PQ_SIG_BODY = 1952 + 3309; // crypto::pqc::ML_DSA_65_{PUBLIC_KEY,SIGNATURE}_BYTES
+  // tx_extra_pq_sig is a BLOB_SERIALIZER: on the wire it is [0x06][pk||sig].
+  // HIDERING Phase 5 (C2): reference the canonical ML-DSA-65 (FIPS 204) sizes from crypto::pqc
+  // rather than literals, so a future liboqs/size change can never silently desync this test.
+  const size_t PQ_SIG_BODY = crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
+}
+
+// HIDERING Phase 5 (C2): pin the FIPS-final ML-DSA-65 / ML-KEM-768 sizes. The Step-9 migration
+// (liboqs 0.10.1→0.15.0) moved ML-DSA-65 sk 4000→4032 and sig 3293→3309; these are the values the
+// tx_extra PQ fields, the wallet BQ blobs and the validator all assume. If liboqs ever changes a
+// size, this test fails loudly instead of letting a wire/format mismatch slip through.
+TEST(pqc_sizes, ml_dsa_65_and_ml_kem_768_are_fips_final)
+{
+  EXPECT_EQ(1952u, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+  EXPECT_EQ(4032u, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES);   // FIPS 204 (was 4000 in the draft)
+  EXPECT_EQ(3309u, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);    // FIPS 204 (was 3293 in the draft)
+  EXPECT_EQ(1184u, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+  EXPECT_EQ(2400u, crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES);
+  EXPECT_EQ(1088u, crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES);
+  EXPECT_EQ(32u,   crypto::pqc::ML_KEM_768_SHARED_SECRET_BYTES);
+  // on-wire tx_extra_pq_sig body = pk||sig
+  EXPECT_EQ(5261u, PQ_SIG_BODY);
 }
 
 TEST(parse_tx_extra, rejects_padding_before_pq_sig)
@@ -177,6 +201,121 @@ TEST(parse_tx_extra, accepts_pq_sig_as_terminal_field)
   ASSERT_EQ(2, tx_extra_fields.size());
   ASSERT_EQ(typeid(cryptonote::tx_extra_pub_key), tx_extra_fields[0].type());
   ASSERT_EQ(typeid(cryptonote::tx_extra_pq_sig), tx_extra_fields.back().type());
+}
+
+// HIDERING Phase 5 (C3, negative consensus — double-spend basis). A transparent BQ input
+// (txin_to_key_pq) carries no Ed25519 key image; its double-spend marker is the SYNTHETIC key
+// image get_pq_input_key_image(real_output_key) = Keccak("HRG_PQ_KI_v1" || P'). For the consensus
+// double-spend check to work, this map must be DETERMINISTIC (same output → same KI, so a second
+// spend collides and is rejected) and COLLISION-FREE across distinct outputs (different output →
+// different KI, so unrelated outputs are not falsely flagged).
+TEST(pq_consensus, synthetic_key_image_is_deterministic_and_distinct)
+{
+  crypto::public_key p1, p2;
+  for (size_t i = 0; i < sizeof(p1); ++i) { ((uint8_t*)&p1)[i] = (uint8_t)(0x10 + i); ((uint8_t*)&p2)[i] = (uint8_t)(0x90 + i); }
+
+  const crypto::key_image ki1a = cryptonote::get_pq_input_key_image(p1);
+  const crypto::key_image ki1b = cryptonote::get_pq_input_key_image(p1);
+  const crypto::key_image ki2  = cryptonote::get_pq_input_key_image(p2);
+
+  // same output → same synthetic key image (a re-spend of the same BQ output collides → rejected)
+  ASSERT_EQ(0, memcmp(&ki1a, &ki1b, sizeof(crypto::key_image)));
+  // distinct outputs → distinct key images (independent BQ outputs never falsely double-spend)
+  ASSERT_NE(0, memcmp(&ki1a, &ki2, sizeof(crypto::key_image)));
+}
+
+// HIDERING Phase 5 (C3, negative consensus — invalid ML-DSA-65 signature). The validator's check
+// (d) verifies the per-input ML-DSA-65 signature over the tx prefix hash; a flipped byte must fail.
+TEST(pq_consensus, invalid_ml_dsa_signature_is_rejected)
+{
+  crypto::pqc::pq_public_key pk; crypto::pqc::pq_secret_key sk;
+  ASSERT_TRUE(crypto::pqc::pqc_keygen(pk, sk));
+  crypto::hash msg; for (size_t i = 0; i < sizeof(msg); ++i) ((uint8_t*)&msg)[i] = (uint8_t)(i * 5 + 3);
+  crypto::pqc::pq_tx_sig sig;
+  memcpy(sig.pk, pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+  ASSERT_TRUE(crypto::pqc::pqc_tx_sign((const uint8_t*)&msg, sizeof(msg),
+      sk.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
+      pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES, sig));
+  ASSERT_TRUE(crypto::pqc::pqc_tx_verify((const uint8_t*)&msg, sizeof(msg), sig));   // honest verifies
+  crypto::pqc::pq_tx_sig bad = sig; bad.sig[0] ^= 0xFF;
+  ASSERT_FALSE(crypto::pqc::pqc_tx_verify((const uint8_t*)&msg, sizeof(msg), bad));  // tampered rejected
+  crypto::pqc::pq_tx_sig wrongkey = sig; wrongkey.pk[0] ^= 0xFF;                     // key/sig mismatch
+  ASSERT_FALSE(crypto::pqc::pqc_tx_verify((const uint8_t*)&msg, sizeof(msg), wrongkey));
+}
+
+// HIDERING Phase 5 (C3, negative consensus — malformed ML-KEM-768 ciphertext at parse). A
+// tx_extra_kyber_ct is a fixed-size 1088-byte blob; a truncated one must fail the canonical TLV
+// parser (the validator parses tx_extra canonically — audit E-3 — and rejects malformed extra).
+TEST(pq_consensus, malformed_kyber_ct_fails_parse)
+{
+  // well-formed: [pubkey][kyber_ct 0x07 + 1088 bytes] parses
+  {
+    std::vector<uint8_t> extra;
+    extra.push_back(TX_EXTRA_TAG_PUBKEY);
+    extra.insert(extra.end(), 32, 0x11);
+    extra.push_back(0x07); // TX_EXTRA_TAG_KYBER_CT
+    extra.insert(extra.end(), crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES, 0x00);
+    std::vector<cryptonote::tx_extra_field> fields;
+    ASSERT_TRUE(cryptonote::parse_tx_extra(extra, fields));
+    bool has_ct = false; for (const auto &f : fields) if (f.type() == typeid(cryptonote::tx_extra_kyber_ct)) has_ct = true;
+    ASSERT_TRUE(has_ct);
+  }
+  // malformed: kyber_ct truncated (body shorter than 1088) → canonical parse fails
+  {
+    std::vector<uint8_t> extra;
+    extra.push_back(TX_EXTRA_TAG_PUBKEY);
+    extra.insert(extra.end(), 32, 0x11);
+    extra.push_back(0x07);
+    extra.insert(extra.end(), crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES - 50, 0x00); // truncated
+    std::vector<cryptonote::tx_extra_field> fields;
+    ASSERT_FALSE(cryptonote::parse_tx_extra(extra, fields));
+  }
+}
+
+// HIDERING Phase 5 (C4, hf transition invariants). The PQ hard fork activates at exactly
+// HF_VERSION_PQ (16) / HF_HEIGHT_PQ (2,000,000). Every BQ/PQ code path is gated on
+// hf_version >= HF_VERSION_PQ, so these constants ARE the hf15→hf16 transition point: below 16 all
+// PQ structures are rejected/inert, at/after 16 they are validated. Pin them so the activation
+// height/version can't drift silently.
+TEST(pq_consensus, hf_transition_parameters)
+{
+  EXPECT_EQ(16, (int)HF_VERSION_PQ);
+  EXPECT_EQ(2000000ull, (unsigned long long)HF_HEIGHT_PQ);
+  // the live chain runs hf 15 (< HF_VERSION_PQ): PQ is inert there by construction.
+  EXPECT_LT(15, (int)HF_VERSION_PQ);
+}
+
+// HIDERING Phase 5 (C4, hf15->hf16 transition at the consensus output rules). A transparent BQ
+// spend is a version-2 RCTTypeNull tx that REVEALS its output amounts and carries a txin_to_key_pq.
+// Blockchain::check_tx_outputs (static, pure on tx+hf_version) is exactly the gate that flips at the
+// fork: BEFORE HFv16 such a tx is rejected (a v2 tx must have 0-amount outputs / only modern rct
+// types), and AT/AFTER HFv16 it is accepted (early-accept for txin_to_key_pq). This pins the
+// transition boundary deterministically without needing a chain. (On regtest the daemon activates
+// v16 at height 1, so the live hf16 acceptance is covered by the functional e2e; this test covers
+// the pre-fork REJECTION that a regtest cannot produce, since it has no hf15 blocks.)
+TEST(pq_consensus, transparent_pq_tx_outputs_gated_at_hf16)
+{
+  cryptonote::transaction tx{};
+  tx.version = 2;
+  tx.rct_signatures.type = rct::RCTTypeNull;          // transparent: no RingCT commitments
+  cryptonote::txin_to_key_pq in{};
+  in.amount = 100;                                    // revealed input amount
+  in.spent_output_index = 0;
+  tx.vin.push_back(in);                               // marks the tx as a transparent BQ spend
+  cryptonote::tx_out o{};
+  o.amount = 100;                                     // REVEALED output amount (non-zero)
+  o.target = cryptonote::txout_to_tagged_key{};       // hf16-era output type (view-tagged)
+  tx.vout.push_back(o);
+
+  // before the fork (hf 15): a v2 tx with non-zero output amounts is invalid -> rejected
+  cryptonote::tx_verification_context tvc_pre{};
+  EXPECT_FALSE(cryptonote::Blockchain::check_tx_outputs(tx, tvc_pre, HF_VERSION_PQ - 1));
+  EXPECT_TRUE(tvc_pre.m_invalid_output);
+
+  // at the fork (hf 16): the txin_to_key_pq early-accept allows the revealed-amount outputs
+  cryptonote::tx_verification_context tvc_post{};
+  EXPECT_TRUE(cryptonote::Blockchain::check_tx_outputs(tx, tvc_post, HF_VERSION_PQ));
+  EXPECT_FALSE(tvc_post.m_invalid_output);
 }
 
 TEST(parse_and_validate_tx_extra, is_valid_tx_extra_parsed)

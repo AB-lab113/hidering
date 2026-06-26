@@ -2963,6 +2963,33 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   // check all outputs for spending (compare key images)
   for(auto& in: tx.vin)
   {
+    // HIDERING Phase 5 (HFv16): a transparent BQ spend (txin_to_key_pq) carries no Ed25519 key
+    // image — instead it reveals real_output_key, the on-chain key of the output it spends. If that
+    // output is ours (m_pub_keys is keyed by the on-chain output key), mark the corresponding
+    // transfer spent so wallet balance/inputs stay consistent after spending a BQ output. Only
+    // present at/after HFv16; classic wallets never see this input type.
+    if (in.type() == typeid(cryptonote::txin_to_key_pq))
+    {
+      const cryptonote::txin_to_key_pq &in_pq = boost::get<cryptonote::txin_to_key_pq>(in);
+      auto pit = m_pub_keys.find(in_pq.real_output_key);
+      if (pit != m_pub_keys.end())
+      {
+        THROW_WALLET_EXCEPTION_IF(pit->second >= m_transfers.size(), error::wallet_internal_error,
+            "BQ spend: pub-key transfer index out of range");
+        transfer_details& td = m_transfers[pit->second];
+        const uint64_t amount = in_pq.amount > 0 ? in_pq.amount : td.amount();
+        tx_money_spent_in_ins += amount;
+        if (subaddr_account && *subaddr_account != td.m_subaddr_index.major)
+          LOG_ERROR("spent funds are from different subaddress accounts; count of incoming/outgoing payments will be incorrect");
+        subaddr_account = td.m_subaddr_index.major;
+        subaddr_indices.insert(td.m_subaddr_index.minor);
+        LOG_PRINT_L0("Spent money (BQ): " << print_money(amount) << ", with tx: " << txid);
+        set_spent(pit->second, height);
+        if (!pool && !ignore_callbacks && 0 != m_callback)
+          m_callback->on_money_spent(height, txid, tx, amount, tx, td.m_subaddr_index);
+      }
+      continue;
+    }
     if(in.type() != typeid(cryptonote::txin_to_key))
       continue;
     const cryptonote::txin_to_key &in_to_key = boost::get<cryptonote::txin_to_key>(in);
