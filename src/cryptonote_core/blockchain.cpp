@@ -3370,9 +3370,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     if (any_pq)
     {
       // The per-input ML-DSA-65 signatures sign the tx prefix hash computed with ALL
-      // txin_to_key_pq.dsa.sig fields zeroed (a signature cannot cover itself). Zero them in
-      // place (tx is non-const), hash, restore — same technique as the extra-sig stripping
-      // above. The dsa public keys are retained, so the signed message commits to them.
+      // txin_to_key_pq.dsa.sig fields zeroed (a signature cannot cover itself) AND with the
+      // trailing external ML-DSA-65 signature field dropped from tx.extra — exactly what
+      // construct_tx signed: it produces the per-input signatures BEFORE appending the external
+      // pq_sig. So we (1) zero each dsa.sig in place, (2) temporarily truncate the trailing pq_sig
+      // field off tx.extra (the same fixed-size [tag|pk|sig] blob the external check strips), hash,
+      // then restore both. tx is non-const here. The dsa public keys are retained, so the signed
+      // message commits to them.
       std::vector<std::pair<size_t, std::vector<uint8_t>>> saved_sigs;
       for (size_t n = 0; n < tx.vin.size(); ++n)
       {
@@ -3381,7 +3385,12 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         saved_sigs.emplace_back(n, std::vector<uint8_t>(in.dsa.sig, in.dsa.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
         memset(in.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
       }
+      const size_t pq_field_len2 = 1 + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
+      CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len2, false, "PQ sig field shorter than expected (input pass)");
+      const std::vector<uint8_t> saved_pq_tail2(tx.extra.end() - pq_field_len2, tx.extra.end());
+      tx.extra.resize(tx.extra.size() - pq_field_len2);
       const crypto::hash pq_in_hash = get_transaction_prefix_hash(tx);
+      tx.extra.insert(tx.extra.end(), saved_pq_tail2.begin(), saved_pq_tail2.end());
       for (const auto& sv : saved_sigs)
         memcpy(boost::get<txin_to_key_pq>(tx.vin[sv.first]).dsa.sig, sv.second.data(), sv.second.size());
 
@@ -3461,6 +3470,57 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           tvc.m_verifivation_failed = true;
           return false;
         }
+      }
+
+      // (e) HIDERING Phase 5 (HFv16, A3) — money conservation for the transparent BQ spend.
+      // A txin_to_key_pq reveals its amount and has no Pedersen commitment, so its value CANNOT be
+      // balanced by RingCT. A3 therefore requires such a transaction to be FULLY transparent:
+      //   * every input is a txin_to_key_pq (no ring input mixed in — that hybrid is A4),
+      //   * it is a version-2 tx with NO RingCT signature (RCTTypeNull), and
+      //   * its revealed amounts conserve value: sum(PQ input amounts) >= sum(output amounts),
+      //     the difference being the fee (collected by the miner; see get_tx_fee).
+      // Without this rule an attacker could pair revealed PQ inputs with hidden RingCT outputs to
+      // mint coins. All gated on HFv16 → the live chain never reaches this code.
+      uint64_t pq_in_sum = 0;
+      for (const auto& txin : tx.vin)
+      {
+        if (txin.type() != typeid(txin_to_key_pq))
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " mixes a non-PQ input with transparent PQ inputs (unsupported until A4)");
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        const uint64_t a = boost::get<txin_to_key_pq>(txin).amount;
+        if (pq_in_sum > std::numeric_limits<uint64_t>::max() - a)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input amount overflow");
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        pq_in_sum += a;
+      }
+      if (tx.version != 2 || tx.rct_signatures.type != rct::RCTTypeNull)
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " transparent PQ spend must be a version-2 RCTTypeNull transaction");
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
+      uint64_t pq_out_sum = 0;
+      for (const auto& o : tx.vout)
+      {
+        if (pq_out_sum > std::numeric_limits<uint64_t>::max() - o.amount)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " output amount overflow");
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        pq_out_sum += o.amount;
+      }
+      if (pq_in_sum < pq_out_sum)
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " transparent PQ spend creates money: inputs " << pq_in_sum << " < outputs " << pq_out_sum);
+        tvc.m_verifivation_failed = true;
+        return false;
       }
     }
   }
@@ -3735,6 +3795,20 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     switch (rv.type)
     {
     case rct::RCTTypeNull: {
+      // HIDERING Phase 5 (HFv16, A3): a transparent post-quantum (BQ...) spend carries no RingCT
+      // signature (RCTTypeNull) — it is authorised by per-input ML-DSA-65 signatures and balanced
+      // by the revealed-amount conservation rule above (check e). Accept RCTTypeNull for such a tx;
+      // otherwise it remains coinbase-only. The PQ pass above already enforced the all-transparent
+      // structure (every input txin_to_key_pq, no money creation), so reaching here with PQ inputs
+      // means the tx is fully validated.
+      bool pq_null_ok = false;
+      if (hf_version >= HF_VERSION_PQ)
+      {
+        for (const auto& txin : tx.vin)
+          if (txin.type() == typeid(txin_to_key_pq)) { pq_null_ok = true; break; }
+      }
+      if (pq_null_ok)
+        break;
       // we only accept no signatures for coinbase txes
       MERROR_VER("Null rct signature on non-coinbase tx");
       return false;

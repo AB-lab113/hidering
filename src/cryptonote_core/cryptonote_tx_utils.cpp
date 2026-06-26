@@ -281,32 +281,31 @@ namespace cryptonote
       return false;
     }
 
-    // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): SPEND side of BQ outputs.
+    // HIDERING Phase 5 (HFv16, Option-2-transparent / A3): SPEND side of BQ outputs.
     //
-    // A source flagged is_pq must be spent as a TRANSPARENT txin_to_key_pq (no ring), with a
-    // per-output ML-DSA-65 signature whose public key matches the on-chain binding tag. The
-    // structures, validator (blockchain.cpp check_tx_inputs checks a/b/c/d) and the per-output
-    // key derivation (crypto::pqc::pqc_keygen_output_dsa) all exist, BUT splicing transparent
-    // inputs into this RingCT construction is NOT yet done: in_contexts[] / inSk / mixRing are
-    // built one-to-one with `sources` assuming every source is a ring input, and money
-    // conservation here is enforced by RingCT commitments — a transparent input needs the new
-    // rule (sum of revealed PQ-input amounts == committed outputs + fee) plus a per-input
-    // signing pass over the (external-sig-stripped, input-sig-zeroed) prefix hash. That is the
-    // wallet2-driven A3 work. Until then, refuse to build a BQ-spend rather than emit a
-    // malformed transaction. Gated on hf_version, and no current caller sets is_pq, so the
-    // live B... chain is wholly unaffected.
-    if (hf_version >= HF_VERSION_PQ)
+    // A source flagged is_pq is spent as a TRANSPARENT txin_to_key_pq (no ring), with a per-output
+    // ML-DSA-65 signature whose public key matches the on-chain binding tag. Because a transparent
+    // input reveals its amount and carries no Pedersen commitment, such a transaction CANNOT use
+    // RingCT money hiding: it is built as a fully transparent version-2 tx (RCTTypeNull, revealed
+    // input AND output amounts) whose balance is plain arithmetic (sum(pq inputs) == sum(outputs) +
+    // fee), enforced by construct_tx here and by the consensus validator (blockchain.cpp). This is
+    // the documented "Option-2-transparent" trade-off: opting into real quantum resistance reveals
+    // amounts for these spends. Everything is gated on hf_version, and no current caller sets is_pq,
+    // so the live B... chain is wholly unaffected.
+    //
+    // A3 SCOPE: only an ALL-PQ-input transaction is supported (a BQ wallet spends BQ outputs).
+    // Mixing transparent PQ inputs with ring (B...) inputs in one tx would need a hybrid balance
+    // (transparent inputs as zero-mask pseudo-commitments inside RingCT) and is deferred to A4.
+    size_t num_pq_sources = 0;
+    for (const tx_source_entry& s : sources)
+      if (s.is_pq) ++num_pq_sources;
+    const bool pq_transparent_tx = (hf_version >= HF_VERSION_PQ) && num_pq_sources > 0;
+    if (pq_transparent_tx && num_pq_sources != sources.size())
     {
-      for (const tx_source_entry& s : sources)
-      {
-        if (s.is_pq)
-        {
-          LOG_ERROR("Transparent post-quantum (BQ...) spend is not yet wired into the RingCT "
-                    "money path (HIDERING A3). Structures + validator are in place; refusing to "
-                    "construct a malformed transaction.");
-          return false;
-        }
-      }
+      LOG_ERROR("HIDERING A3: mixing transparent post-quantum (BQ...) inputs with classic ring "
+                "inputs in one transaction is not supported yet (deferred to A4). Spend BQ outputs "
+                "on their own.");
+      return false;
     }
 
     std::vector<rct::key> amount_keys;
@@ -402,6 +401,10 @@ namespace cryptonote
     std::vector<input_generation_context_data> in_contexts;
 
     uint64_t summary_inputs_money = 0;
+    // HIDERING Phase 5 (HFv16, A3): per-output ML-DSA-65 signing keys for transparent PQ inputs,
+    // paired with the vin index they belong to. Filled while building the inputs, consumed by the
+    // post-prefix-hash signing pass (a signature cannot cover itself, so sigs are zero until then).
+    std::vector<std::pair<size_t, crypto::pqc::pq_secret_key>> pq_input_signing_keys;
     //fill inputs
     int idx = -1;
     for(const tx_source_entry& src_entr:  sources)
@@ -417,6 +420,38 @@ namespace cryptonote
       //key_derivation recv_derivation;
       in_contexts.push_back(input_generation_context_data());
       keypair& in_ephemeral = in_contexts.back().in_ephemeral;
+
+      // HIDERING Phase 5 (HFv16, A3): a transparent post-quantum source becomes a txin_to_key_pq.
+      // It carries no Ed25519 key image (double-spend is tracked by a synthetic key image derived
+      // from real_output_key, validator-side) and is authorised by a per-output ML-DSA-65 signature
+      // produced after the prefix hash is known (below). Skip the ring key-image derivation — the
+      // BQ output key is tweaked, so generate_key_image_helper would derive the un-tweaked key and
+      // fail the consistency check. The per-output ML-DSA key is re-derived here from (pq_ss,
+      // real_output_in_tx_index), matching what the sender bound at output creation.
+      if (src_entr.is_pq)
+      {
+        CHECK_AND_ASSERT_MES((bool)src_entr.pq_ss, false, "is_pq source carries no ML-KEM-768 shared secret (pq_ss)");
+        const crypto::public_key real_out_key = rct::rct2pk(src_entr.outputs[src_entr.real_output].second.dest);
+        crypto::pqc::pq_public_key out_dsa_pk;
+        crypto::pqc::pq_secret_key out_dsa_sk;
+        if (!crypto::pqc::pqc_keygen_output_dsa(*src_entr.pq_ss, src_entr.real_output_in_tx_index, out_dsa_pk, out_dsa_sk))
+        {
+          LOG_ERROR("Failed to re-derive per-output ML-DSA-65 key for BQ spend");
+          return false;
+        }
+        txin_to_key_pq in_pq;
+        in_pq.amount = src_entr.amount;
+        in_pq.spent_output_index = src_entr.outputs[src_entr.real_output].first; // global output index
+        in_pq.real_output_key = real_out_key;
+        memcpy(in_pq.dsa.pk, out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+        memset(in_pq.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES); // signed below, once prefix hash is known
+        // stash the signing key for the post-prefix-hash signing pass, keyed by vin position
+        pq_input_signing_keys.emplace_back(tx.vin.size(), out_dsa_sk);
+        memwipe(&out_dsa_sk, sizeof(out_dsa_sk));
+        tx.vin.push_back(in_pq);
+        continue;
+      }
+
       crypto::key_image img;
       const auto& out_key = reinterpret_cast<const crypto::public_key&>(src_entr.outputs[src_entr.real_output].second.dest);
       if(!generate_key_image_helper(sender_account_keys, subaddresses, out_key, src_entr.real_out_tx_key, src_entr.real_out_additional_tx_keys, src_entr.real_output_in_tx_index, in_ephemeral,img, hwdev))
@@ -454,7 +489,12 @@ namespace cryptonote
       std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
     }
 
-    // sort ins by their key image
+    // sort ins by their key image. HIDERING Phase 5 (HFv16, A3): the transparent PQ path has no
+    // key images (txin_to_key_pq) and casting to txin_to_key would throw; it keeps source order
+    // (a single-input BQ spend is the common case, and order is not consensus-critical for the
+    // synthetic-key-image double-spend check). Only the classic ring path is sorted.
+    if (!pq_transparent_tx)
+    {
     std::vector<size_t> ins_order(sources.size());
     for (size_t n = 0; n < sources.size(); ++n)
       ins_order[n] = n;
@@ -468,6 +508,7 @@ namespace cryptonote
       std::swap(in_contexts[i0], in_contexts[i1]);
       std::swap(sources[i0], sources[i1]);
     });
+    }
 
     // figure out if we need to make additional tx pubkeys
     size_t num_stdaddresses = 0;
@@ -658,6 +699,37 @@ namespace cryptonote
       }
     }
 
+    // HIDERING Phase 5 (HFv16, A3): sign every transparent post-quantum input. A txin_to_key_pq is
+    // authorised by an ML-DSA-65 signature over the tx prefix hash computed with ALL dsa.sig fields
+    // zeroed (a signature cannot cover itself) and BEFORE the external ML-DSA-65 tx signature is
+    // appended to tx.extra — exactly the message the validator reconstructs (blockchain.cpp: zero
+    // all dsa.sig AND drop the trailing pq_sig field, then hash). This runs before the external
+    // pq_sig block below, so when that block hashes the prefix the inputs already carry their final
+    // signatures. pq_input_signing_keys is empty unless this is a BQ spend → no-op on the live chain.
+    if (pq_transparent_tx)
+    {
+      crypto::hash pq_in_prefix_hash;
+      get_transaction_prefix_hash(tx, pq_in_prefix_hash); // dsa.sig all zero, extra has no pq_sig yet
+      for (auto& vk : pq_input_signing_keys)
+      {
+        crypto::pqc::pq_tx_sig in_sig;
+        // out_dsa public key for this input is already stored in the vin; sign with the matching sk.
+        txin_to_key_pq& in = boost::get<txin_to_key_pq>(tx.vin[vk.first]);
+        if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_in_prefix_hash), sizeof(pq_in_prefix_hash),
+                                      vk.second.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
+                                      in.dsa.pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                      in_sig))
+        {
+          LOG_ERROR("Failed to sign transparent post-quantum (BQ...) input");
+          memwipe(&vk.second, sizeof(vk.second));
+          return false;
+        }
+        memcpy(in.dsa.sig, in_sig.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
+        memwipe(&vk.second, sizeof(vk.second));
+      }
+      pq_input_signing_keys.clear();
+    }
+
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): attach an external
     // ML-DSA-65 signature over the tx prefix as the LAST field of tx.extra. Gated on
     // hf_version, which is 0 on the live chain (get_pq_hf_version()) / at every other
@@ -756,6 +828,17 @@ namespace cryptonote
       }
 
       MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str());
+    }
+    else if (pq_transparent_tx)
+    {
+      // HIDERING Phase 5 (HFv16, A3): a transparent BQ spend has no RingCT signature. Inputs are
+      // authorised by their per-input ML-DSA-65 signatures (signed above) and the external account
+      // ML-DSA-65 signature; balance is plain arithmetic on revealed amounts (checked above:
+      // summary_outs_money <= summary_inputs_money, the difference being the fee) and re-checked by
+      // the consensus validator. Output amounts stay REVEALED (not zeroed) so anyone can verify the
+      // balance. tx.version is 2 (so it shares the post-RingCT tx machinery) with an empty/null rct.
+      tx.rct_signatures = rct::rctSig{};
+      tx.rct_signatures.type = rct::RCTTypeNull;
     }
     else
     {

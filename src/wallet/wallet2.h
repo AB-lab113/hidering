@@ -331,8 +331,13 @@ private:
       // Stays false for classic outputs, so they are never tweaked even if the tx carries a
       // ML-KEM ciphertext.
       bool received_via_pq_untweak;
+      // HIDERING Phase 5 (HFv16, fix H-5): the per-OUTPUT ML-KEM-768 shared secret that
+      // actually matched this output (a tx may carry several ciphertexts, one per BQ output).
+      // Set together with received_via_pq_untweak so apply_pq_output_tweak folds in the SAME
+      // secret that matched, not blindly ct[0]. Meaningless when received_via_pq_untweak is false.
+      crypto::pqc::kyber_shared_secret pq_ss;
 
-      tx_scan_info_t(): amount(0), money_transfered(0), error(true), received_via_pq_untweak(false) {}
+      tx_scan_info_t(): amount(0), money_transfered(0), error(true), received_via_pq_untweak(false), pq_ss{} {}
     };
 
     struct transfer_details
@@ -1861,22 +1866,32 @@ private:
     bool generate_chacha_key_from_secret_keys(crypto::chacha_key &key) const;
     void generate_chacha_key_from_password(const epee::wipeable_string &pass, crypto::chacha_key &key) const;
     crypto::hash get_payment_id(const pending_tx &ptx) const;
-    // HIDERING Phase 5 (HFv16): `pq_ss`, when non-null, is the ML-KEM-768 shared secret
-    // recovered for this tx (see get_pq_output_shared_secret). If the classic match fails,
-    // the candidate key P_onchain - t_i*G is retried (t_i = derive_bq_output_tweak(ss, i),
-    // per-output index-bound — audit E-4) so BQ... outputs are detected; on such a match
-    // tx_scan_info.received_via_pq_untweak is set so the spend secret is tweaked later
-    // (audit E-2). nullptr for every classic wallet → unchanged on the live chain.
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
-    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const crypto::pqc::kyber_shared_secret *pq_ss = nullptr) const;
-    // HIDERING Phase 5 (HFv16): if this wallet owns a ML-KEM-768 decaps key and `tx` carries
-    // a ML-KEM-768 ciphertext, recover the shared secret ss and return true. NB (audit E-1):
-    // ML-KEM uses implicit rejection, so decaps "succeeds" for ANY well-formed ciphertext —
-    // a true success only means "well-formed", NOT "ours". The authoritative ownership test
-    // is the per-output is_out_to_acc_precomp match on P_onchain - t_i*G, not this return.
-    // Returns false (no output) for every classic wallet (pq_keys none).
-    bool get_pq_output_shared_secret(const cryptonote::transaction &tx, crypto::pqc::kyber_shared_secret &ss) const;
+    // HIDERING Phase 5 (HFv16, fix H-5): `pq_ss_list`, when non-null, is the LIST of ML-KEM-768
+    // shared secrets recovered for this tx — one per ML-KEM-768 ciphertext it carries (a tx may
+    // pay several BQ... outputs, each with its own ciphertext). If the classic match fails, each
+    // candidate key P_onchain - t_i*G is retried for EVERY secret in the list (t_i =
+    // derive_bq_output_tweak(ss, i), per-output index-bound — audit E-4) so every BQ... output is
+    // detected with the secret that actually encapsulated to it; on a match
+    // tx_scan_info.received_via_pq_untweak is set and the matching secret stored in
+    // tx_scan_info.pq_ss so the spend secret is tweaked with the SAME secret later (audit E-2).
+    // nullptr for every classic wallet → unchanged on the live chain.
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
+    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
+    // HIDERING Phase 5 (HFv16, fix H-5): if this wallet owns a ML-KEM-768 decaps key, decapsulate
+    // EVERY ML-KEM-768 ciphertext carried in `tx` into `ss_list` (one shared secret per ciphertext,
+    // in tx_extra order) and return true if any were found. NB (audit E-1): ML-KEM uses implicit
+    // rejection, so decaps "succeeds" for ANY well-formed ciphertext — success only means
+    // "well-formed", NOT "ours". The authoritative ownership test is the per-output
+    // is_out_to_acc_precomp match on P_onchain - t_i*G, not this return. Returns false (empties
+    // the list) for every classic wallet (pq_keys none).
+    bool get_pq_output_shared_secrets(const cryptonote::transaction &tx, std::vector<crypto::pqc::kyber_shared_secret> &ss_list) const;
+    // HIDERING Phase 5 (HFv16, A3): recover the ML-KEM-768 shared secret that encapsulated to the
+    // BQ... output held in `td` (re-decapsulating that output's ciphertext and confirming the
+    // un-tweak match), so the spend path can re-derive the per-output ML-DSA-65 key. Returns false
+    // (leaving `ss` untouched) for a classic output or a wallet without pq_keys → is_pq stays
+    // false and the source is spent as a normal ring input. Used by transfer_selected_rct.
+    bool recover_pq_spend_secret(const transfer_details &td, crypto::pqc::kyber_shared_secret &ss) const;
     void parse_block_round(const cryptonote::blobdata &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const;
     uint64_t get_upper_transaction_weight_limit();
     std::vector<uint64_t> get_unspent_amounts_vector(bool strict);

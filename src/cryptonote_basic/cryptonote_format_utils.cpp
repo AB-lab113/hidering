@@ -513,6 +513,27 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool get_tx_fee(const transaction& tx, uint64_t & fee)
   {
+    // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with
+    // NO RingCT signature (RCTTypeNull) — its input AND output amounts are revealed, so the fee is
+    // plain arithmetic, not rct_signatures.txnFee (which is 0 for such txs). Detect it by the
+    // presence of a txin_to_key_pq input. Only ever produced at/after HFv16; classic txs unaffected.
+    bool has_pq_in = false;
+    for (const auto& in: tx.vin)
+      if (in.type() == typeid(txin_to_key_pq)) { has_pq_in = true; break; }
+    if (has_pq_in)
+    {
+      uint64_t amount_in = 0, amount_out = 0;
+      for (const auto& in: tx.vin)
+      {
+        if (in.type() == typeid(txin_to_key_pq)) amount_in += boost::get<txin_to_key_pq>(in).amount;
+        else if (in.type() == typeid(txin_to_key)) amount_in += boost::get<txin_to_key>(in).amount;
+      }
+      for (const auto& o: tx.vout)
+        amount_out += o.amount;
+      CHECK_AND_ASSERT_MES(amount_in >= amount_out, false, "PQ transaction spends (" << amount_in << ") more than it has (" << amount_out << ")");
+      fee = amount_in - amount_out;
+      return true;
+    }
     if (tx.version > 1)
     {
       fee = tx.rct_signatures.txnFee;
