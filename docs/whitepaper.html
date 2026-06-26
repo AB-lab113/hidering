@@ -72,8 +72,8 @@
   <h1 class="section-title">HIDERING Whitepaper</h1>
   <p class="section-sub">Enhanced-privacy cryptocurrency with Bitcoin-style emission. Fair launch · 100% PoW · RandomX CPU.</p>
   <div class="wp-meta" style="justify-content:center;">
-    <div>VERSION <span>1.4</span></div>
-    <div>REVISED <span>JUN 2026</span></div>
+    <div>VERSION <span>1.4.2</span></div>
+    <div>REVISED <span>JUN 26 2026</span></div>
     <div>FORK BASE <span>MONERO v0.18.1</span></div>
   </div>
   <div style="margin-top:1.75rem;">
@@ -185,7 +185,7 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (June 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone an internal security audit. All PQ code remains <strong>inert</strong> until the hard fork (HFv16); the validator key-binding specification must be finalised before any activation. Mainnet target: <strong>Q2 2027</strong>.</div>
+    <div class="note"><strong>Status (June 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone an internal security audit. All PQ code remains <strong>inert</strong> until the hard fork (HFv16). <strong>Implementation complete (June 2026):</strong> the C-1 key-binding spec is finalised, validator checks a–d implemented, the wallet2 spend-side wired, the H-5 multi-ciphertext fix landed, mempool acceptance and HFv16 wallet activation done. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). If a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant. Mainnet target: <strong>Q2 2027</strong> (unchanged).</div>
 
     <h2 id="fairlaunch">7 · Fair Launch Distribution</h2>
     <p><strong>Principle:</strong> 100% emission via RandomX PoW, no private sale, no seed round. Block 0 is a genesis with 157.14 HRG locked under a NUMS key (unspendable). From block 1 onward, rewards are distributed by pure PoW competition.</p>

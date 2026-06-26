@@ -77,6 +77,10 @@ Monero is a private, secure, untraceable, decentralised digital currency. You ar
 
 **Decentralization:** The utility of Monero depends on its decentralised peer-to-peer consensus network - anyone should be able to run the monero software, validate the integrity of the blockchain, and participate in all aspects of the monero network using consumer-grade commodity hardware. Decentralization of the monero network is maintained by software development that minimizes the costs of running the monero software and inhibits the proliferation of specialized, non-commodity hardware.
 
+## Post-Quantum Cryptography (HIDERING)
+
+**Post-Quantum Status (June 2026):** HFv16 implementation is complete and validated end-to-end on regtest. ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) via liboqs 0.15.0. Three address modes: `B...` (classic, ring anonymity), `BQ...` (quantum-resistant, transparent spend, opt-in), `BQA...` (future HFv17, full anonymity + quantum resistance). Full B...→BQ...→spend e2e validated (commits 7d53cb940→b72425afe, branch v2-privacy). Activation: change `HF_HEIGHT_PQ` constant + redeploy (24–48h if needed). Mainnet target: Q2 2027. All PQ code is inert until HFv16 activation.
+
 ## About this project
 
 This is the core implementation of Monero. It is open source and completely free to use without restrictions, except for those specified in the license agreement below. There are no restrictions on anyone creating an alternative implementation of Monero that uses the protocol and network in a compatible manner.

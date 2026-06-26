@@ -1,7 +1,7 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
-**Version 1.4 (révisée 22 Juin 2026 — post-audit sécurité juin 2026)**  
+**Version 1.4.2 (révisée 26 Juin 2026 — implémentation HFv16 complète)**  
 **Juin 2026**
 
 ---
@@ -177,7 +177,7 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (juin 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16) ; la spécification du *binding* validateur des clés PQ doit être finalisée avant toute activation. Cible mainnet : **T2 2027**.
+**État (juin 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16). **Implémentation complète (juin 2026)** : spec binding C-1 finalisée, validateur checks a–d implémentés, spend-side wallet2 câblé, fix H-5 multi-ciphertext, mempool acceptance, activation wallet HFv16. Flow e2e complet B...→BQ...→dépense validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). En cas de menace quantique réelle, activation possible en 24–48h via changement de constante `HF_HEIGHT_PQ`. Cible mainnet : **T2 2027** (inchangée).
 
 ---
 
@@ -247,7 +247,8 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
 - ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signatures (prototype audité, code inerte jusqu'à HFv16)
-- Finalisation spec binding PQ + tests end-to-end
+- ✅ **Finalisé (juin 2026)** — A1 spec, A2 validateur, A3 spend-side, A4 wallet
+- ✅ **Tests e2e BQ regtest validés (juin 2026)**
 - Hard fork PQC mainnet (cible T2 2027)
 
 ---
@@ -348,7 +349,7 @@ Le fair launch garantit une distribution par compétition PoW pure. La phase pr�
 
 ---
 
-*Whitepaper v1.4 — Juin 2026 (révisé 6 juin 2026 après l'audit sécurité de juin 2026 : corrections privacy, transparence réserve minée, ajout pool mining + checkpoints)*  
+*Whitepaper v1.4.2 — Juin 2026 (révisé 26 juin 2026 : implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; révisions antérieures : audit sécurité juin 2026, corrections privacy, transparence réserve minée, pool mining + checkpoints)*  
 *SHA256 release v2.0.3 (dernière publique) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
