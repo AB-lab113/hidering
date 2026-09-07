@@ -342,3 +342,128 @@ TYPED_TEST(BlockchainDBTest, RetrieveBlockData)
 }
 
 }  // anonymous namespace
+
+// ---------------------------------------------------------------------------------------------
+// HIDERING Phase 5 (HFv16, A3) — regression test for CRIT-1 (audit 7 Sep 2026).
+//
+// THE BUG. A transparent BQ spend (a tx carrying a txin_to_key_pq input) publishes its outputs
+// with REVEALED amounts, because its balance is plain arithmetic instead of RingCT. Stored
+// naively those outputs landed in the per-amount bucket tx.vout[i].amount, while the consensus
+// validator resolves a PQ input in the RingCT bucket 0:
+//     Blockchain::check_tx_inputs, check (a): m_db->get_output_key((uint64_t)0, idx, true)
+//     Blockchain::check_tx_inputs, check (c): m_db->get_output_tx_and_index((uint64_t)0, idx)
+// The lookup therefore missed (or resolved a completely unrelated output, failing check (b) on
+// the pubkey), so EVERY BQ output created by a BQ spend — the CHANGE above all — was permanently
+// unspendable. That is guaranteed fund loss on the very first BQ->BQ chain: spend once, and the
+// change is gone forever.
+//
+// It was invisible to the A4 end-to-end run because the only BQ output exercised there came from
+// a classic RingCT B...->BQ... tx, whose output amounts ARE zeroed, hence bucket 0 — the one case
+// that happened to work.
+//
+// THE FIX (mirroring what Monero already does for v2 coinbase outputs, which are likewise v2
+// outputs with a revealed amount): normalise the DB representation, not the wire format. Store
+// transparent-BQ outputs in bucket 0 as rct outputs with an identity-mask commitment. The tx on
+// the wire keeps its revealed amounts (needed by money-conservation check (e) and by the wallet);
+// only the amount bucket is normalised, so all BQ outputs share one uniform index space
+// regardless of how they were produced.
+//
+// WHAT THIS TEST DOES. It drives a real BlockchainLMDB and asserts the exact primitive pair the
+// validator uses. Before the fix, get_output_key(0, idx) throws OUTPUT_DNE (the output sits in
+// bucket 42'000'000'000'000) and the test fails on the first EXPECT — reproducing the defect
+// precisely. After the fix both lookups resolve and agree with the on-chain output key.
+// It also covers the reorg direction: remove_tx_outputs must pick the SAME bucket, or popping the
+// block would delete the wrong output / throw and corrupt the DB.
+TYPED_TEST(BlockchainDBTest, PqTransparentOutputsLiveInRctBucketZero)
+{
+  boost::filesystem::path tempPath = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+  std::string dirPath = tempPath.string();
+  this->set_prefix(dirPath);
+
+  ASSERT_NO_THROW(this->m_db->open(dirPath));
+  this->get_filenames();
+  this->init_hard_fork();
+
+  uint64_t rct_outs_before = 0;
+  {
+  // scoped: pop_block() opens its own write txn, so the guard must be closed before the reorg leg
+  db_wtxn_guard guard(this->m_db);
+
+  // a base block so the chain is non-empty and bucket 0 already holds real rct outputs
+  ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0], t_diffs[0], t_coins[0], this->m_txs[0]));
+  rct_outs_before = this->m_db->get_num_outputs(0);
+
+  // ---- build a transparent BQ spend: v2 + RCTTypeNull + txin_to_key_pq + revealed amounts ----
+  // This is the shape construct_tx produces on the pq_transparent_tx branch, and the shape the
+  // change output of any BQ->BQ spend has.
+  const uint64_t BQ_CHANGE_AMOUNT = 42000000000000ull; // revealed, NOT a decomposed amount
+  transaction pq_tx{};
+  pq_tx.version = 2;
+  pq_tx.rct_signatures.type = rct::RCTTypeNull;       // no commitments: outPk is empty
+  txin_to_key_pq pq_in{};
+  pq_in.amount = BQ_CHANGE_AMOUNT;
+  pq_in.spent_output_index = 0;
+  for (size_t i = 0; i < sizeof(pq_in.real_output_key); ++i)
+    ((uint8_t*)&pq_in.real_output_key)[i] = (uint8_t)(0x40 + i);
+  pq_tx.vin.push_back(pq_in);
+
+  crypto::public_key bq_out_key;
+  for (size_t i = 0; i < sizeof(bq_out_key); ++i)
+    ((uint8_t*)&bq_out_key)[i] = (uint8_t)(0xA0 + i);
+  tx_out bq_out{};
+  bq_out.amount = BQ_CHANGE_AMOUNT;                   // REVEALED (this is the crux of the bug)
+  txout_to_tagged_key tagged{};
+  tagged.key = bq_out_key;
+  tagged.view_tag = crypto::view_tag{};
+  bq_out.target = tagged;
+  pq_tx.vout.push_back(bq_out);
+
+  // splice it into the next block
+  std::pair<block, blobdata> blk = this->m_blocks[1];
+  const crypto::hash pq_txid = get_transaction_hash(pq_tx);
+  blk.first.tx_hashes.clear();
+  blk.first.tx_hashes.push_back(pq_txid);
+  std::vector<std::pair<transaction, blobdata>> blk_txs;
+  blk_txs.push_back(std::make_pair(pq_tx, tx_to_blob(pq_tx)));
+
+  ASSERT_NO_THROW(this->m_db->add_block(blk, t_sizes[1], t_sizes[1], t_diffs[1], t_coins[1], blk_txs));
+
+  // ---- the assertions that failed before the fix ----
+
+  // the BQ output must have been indexed in the RingCT bucket, not in bucket BQ_CHANGE_AMOUNT
+  EXPECT_EQ(rct_outs_before + 1, this->m_db->get_num_outputs(0))
+      << "transparent BQ output was not indexed in the rct bucket 0";
+  EXPECT_EQ(0u, this->m_db->get_num_outputs(BQ_CHANGE_AMOUNT))
+      << "transparent BQ output leaked into a per-amount bucket; check_tx_inputs looks in bucket 0 only";
+
+  // the amount output index the daemon hands wallets must address bucket 0
+  const std::vector<std::vector<uint64_t>> amount_indices =
+      this->m_db->get_tx_amount_output_indices(this->m_db->get_tx_count() - 1, 1);
+  ASSERT_EQ(1u, amount_indices.size());
+  ASSERT_EQ(1u, amount_indices.front().size());
+  const uint64_t bq_global_index = amount_indices.front()[0];
+
+  // validator check (a)+(b): resolve in bucket 0 and match the revealed output key.
+  // BEFORE THE FIX this throws OUTPUT_DNE -> the BQ change is unspendable forever.
+  output_data_t od{};
+  ASSERT_NO_THROW(od = this->m_db->get_output_key((uint64_t)0, bq_global_index, true))
+      << "get_output_key(0, idx) missed the BQ output => validator check (a) fails => funds lost";
+  EXPECT_EQ(bq_out_key, od.pubkey)
+      << "bucket-0 lookup resolved a DIFFERENT output => validator check (b) fails => funds lost";
+
+  // validator check (c): the creating tx must be reachable through the same bucket
+  tx_out_index toi;
+  ASSERT_NO_THROW(toi = this->m_db->get_output_tx_and_index((uint64_t)0, bq_global_index))
+      << "get_output_tx_and_index(0, idx) missed the BQ output => validator check (c) fails";
+  ASSERT_HASH_EQ(pq_txid, toi.first);
+  EXPECT_EQ(0u, toi.second);
+  } // close the write txn before the reorg leg
+
+  // reorg direction: removal must target the same bucket, otherwise the DB is corrupted
+  block popped_blk;
+  std::vector<transaction> popped_txs;
+  ASSERT_NO_THROW(this->m_db->pop_block(popped_blk, popped_txs))
+      << "popping a block holding a transparent BQ output failed => remove_tx_outputs used the wrong bucket";
+  EXPECT_EQ(rct_outs_before, this->m_db->get_num_outputs(0))
+      << "the BQ output was not removed from bucket 0 on reorg";
+}

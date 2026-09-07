@@ -1152,7 +1152,14 @@ void BlockchainLMDB::remove_tx_outputs(const uint64_t tx_id, const transaction& 
       throw0(DB_ERROR("tx has outputs, but no output indices found"));
   }
 
-  bool is_pseudo_rct = tx.version >= 2 && tx.vin.size() == 1 && tx.vin[0].type() == typeid(txin_gen);
+  // HIDERING Phase 5 (HFv16, A3) — CRIT-1 fix (audit 7 Sep 2026): this MUST mirror the
+  // bucket choice made by BlockchainDB::add_transaction. A transparent BQ spend
+  // (txin_to_key_pq) has revealed output amounts but is stored in the RingCT bucket 0 with
+  // an identity-mask commitment, exactly like a v2 coinbase — so on a reorg it must be
+  // removed from bucket 0 too, not from tx.vout[i].amount. Getting this wrong would delete
+  // the wrong output (or throw OUTPUT_DNE) and corrupt the DB.
+  bool is_pseudo_rct = (tx.version >= 2 && tx.vin.size() == 1 && tx.vin[0].type() == typeid(txin_gen))
+                    || has_transparent_pq_input(tx);
   for (size_t i = tx.vout.size(); i-- > 0;)
   {
     uint64_t amount = is_pseudo_rct ? 0 : tx.vout[i].amount;

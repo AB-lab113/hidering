@@ -80,6 +80,12 @@ namespace cryptonote
   // is needed. ki = Keccak("HRG_PQ_KI_v1" || real_output_key) reinterpreted as a key_image
   // (used purely as 32 opaque bytes; it need not be a valid curve point).
   crypto::key_image get_pq_input_key_image(const crypto::public_key& real_output_key);
+  // HIDERING Phase 5 (HFv16, A3): true iff the tx spends at least one transparent
+  // post-quantum input (txin_to_key_pq) — i.e. it is a transparent BQ spend: version-2,
+  // RCTTypeNull, REVEALED output amounts. Such a tx can only exist at/after HF_VERSION_PQ
+  // (enforced in check_inputs_types_supported / Blockchain::check_tx_inputs), so this
+  // variant test IS the hard-fork gate wherever no hf_version is in scope.
+  bool has_transparent_pq_input(const transaction& tx);
   crypto::public_key get_tx_pub_key_from_extra(const std::vector<uint8_t>& tx_extra, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction_prefix& tx, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction& tx, size_t pk_index = 0);
@@ -138,7 +144,7 @@ namespace cryptonote
   uint64_t get_outs_money_amount(const transaction& tx);
   bool get_output_public_key(const cryptonote::tx_out& out, crypto::public_key& output_public_key);
   boost::optional<crypto::view_tag> get_output_view_tag(const cryptonote::tx_out& out);
-  bool check_inputs_types_supported(const transaction& tx);
+  bool check_inputs_types_supported(const transaction& tx, uint8_t hf_version = 0);
   bool check_outs_valid(const transaction& tx);
   bool parse_amount(uint64_t& amount, const std::string& str_amount);
   uint64_t get_transaction_weight(const transaction &tx);

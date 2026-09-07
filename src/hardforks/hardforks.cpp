@@ -45,8 +45,8 @@ const hardfork_t mainnet_hard_forks[] = {
   { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
   // Phase 5 — Post-Quantum additive hard fork (Dilithium3 + Kyber768).
-  // Registered but INACTIVE: HF_HEIGHT_PQ (1,000,000) is a placeholder far above
-  // the current mainnet tip (~h11000), so no block requires major_version 16 yet.
+  // Registered but INACTIVE: HF_HEIGHT_PQ (2,000,000) is a placeholder far above
+  // the current mainnet tip (~h81000, Sep 2026), so no block requires major_version 16 yet.
   // The activation height is finalised before the T2 2027 mainnet fork.
   { HF_VERSION_PQ, HF_HEIGHT_PQ, 0, 1713700002 },
 };

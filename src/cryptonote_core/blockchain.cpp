@@ -3399,10 +3399,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   //   (c) the binding tag published when that output was CREATED commits real_output_key
   //       to the supplied per-output ML-DSA-65 public key, and
   //   (d) the ML-DSA-65 signature verifies over the tx prefix hash.
-  // Wholly skipped below HF_VERSION_PQ → the live chain is untouched. NOTE (residual, see
-  // A2 report): money-conservation for transparent inputs vs. the RingCT output commitments
-  // is NOT yet enforced here — that consensus rule (sum of revealed PQ-input amounts ==
-  // committed outputs + fee) is the remaining piece before HFv16 activation.
+  //   (e) money conservation over the revealed amounts (added in A3, see below).
+  // Wholly skipped below HF_VERSION_PQ → the live chain is untouched; a PQ input appearing
+  // before the fork is rejected outright in the main input loop further down (audit HAUT-2).
   if (hf_version >= HF_VERSION_PQ)
   {
     bool any_pq = false;
@@ -3441,7 +3440,12 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         if (txin.type() != typeid(txin_to_key_pq)) continue;
         const txin_to_key_pq& in = boost::get<txin_to_key_pq>(txin);
 
-        // (a) referenced output exists (BQ outputs are rct → DB amount bucket 0) ...
+        // (a) referenced output exists. Bucket 0 is correct for BOTH ways a BQ output can be
+        // created: a classic RingCT B...->BQ... tx zeroes its output amounts, and a
+        // transparent BQ spend keeps its amounts revealed on the wire but is stored in bucket
+        // 0 with an identity-mask commitment, like a v2 coinbase (see the CRIT-1 note in
+        // BlockchainDB::add_transaction). Do not switch this to in.amount: the amount bucket
+        // must not depend on how the output was produced, and in.amount is attacker-supplied.
         output_data_t od;
         try
         {
@@ -3732,11 +3736,25 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   for (const auto& txin : tx.vin)
   {
     // HIDERING Phase 5 (HFv16): transparent post-quantum inputs (txin_to_key_pq) are NOT
-    // ring inputs — they were already fully validated (checks a/b/c/d) in the dedicated PQ
+    // ring inputs — they were already fully validated (checks a/b/c/d/e) in the dedicated PQ
     // pass above. Skip them here so the classic ring/CLSAG path is untouched, and DO NOT
-    // advance sig_index (it indexes ring inputs only). Only reachable at/after HF_VERSION_PQ.
+    // advance sig_index (it indexes ring inputs only).
+    //
+    // The hf_version test is NOT redundant (audit finding HAUT-2, 7 Sep 2026): the PQ pass
+    // above is itself gated on hf_version >= HF_VERSION_PQ, so an unconditional `continue`
+    // here would make a pre-fork PQ input skip BOTH passes — neither validated nor rejected.
+    // Reject explicitly instead of relying on unrelated invariants downstream.
     if (txin.type() == typeid(txin_to_key_pq))
+    {
+      if (hf_version < HF_VERSION_PQ)
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " carries a transparent post-quantum input before HF_VERSION_PQ");
+        tvc.m_invalid_input = true;
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
       continue;
+    }
 
     // make sure output being spent is of type txin_to_key, rather than
     // e.g. txin_gen, which is only used for miner transactions

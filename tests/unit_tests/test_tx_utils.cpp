@@ -318,6 +318,41 @@ TEST(pq_consensus, transparent_pq_tx_outputs_gated_at_hf16)
   EXPECT_FALSE(tvc_post.m_invalid_output);
 }
 
+// HIDERING Phase 5 — regression test for HAUT-2 (audit 7 Sep 2026).
+// check_inputs_types_supported used to whitelist txin_to_key_pq unconditionally, and the main
+// input loop of Blockchain::check_tx_inputs then skipped it with a bare `continue`. Since the
+// dedicated PQ validation pass IS gated on hf_version >= HF_VERSION_PQ, a PQ input appearing
+// before the fork went through BOTH passes untouched: neither validated nor rejected. It was
+// safe only by accident, through unrelated invariants (RCTTypeNull refused off-coinbase, empty
+// CLSAG ring, min_tx_version == 2). The type is now rejected explicitly at the semantic gate.
+TEST(pq_consensus, transparent_pq_input_type_rejected_before_hf16)
+{
+  cryptonote::transaction tx{};
+  tx.version = 2;
+  tx.rct_signatures.type = rct::RCTTypeNull;
+  cryptonote::txin_to_key_pq in{};
+  in.amount = 100;
+  in.spent_output_index = 0;
+  tx.vin.push_back(in);
+
+  // before the fork the input type itself is refused, whatever the rest of the tx looks like
+  EXPECT_FALSE(cryptonote::check_inputs_types_supported(tx, HF_VERSION_PQ - 1));
+  EXPECT_FALSE(cryptonote::check_inputs_types_supported(tx, 0));
+  // at/after the fork it is a legitimate input type
+  EXPECT_TRUE(cryptonote::check_inputs_types_supported(tx, HF_VERSION_PQ));
+
+  // a classic ring input is accepted at every hard-fork version (no behaviour change for B...)
+  cryptonote::transaction classic{};
+  classic.version = 2;
+  cryptonote::txin_to_key cin{};
+  cin.amount = 0;
+  cin.key_offsets.push_back(0);
+  classic.vin.push_back(cin);
+  EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, 0));
+  EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, HF_VERSION_PQ - 1));
+  EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, HF_VERSION_PQ));
+}
+
 TEST(parse_and_validate_tx_extra, is_valid_tx_extra_parsed)
 {
   cryptonote::transaction tx = AUTO_VAL_INIT(tx);

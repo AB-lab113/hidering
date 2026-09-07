@@ -840,7 +840,9 @@ namespace cryptonote
       return false;
     }
 
-    if(!check_inputs_types_supported(tx))
+    // HIDERING Phase 5 (HFv16): hf_version gates the transparent post-quantum input type
+    // (txin_to_key_pq) — rejected outright before HF_VERSION_PQ (audit HAUT-2).
+    if(!check_inputs_types_supported(tx, hf_version))
     {
       MERROR_VER("unsupported input types for tx id= " << get_transaction_hash(tx));
       tvc.m_verifivation_failed = true;

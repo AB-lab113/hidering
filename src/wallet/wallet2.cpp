@@ -2614,6 +2614,17 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   std::vector<crypto::pqc::kyber_shared_secret> pq_ss_list;
   const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list_ptr = get_pq_output_shared_secrets(tx, pq_ss_list) ? &pq_ss_list : nullptr;
 
+  // HIDERING Phase 5 (HFv16, A3) — CRIT-1 fix (audit 7 Sep 2026), wallet side.
+  // A transparent BQ spend keeps its output amounts REVEALED on the wire (amount != 0), but
+  // the daemon stores those outputs in the RingCT bucket 0 with an identity-mask commitment,
+  // exactly like a v2 coinbase output (see BlockchainDB::add_transaction). The wallet must
+  // classify them the same way, otherwise a BQ output produced by a BQ spend — the CHANGE
+  // above all — is recorded with m_rct = false and is then filtered out of every spendable
+  // set (`td.is_rct() || is_valid_decomposed_amount(td.amount())`, and the is_rct()-only
+  // predicates in the transfer selectors), so the change could never be spent again even
+  // once the daemon-side lookup was fixed. False for every classic tx → no impact on B...
+  const bool pq_transparent_tx = cryptonote::has_transparent_pq_input(tx);
+
   while (!tx.vout.empty())
   {
     std::vector<size_t> outs;
@@ -2829,8 +2840,11 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
               td.m_mask = tx_scan_info[o].mask;
               td.m_rct = true;
             }
-            else if (miner_tx && tx.version == 2)
+            else if ((miner_tx && tx.version == 2) || pq_transparent_tx)
             {
+              // HIDERING CRIT-1: a transparent BQ spend's outputs carry a revealed amount but
+              // are stored by the daemon as bucket-0 rct outputs with an identity mask — same
+              // as a v2 coinbase. Classify them identically so they stay spendable.
               td.m_mask = rct::identity();
               td.m_rct = true;
             }
@@ -2845,7 +2859,10 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 	      m_key_images[td.m_key_image] = m_transfers.size()-1;
 	    m_pub_keys[tx_scan_info[o].in_ephemeral.pub] = m_transfers.size()-1;
             if (output_tracker_cache)
-              (*output_tracker_cache)[std::make_pair(tx.vout[o].amount, td.m_global_output_index)] = m_transfers.size() - 1;
+              // HIDERING CRIT-1: key BQ outputs by bucket 0, matching both their on-chain index
+              // space and create_output_tracker_cache()'s `td.is_rct() ? 0 : td.amount()`.
+              // Classic paths keep tx.vout[o].amount verbatim (0 for rct) — unchanged.
+              (*output_tracker_cache)[std::make_pair(pq_transparent_tx ? (uint64_t)0 : tx.vout[o].amount, td.m_global_output_index)] = m_transfers.size() - 1;
             if (m_multisig)
             {
               THROW_WALLET_EXCEPTION_IF(m_multisig_rescan_k.empty() && !m_multisig_rescan_info.empty(),
@@ -2920,8 +2937,9 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
               td.m_mask = tx_scan_info[o].mask;
               td.m_rct = true;
             }
-            else if (miner_tx && tx.version == 2)
+            else if ((miner_tx && tx.version == 2) || pq_transparent_tx)
             {
+              // HIDERING CRIT-1: see the matching branch above (new-transfer path).
               td.m_mask = rct::identity();
               td.m_rct = true;
             }
@@ -2931,7 +2949,8 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
               td.m_rct = false;
             }
             if (output_tracker_cache)
-              (*output_tracker_cache)[std::make_pair(tx.vout[o].amount, td.m_global_output_index)] = kit->second;
+              // HIDERING CRIT-1: see the matching site above.
+              (*output_tracker_cache)[std::make_pair(pq_transparent_tx ? (uint64_t)0 : tx.vout[o].amount, td.m_global_output_index)] = kit->second;
             if (m_multisig)
             {
               THROW_WALLET_EXCEPTION_IF(m_multisig_rescan_k.empty() && !m_multisig_rescan_info.empty(),

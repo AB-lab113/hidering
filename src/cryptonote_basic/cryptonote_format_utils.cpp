@@ -912,19 +912,38 @@ namespace cryptonote
     return coinbase_in.height;
   }
   //---------------------------------------------------------------
-  bool check_inputs_types_supported(const transaction& tx)
+  bool check_inputs_types_supported(const transaction& tx, uint8_t hf_version)
   {
     for(const auto& in: tx.vin)
     {
-      // HIDERING Phase 5 (HFv16): also accept the transparent post-quantum input type.
-      // Its semantics are gated by hf_version in the consensus validator (check_tx_inputs);
-      // here we only whitelist the variant so PQ txs are not rejected at the type check.
-      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_to_key_pq), false, "wrong variant type: "
+      // HIDERING Phase 5 (HFv16): also accept the transparent post-quantum input type, but
+      // ONLY from HF_VERSION_PQ on (audit finding HAUT-2, 7 Sep 2026). Before the fork this
+      // variant must be rejected HERE, explicitly. It used to be whitelisted unconditionally
+      // and then silently skipped by the main loop of Blockchain::check_tx_inputs, leaving a
+      // pre-fork PQ input neither validated nor rejected — safe only by accident, via
+      // unrelated invariants elsewhere (RCTTypeNull refused off-coinbase, empty CLSAG ring,
+      // min_tx_version==2). Never rely on those: reject the type outright.
+      if (in.type() == typeid(txin_to_key_pq))
+      {
+        CHECK_AND_ASSERT_MES(hf_version >= HF_VERSION_PQ, false,
+          "transparent post-quantum input (txin_to_key_pq) before HF_VERSION_PQ, in transaction id="
+          << get_transaction_hash(tx));
+        continue;
+      }
+      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key), false, "wrong variant type: "
         << in.type().name() << ", expected " << typeid(txin_to_key).name()
         << ", in transaction id=" << get_transaction_hash(tx));
 
     }
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool has_transparent_pq_input(const transaction& tx)
+  {
+    for (const auto& in: tx.vin)
+      if (in.type() == typeid(txin_to_key_pq))
+        return true;
+    return false;
   }
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)

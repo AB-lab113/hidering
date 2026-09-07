@@ -231,13 +231,43 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
 
   std::vector<uint64_t> amount_output_indices(tx.vout.size());
 
+  // HIDERING Phase 5 (HFv16, A3) — CRIT-1 fix (audit 7 Sep 2026).
+  //
+  // A transparent BQ spend (txin_to_key_pq) publishes its outputs with REVEALED amounts
+  // (amount != 0), because its balance is plain arithmetic rather than RingCT. Stored
+  // naively, those outputs would land in the per-amount bucket `tx.vout[i].amount`, while
+  // Blockchain::check_tx_inputs resolves a PQ input in the RingCT bucket 0
+  // (get_output_key(0, …) / get_output_tx_and_index(0, …)). The lookup would then miss, so
+  // EVERY BQ output produced by a BQ spend — the change included — became permanently
+  // unspendable: guaranteed fund loss on the first BQ->BQ chain.
+  //
+  // Fix: normalise the DB representation instead of the wire format. This is exactly what
+  // Monero already does for v2 coinbase outputs, which are likewise version-2 outputs with
+  // a revealed amount: store them in bucket 0 as rct outputs carrying an identity-mask
+  // commitment zeroCommit(amount). The transaction on the wire is untouched (the revealed
+  // amount is still needed by the money-conservation rule (e) and by the wallet), only the
+  // amount bucket is normalised — so all BQ outputs, whether created by a classic RingCT
+  // B...->BQ... tx or by a transparent BQ spend, share one uniform index space.
+  //
+  // It also removes the out-of-bounds `tx.rct_signatures.outPk[i]` on the else-branch below
+  // (a transparent BQ spend is RCTTypeNull, so outPk is empty).
+  //
+  // NOTE: BlockchainLMDB::remove_tx_outputs must mirror this bucket choice, or a reorg would
+  // remove from the wrong bucket and corrupt the DB — see `is_pseudo_rct` there.
+  //
+  // Gated by the input variant, which can only exist at/after HF_VERSION_PQ (enforced in
+  // check_inputs_types_supported and Blockchain::check_tx_inputs). Classic B... txs are
+  // byte-identical, on the wire and on disk.
+  const bool pq_transparent_tx = has_transparent_pq_input(tx);
+
   // iterate tx.vout using indices instead of C++11 foreach syntax because
   // we need the index
   for (uint64_t i = 0; i < tx.vout.size(); ++i)
   {
     // miner v2 txes have their coinbase output in one single out to save space,
-    // and we store them as rct outputs with an identity mask
-    if (miner_tx && tx.version == 2)
+    // and we store them as rct outputs with an identity mask.
+    // HIDERING: transparent BQ spends take the same path (see CRIT-1 note above).
+    if ((miner_tx && tx.version == 2) || pq_transparent_tx)
     {
       cryptonote::tx_out vout = tx.vout[i];
       rct::key commitment = rct::zeroCommit(vout.amount);
