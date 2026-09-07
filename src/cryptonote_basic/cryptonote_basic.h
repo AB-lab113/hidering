@@ -177,6 +177,14 @@ namespace cryptonote
       FIELD(real_output_key)
       // dsa is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
       // (no BLOB_SERIALIZER registration needed in this TU — that lives in tx_extra.h).
+      // The tag() is REQUIRED even for a blob: without it the JSON archive emits the blob
+      // as a bare value with no key and no separator, producing invalid JSON
+      // (`"real_output_key": "63..e8""6906.."`) in obj_to_json_str — i.e. in the as_json the
+      // daemon serves from get_transactions for every transparent BQ spend. Wire-neutral:
+      // binary_archive::tag() is a no-op (binary_archive.h), so the consensus encoding is
+      // unchanged — pinned by pq_consensus.txin_to_key_pq_json_valid_and_wire_unchanged.
+      // Same idiom as MAGIC_FIELD (serialization.h): tag() then serialize_blob().
+      ar.tag("dsa");
       ar.serialize_blob(&dsa, sizeof(dsa));
       if (!ar.good()) return false;
     END_SERIALIZE()

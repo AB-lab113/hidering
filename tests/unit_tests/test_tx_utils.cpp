@@ -41,6 +41,8 @@
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_config.h"
 #include "crypto/pqc.h"
+#include "string_tools.h"
+#include "rapidjson/document.h"
 
 namespace
 {
@@ -351,6 +353,75 @@ TEST(pq_consensus, transparent_pq_input_type_rejected_before_hf16)
   EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, 0));
   EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, HF_VERSION_PQ - 1));
   EXPECT_TRUE(cryptonote::check_inputs_types_supported(classic, HF_VERSION_PQ));
+}
+
+// HIDERING Phase 5 — regression test for the txin_to_key_pq JSON bug (found during the
+// BQ->BQ e2e, 7 Sep 2026). The serialization macro for txin_to_key_pq called
+// ar.serialize_blob(&dsa, sizeof(dsa)) WITHOUT a preceding ar.tag("dsa"), so the JSON
+// archive emitted the 5261-byte dsa blob as a bare value with no key and no comma:
+//     "real_output_key": "6313...e8""6906..."
+// making obj_to_json_str() output (served by the daemon as get_transactions.as_json)
+// unparseable for every transparent BQ spend. binary_archive::tag() is a no-op, so the fix
+// is wire-neutral — which the pinned blob below enforces.
+TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
+{
+  cryptonote::transaction tx{};
+  tx.version = 2;
+  tx.unlock_time = 0;
+  tx.rct_signatures.type = rct::RCTTypeNull;
+
+  cryptonote::txin_to_key_pq in{};
+  in.amount = 500000000000000ull;
+  in.spent_output_index = 281;
+  for (size_t i = 0; i < sizeof(in.real_output_key); ++i)
+    ((uint8_t*)&in.real_output_key)[i] = (uint8_t)(0x40 + i);
+  for (size_t i = 0; i < crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES; ++i)
+    in.dsa.pk[i] = (uint8_t)(i & 0xFF);
+  for (size_t i = 0; i < crypto::pqc::ML_DSA_65_SIGNATURE_BYTES; ++i)
+    in.dsa.sig[i] = (uint8_t)((i * 7 + 13) & 0xFF);
+  tx.vin.push_back(in);
+
+  cryptonote::tx_out o{};
+  o.amount = 299999931430000ull;
+  cryptonote::txout_to_tagged_key tagged{};
+  for (size_t i = 0; i < sizeof(tagged.key); ++i)
+    ((uint8_t*)&tagged.key)[i] = (uint8_t)(0xA0 + i);
+  tagged.view_tag = crypto::view_tag{};
+  o.target = tagged;
+  tx.vout.push_back(o);
+
+  tx.extra.push_back(TX_EXTRA_TAG_PUBKEY);
+  tx.extra.insert(tx.extra.end(), 32, 0x11);
+
+  // (1) WIRE FORMAT IS UNCHANGED. Pinned against the blob produced before the tag("dsa")
+  // fix; binary_archive::tag() is a no-op so these must never move. A change here means
+  // the consensus-visible encoding of a PQ input moved — never acceptable.
+  const cryptonote::blobdata blob = cryptonote::tx_to_blob(tx);
+  EXPECT_EQ(5383u, blob.size());
+  crypto::hash blob_hash;
+  crypto::cn_fast_hash(blob.data(), blob.size(), blob_hash);
+  EXPECT_EQ(std::string("aa202bc0fbe69e42d64438f7e3845457efeb7ad7568d4cbda89d0e8a7e101879"), epee::string_tools::pod_to_hex(blob_hash));
+
+  // (2) the blob still round-trips
+  cryptonote::transaction tx2{};
+  ASSERT_TRUE(cryptonote::parse_and_validate_tx_from_blob(blob, tx2));
+  ASSERT_EQ(1u, tx2.vin.size());
+  ASSERT_EQ(typeid(cryptonote::txin_to_key_pq), tx2.vin[0].type());
+  const cryptonote::txin_to_key_pq &in2 = boost::get<cryptonote::txin_to_key_pq>(tx2.vin[0]);
+  EXPECT_EQ(in.amount, in2.amount);
+  EXPECT_EQ(in.spent_output_index, in2.spent_output_index);
+  EXPECT_EQ(in.real_output_key, in2.real_output_key);
+  EXPECT_EQ(0, memcmp(in.dsa.pk,  in2.dsa.pk,  crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES));
+  EXPECT_EQ(0, memcmp(in.dsa.sig, in2.dsa.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
+
+  // (3) THE BUG: the JSON the daemon serves must name the dsa field and must PARSE.
+  const std::string js = cryptonote::obj_to_json_str(tx);
+  EXPECT_NE(std::string::npos, js.find("\"dsa\""))
+      << "dsa blob emitted without its key -> invalid JSON";
+  rapidjson::Document doc;
+  doc.Parse(js.c_str());
+  EXPECT_FALSE(doc.HasParseError())
+      << "obj_to_json_str produced invalid JSON at offset " << doc.GetErrorOffset();
 }
 
 TEST(parse_and_validate_tx_extra, is_valid_tx_extra_parsed)
