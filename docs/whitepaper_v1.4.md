@@ -195,11 +195,11 @@ sensibles »*. Elle ne détient aucune validation FIPS 140-3 — seuls les **alg
 pas résolu (audit tiers, implémentation validée, ou posture hybride formalisée), **HFv16 ne
 sera pas activé.**
 
-**Points fonctionnels ouverts.** Une transaction ne peut pas mélanger des fonds B... et BQ...
-(pas de consolidation possible entre les deux mondes) ; les subaddresses BQ n'existent pas
-encore. *(Le cold-signing d'une dépense BQ, ouvert jusqu'au 8 septembre 2026, est désormais
-implémenté : le fichier de transfert transporte le ciphertext ML-KEM-768, jamais le secret
-partagé, et la machine hors-ligne re-dérive celui-ci avec ses propres clés.)*
+**Points fonctionnels ouverts.** Les subaddresses BQ n'existent pas encore. *(Deux points
+ouverts ont été fermés le 8 septembre 2026 : le **cold-signing** d'une dépense BQ — le fichier
+de transfert transporte le ciphertext ML-KEM-768, jamais le secret partagé, et la machine
+hors-ligne re-dérive celui-ci avec ses propres clés ; et la **consolidation B.../BQ**, via les
+transactions hybrides décrites au §6.3.)*
 
 **Le coût réel, c'est la coordination.** Un hard fork n'est pas un déploiement logiciel : il
 faut publier des binaires pour toutes les plateformes, laisser mineurs, pools, services et
@@ -237,10 +237,30 @@ Ce qui reste protégé : *recevoir* sur une adresse BQ ne révèle rien de plus 
 classique — la sortie est furtive et non liée à l'adresse publiée. C'est la **dépense** de cet
 output qui est transparente.
 
-Pistes d'amélioration à l'étude (non implémentées, non promises) : une transaction *hybride*,
-mêlant une entrée transparente PQ et des entrées ring, rendrait aux sorties leurs engagements
-de Pedersen et donc leurs montants masqués. Une véritable signature de cercle post-quantique
-est un problème de recherche ouvert, et HIDERING ne prétend pas l'avoir résolu.
+Une véritable signature de cercle post-quantique est un problème de recherche ouvert, et
+HIDERING ne prétend pas l'avoir résolu.
+
+### 6.3 Transactions hybrides — récupérer la confidentialité des montants de sortie
+
+Depuis le 8 septembre 2026, une transaction peut **mélanger** une entrée transparente BQ et
+des entrées ring classiques. Deux conséquences :
+
+- **Consolidation possible.** Un wallet peut enfin dépenser ses fonds B... et BQ... dans une
+  même transaction, et payer un montant supérieur au solde de l'un ou l'autre monde. Sans
+  cela, un utilisateur en cours de migration se retrouvait avec deux tirelires étanches.
+- **Plus de confidentialité, pas moins.** Une dépense BQ « pure » est une transaction
+  entièrement transparente (§6.2) : **tous** les montants de sortie sont en clair. Une
+  transaction hybride est une vraie transaction RingCT — **seuls les montants des entrées PQ
+  sont révélés, les sorties redeviennent des engagements de Pedersen avec preuves de portée.**
+
+Comment l'équilibre tient : une entrée transparente de valeur *a* n'a pas d'engagement, mais
+le vérificateur peut en recalculer un depuis des données publiques, avec un masque nul (*a·H*).
+L'équation RingCT devient `Σ pseudoOuts + Σ a_pq·H == Σ sorties + frais·H` — autrement dit,
+**les entrées transparentes se comportent exactement comme des frais négatifs.**
+
+Ce qui reste vrai dans tous les cas : le montant d'une entrée BQ dépensée est public. L'hybride
+ne masque pas *ce que vous dépensez* depuis une adresse BQ ; il masque de nouveau *ce que vous
+envoyez*. La recommandation du §6.2 est inchangée.
 
 **Recommandation aux utilisateurs, tant que ce compromis existe :** utilisez les adresses
 classiques B... pour vos usages courants. Les adresses BQ sont destinées à ceux dont le modèle

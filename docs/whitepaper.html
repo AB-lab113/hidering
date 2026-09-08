@@ -191,7 +191,7 @@
     <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
     <ul>
       <li><strong>Security blockers.</strong> The post-quantum library we use (liboqs) still carries its authors' own warning, in its current release: <em>"we do not currently recommend relying on this library in a production environment or to protect any sensitive data"</em>. It holds no FIPS 140-3 validation — only the <em>algorithms</em> (ML-KEM, ML-DSA) are final NIST standards, not the implementation. Until that is resolved (third-party audit, a validated implementation, or a formalised hybrid posture), <strong>HFv16 will not be activated</strong>.</li>
-      <li><strong>Open functional gaps.</strong> A transaction cannot mix B... and BQ... funds, so the two worlds cannot be consolidated; BQ subaddresses do not exist yet. (Cold-signing a BQ spend, open until 8 September 2026, is now implemented: the transfer file carries the ML-KEM-768 ciphertext and never the shared secret, and the offline machine re-derives that secret with its own keys.)</li>
+      <li><strong>Open functional gaps.</strong> BQ subaddresses do not exist yet. (Two gaps closed on 8 September 2026: cold-signing a BQ spend — the transfer file carries the ML-KEM-768 ciphertext and never the shared secret, and the offline machine re-derives that secret with its own keys — and B.../BQ consolidation, via the hybrid transactions described in §6.3.)</li>
       <li><strong>The real cost is coordination.</strong> A hard fork is not a software deployment. Binaries must be published for every platform, miners, pools, services and wallet holders must upgrade, and the activation height must be announced well in advance so the network converges. A node that has not upgraded ends up on a dead chain. That process takes <strong>weeks</strong>, and no amount of urgency compresses it.</li>
     </ul>
     <p><strong>If a real quantum threat emerged</strong>, the schedule would be compressed as far as it can go and communicated as an emergency — but the order of magnitude remains <strong>weeks, not hours</strong>. Any promise to the contrary would be dishonest.</p>
@@ -207,7 +207,16 @@
     </ul>
     <p>In plain terms: <strong>spending from a BQ address is as transparent as a Bitcoin transaction.</strong> Full HIDERING privacy remains the property of classic B... addresses. BQ addresses buy quantum resistance <strong>at the cost of spend privacy</strong>.</p>
     <p>What is still protected: <em>receiving</em> to a BQ address reveals no more than a classic receive — the output is stealthy and unlinkable to the published address. It is <em>spending</em> that output that is transparent.</p>
-    <p>Under study, neither implemented nor promised: a <em>hybrid</em> transaction mixing a transparent PQ input with ring inputs would give the outputs back their Pedersen commitments, and therefore their hidden amounts. A genuine post-quantum ring signature is an open research problem, and HIDERING does not claim to have solved it.</p>
+    <p>A genuine post-quantum ring signature is an open research problem, and HIDERING does not claim to have solved it.</p>
+
+    <h3>6.3 · Hybrid transactions — getting output amounts hidden again</h3>
+    <p>Since 8 September 2026 a transaction may <strong>mix</strong> a transparent BQ input with classic ring inputs. Two consequences:</p>
+    <ul>
+      <li><strong>Consolidation works.</strong> A wallet can finally spend B... and BQ... funds in one transaction, and pay more than either side holds on its own. Without it, anyone mid-migration had two watertight pots.</li>
+      <li><strong>More privacy, not less.</strong> A pure BQ spend is a fully transparent transaction (§6.2): <em>every</em> output amount is in cleartext. A hybrid is a real RingCT transaction — <strong>only the PQ inputs' amounts are revealed, and the outputs go back to being Pedersen commitments with range proofs.</strong></li>
+    </ul>
+    <p>How the balance closes: a transparent input of value <em>a</em> has no commitment, but a verifier can recompute one from public data with a zero mask (<em>a·H</em>). The RingCT equation becomes <code class="inline">sum(pseudoOuts) + sum(a_pq)·H == sum(outputs) + fee·H</code> — that is, <strong>transparent inputs behave exactly like a negative fee</strong>.</p>
+    <p>What stays true either way: the amount of a BQ input being spent is public. The hybrid does not hide <em>what you spend</em> from a BQ address; it hides <em>what you send</em> again. The guidance in §6.2 is unchanged.</p>
     <p><strong>Guidance while this trade-off stands:</strong> use classic B... addresses for everyday use. BQ addresses are for those whose threat model includes a quantum adversary and who knowingly accept revealed amounts and no ring on their spends.</p>
 
     <h2 id="fairlaunch">7 · Fair Launch Distribution</h2>
