@@ -63,9 +63,15 @@ static bool test_pq_bq_address()
       parsed.m_view_public_key  != addr.m_view_public_key) { printf("FAIL: BQ Ed25519 keys mismatch\n"); return false; }
   if (memcmp(parsed.pq_kyber_pk->data(), kpk.data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0) { printf("FAIL: BQ ML-KEM-768 key mismatch\n"); return false; }
 
-  // A BQ... address must NOT parse via the classic path with the BQ prefix.
+  // Since Phase 5 A4 the generic entry point ROUTES a BQ... address to the BQ parser
+  // (that is what lets `transfer BQ...` work); it must come back flagged is_pq and
+  // NOT as a subaddress, even though prefix 62 is shared with subaddresses.
   address_parse_info info{};
-  if (get_account_address_from_str(info, MAINNET, bq_addr)) { printf("FAIL: BQ address wrongly parsed as classic\n"); return false; }
+  if (!get_account_address_from_str(info, MAINNET, bq_addr))
+  { printf("FAIL: BQ address rejected by the generic parser\n"); return false; }
+  if (!info.address.is_pq() || info.is_subaddress)
+  { printf("FAIL: BQ address misclassified by the generic parser (is_pq=%d, is_subaddress=%d)\n",
+           (int)info.address.is_pq(), (int)info.is_subaddress); return false; }
 
   printf("PASS: BQ... address encode + parse round-trip (spend/view + ML-KEM-768 1184B)\n");
   return true;

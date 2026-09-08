@@ -59,10 +59,30 @@ static bool test_bq_keygen_and_address()
              crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0)
   { printf("FAIL: ML-KEM-768 key mismatch after round-trip\n"); return false; }
 
-  // A BQ... address must NOT parse via the classic path (shares prefix 62 with subaddress,
-  // disambiguated by payload size + marker byte).
+  // The generic entry point must ROUTE a BQ... address to the BQ parser rather than
+  // mistake it for a subaddress: prefix 62 is shared with subaddresses and is
+  // disambiguated by payload size (64 vs 1249) plus the marker byte. This is what
+  // makes `transfer BQ...` work (Phase 5 A4); before A4 the generic path rejected
+  // BQ outright, and this test asserted that older contract.
   address_parse_info info{};
-  if (get_account_address_from_str(info, MAINNET, bq)) { printf("FAIL: BQ address wrongly parsed as classic/subaddress\n"); return false; }
+  if (!get_account_address_from_str(info, MAINNET, bq))
+  { printf("FAIL: BQ address rejected by the generic parser (transfer to BQ... would fail)\n"); return false; }
+  if (!info.address.is_pq()) { printf("FAIL: generic parser returned a non-PQ address for a BQ... string\n"); return false; }
+  if (info.is_subaddress) { printf("FAIL: BQ address parsed as a subaddress\n"); return false; }
+  if (info.address.m_spend_public_key != acc.get_keys().m_account_address.m_spend_public_key ||
+      info.address.m_view_public_key  != acc.get_keys().m_account_address.m_view_public_key)
+  { printf("FAIL: generic parser lost the Ed25519 keys of the BQ address\n"); return false; }
+  if (memcmp(info.address.pq_kyber_pk->data(), acc.get_keys().m_account_address.pq_kyber_pk->data(),
+             crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES) != 0)
+  { printf("FAIL: generic parser lost the ML-KEM-768 key of the BQ address\n"); return false; }
+
+  // A classic B... address must still come back non-PQ through the same entry point.
+  account_base classic;
+  classic.generate();
+  address_parse_info cinfo{};
+  if (!get_account_address_from_str(cinfo, MAINNET, classic.get_public_address_str(MAINNET)))
+  { printf("FAIL: classic B... address no longer parses\n"); return false; }
+  if (cinfo.address.is_pq()) { printf("FAIL: classic B... address came back is_pq()=true\n"); return false; }
 
   printf("PASS: BQ keygen + \"BQ\" prefix + encode/parse round-trip (spend/view + ML-KEM-768 1184B)\n");
   return true;
