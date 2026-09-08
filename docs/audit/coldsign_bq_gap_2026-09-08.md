@@ -1,6 +1,21 @@
 # Cold-signing d'une dépense BQ — état réel, correctif appliqué, et décision en attente
 
 **Date :** 8 septembre 2026 — item 1c de la revue post-audit du 7 septembre.
+**MISE À JOUR (8 septembre 2026, même jour) : ⛔ → ✅ RÉSOLU.** Les deux décisions du §3 ont été
+prises et implémentées : **Option A** (table latérale + bump `unsigned_tx_set` v3 → v4, cold-sign
+classique byte-identique) et **A2** (transport du **ciphertext** ML-KEM, jamais `pq_ss`).
+Voir le commit `feat(pqc): cold-sign a BQ spend — unsigned_tx_set v4 side table` et le test
+`src/crypto/pq_coldsign_v4_test.cpp`. Le reste du document est conservé tel quel : il décrit le
+problème et le raisonnement qui ont mené à ces choix.
+
+**Un point a été ajouté à l'implémentation, absent de l'analyse initiale ci-dessous.** Le bump du
+`VERSION_FIELD` de la structure ne suffit pas à protéger un ancien wallet : il lirait version 4,
+traiterait les champs qu'il connaît et **ignorerait silencieusement le `pq_data` en fin de flux**,
+donc signerait une dépense BQ comme une dépense ring classique. Le seul élément qu'un binaire déjà
+publié rejette est **l'octet de version au niveau fichier** — un jeu porteur de matériel PQ est
+donc écrit sous `\006` et les anciens wallets le refusent bruyamment, tandis que les jeux
+classiques gardent `\005`.
+
 
 ## TL;DR
 

@@ -195,9 +195,11 @@ sensibles »*. Elle ne détient aucune validation FIPS 140-3 — seuls les **alg
 pas résolu (audit tiers, implémentation validée, ou posture hybride formalisée), **HFv16 ne
 sera pas activé.**
 
-**Points fonctionnels ouverts.** Le cold-signing d'une dépense BQ (signature hors-ligne) n'est
-pas opérationnel ; une transaction ne peut pas mélanger des fonds B... et BQ... (pas de
-consolidation possible entre les deux mondes) ; les subaddresses BQ n'existent pas encore.
+**Points fonctionnels ouverts.** Une transaction ne peut pas mélanger des fonds B... et BQ...
+(pas de consolidation possible entre les deux mondes) ; les subaddresses BQ n'existent pas
+encore. *(Le cold-signing d'une dépense BQ, ouvert jusqu'au 8 septembre 2026, est désormais
+implémenté : le fichier de transfert transporte le ciphertext ML-KEM-768, jamais le secret
+partagé, et la machine hors-ligne re-dérive celui-ci avec ses propres clés.)*
 
 **Le coût réel, c'est la coordination.** Un hard fork n'est pas un déploiement logiciel : il
 faut publier des binaires pour toutes les plateformes, laisser mineurs, pools, services et
