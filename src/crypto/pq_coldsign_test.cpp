@@ -11,16 +11,17 @@
 //      keys. NB this serializer has no caller in-tree today (verified by symbol
 //      inspection); the test pins the contract so it cannot rot before it does.
 //
-//  (2) THE REAL COLD-SIGNING GAP, demonstrated rather than asserted-away: the
-//      unsigned-tx file drops the PQ fields of every input and output.
-//      tx_source_entry::{is_pq,pq_ss} and tx_destination_entry::is_pq are not in
-//      their BEGIN_SERIALIZE_OBJECT lists, and tx_destination_entry::addr goes
-//      through account_public_address's binary serializer, which deliberately
-//      omits pq_kyber_pk to keep B... addresses byte-identical on the wire. So a
-//      BQ spend exported to an offline signer arrives looking like a classic ring
-//      spend to a classic recipient. The test asserts this is STILL the current
-//      behaviour, so that whoever fixes it gets a failing test telling them the
-//      contract moved rather than silence.
+//  (2) The structs themselves still carry NO post-quantum material through
+//      serialization: tx_source_entry::{is_pq,pq_ss} and tx_destination_entry::is_pq
+//      are absent from their BEGIN_SERIALIZE_OBJECT lists, and
+//      tx_destination_entry::addr goes through account_public_address's binary
+//      serializer, which deliberately omits pq_kyber_pk to keep B... addresses
+//      byte-identical on the wire. That is by design and must STAY true — changing
+//      either struct would alter the transfer format for classic cold signing too.
+//      The PQ material instead rides beside them in unsigned_tx_set::pq_data (v4),
+//      which closed the cold-signing gap; see pq_coldsign_v4_test.cpp. This test
+//      pins the invariant the side table depends on: if someone "fixes" cold signing
+//      by adding fields to these structs instead, this fails and says so.
 #include <cstdio>
 #include <cstring>
 #include <sstream>
@@ -139,9 +140,10 @@ static bool test_restored_account_can_sign_a_bq_spend()
   return true;
 }
 
-// (2) The unsigned-tx transfer format still loses the PQ fields. Documented as a
-// live assertion so the day it is fixed, this test says so.
-static bool test_transfer_format_still_drops_pq_fields()
+// (2) The two structs must keep serializing without their PQ fields — the invariant that
+// lets classic cold signing stay byte-identical while unsigned_tx_set v4's side table
+// carries the post-quantum material separately.
+static bool test_structs_keep_no_pq_fields_on_the_wire()
 {
   // --- input side ---
   tx_source_entry src{};
@@ -162,8 +164,9 @@ static bool test_transfer_format_still_drops_pq_fields()
 
   if (src2.is_pq || src2.pq_ss)
   {
-    printf("NOTE: tx_source_entry now carries its PQ fields — cold-signing a BQ input may be\n"
-           "      fixed; update this test and the cold-sign documentation.\n");
+    printf("FAIL: tx_source_entry now serializes its PQ fields. That changes the transfer\n"
+           "      format for CLASSIC cold signing too, breaking published binaries. The PQ\n"
+           "      material belongs in unsigned_tx_set::pq_data (v4), not here.\n");
     return false;
   }
 
@@ -182,14 +185,15 @@ static bool test_transfer_format_still_drops_pq_fields()
 
   if (dst2.is_pq || dst2.addr.is_pq())
   {
-    printf("NOTE: tx_destination_entry now carries its PQ fields — cold-signing to a BQ\n"
-           "      recipient may be fixed; update this test and the cold-sign documentation.\n");
+    printf("FAIL: tx_destination_entry now serializes its PQ fields, which would also change\n"
+           "      the on-wire bytes of every classic B... address. The recipient ML-KEM key\n"
+           "      belongs in unsigned_tx_set::pq_data (v4), not here.\n");
     return false;
   }
 
-  printf("PASS (documents an OPEN gap): the transfer format drops is_pq/pq_ss on inputs and\n"
-         "      is_pq/ML-KEM key on outputs — an offline signer cannot build a BQ spend from\n"
-         "      an exported unsigned tx. Needs a transfer-file format decision.\n");
+  printf("PASS: the tx structs still put no PQ material on the wire — classic cold signing\n"
+         "      stays byte-identical, and the BQ material travels in the v4 side table instead\n"
+         "      (see pq_coldsign_v4_test.cpp)\n");
   return true;
 }
 
@@ -198,7 +202,7 @@ int main()
   bool ok = true;
   ok &= test_account_archive_round_trip();
   ok &= test_restored_account_can_sign_a_bq_spend();
-  ok &= test_transfer_format_still_drops_pq_fields();
+  ok &= test_structs_keep_no_pq_fields_on_the_wire();
   printf("\nRESULT: %s\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }

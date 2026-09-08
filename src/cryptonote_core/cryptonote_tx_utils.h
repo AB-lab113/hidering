@@ -62,6 +62,13 @@ namespace cryptonote
     bool is_pq = false;
     boost::optional<crypto::pqc::kyber_shared_secret> pq_ss;
 
+    // The ML-KEM-768 CIPHERTEXT that encapsulated to the output being spent — i.e. the
+    // public half of what produced pq_ss. Also not serialised here, but unlike pq_ss it is
+    // safe to transmit: cold signing carries THIS to the offline machine, which decapsulates
+    // it with its own pq_keys to recompute pq_ss locally (see unsigned_tx_set::pq_data).
+    // Shipping pq_ss instead would put spend authority for the output into the transfer file.
+    boost::optional<crypto::pqc::kyber_ciphertext> pq_ct;
+
     void push_output(uint64_t idx, const crypto::public_key &k, uint64_t amount) { outputs.push_back(std::make_pair(idx, rct::ctkey({rct::pk2rct(k), rct::zeroCommit(amount)}))); }
 
     BEGIN_SERIALIZE_OBJECT()

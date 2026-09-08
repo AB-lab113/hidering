@@ -687,6 +687,65 @@ private:
       END_SERIALIZE()
     };
 
+    // HIDERING Phase 5 (HFv16) — post-quantum side table for cold signing.
+    //
+    // WHY A SIDE TABLE. tx_source_entry and tx_destination_entry deliberately do not
+    // serialise their PQ fields: tx_destination_entry::addr goes through
+    // account_public_address's binary serialiser, which omits pq_kyber_pk on purpose so
+    // classic B... addresses stay byte-identical on the wire (Step 5). Adding positional
+    // epee fields to either struct would change the transfer format for CLASSIC cold
+    // signing too, breaking every published binary — for a feature that is inert until
+    // HFv16. So the PQ material rides alongside, written only from unsigned_tx_set v4.
+    //
+    // WHAT TRAVELS, AND WHAT DELIBERATELY DOES NOT. Inputs carry the ML-KEM-768
+    // CIPHERTEXT of the output being spent — never the shared secret it decapsulates to.
+    // The offline machine recomputes the secret itself with its own pq_keys. A stolen
+    // unsigned-tx file therefore grants no BQ spend authority, which is the whole point of
+    // signing offline. Shipping pq_ss would have been one field shorter and would have
+    // handed that authority to anyone holding the file.
+    struct pq_source_ct
+    {
+      uint32_t index;                       // index into tx_construction_data::sources
+      crypto::pqc::kyber_ciphertext ct;     // 1088 bytes, BLOB_SERIALIZER'd in tx_extra.h
+
+      BEGIN_SERIALIZE_OBJECT()
+        VARINT_FIELD(index)
+        FIELD(ct)
+      END_SERIALIZE()
+    };
+
+    struct pq_dest_kem_pk
+    {
+      uint32_t index;                       // index into the destination vector it annotates
+      std::string kem_pk;                   // recipient ML-KEM-768 encapsulation key, 1184 bytes
+
+      BEGIN_SERIALIZE_OBJECT()
+        VARINT_FIELD(index)
+        FIELD(kem_pk)
+      END_SERIALIZE()
+    };
+
+    // One entry per transaction, positionally aligned with unsigned_tx_set::txes.
+    struct tx_pq_data
+    {
+      std::vector<pq_source_ct> source_cts;        // the is_pq inputs; presence IS the flag
+      std::vector<pq_dest_kem_pk> dest_kem_pks;    // annotates tx_construction_data::splitted_dsts
+      std::vector<pq_dest_kem_pk> orig_dest_kem_pks; // annotates tx_construction_data::dests
+      std::string change_kem_pk;                   // change_dts.addr's key, empty if the change is classic
+
+      bool empty() const
+      {
+        return source_cts.empty() && dest_kem_pks.empty() && orig_dest_kem_pks.empty() && change_kem_pk.empty();
+      }
+
+      BEGIN_SERIALIZE_OBJECT()
+        FIELD(source_cts)
+        FIELD(dest_kem_pks)
+        FIELD(orig_dest_kem_pks)
+        FIELD(change_kem_pk)
+      END_SERIALIZE()
+    };
+
     // The term "Unsigned tx" is not really a tx since it's not signed yet.
     // It doesnt have tx hash, key and the integrated address is not separated into addr + payment id.
     struct unsigned_tx_set
@@ -698,9 +757,29 @@ private:
       // the offline cold-signer (which has no daemon to query) gates the post-quantum paths
       // correctly instead of silently defaulting to 0. 0 = pre-HFv16 / unknown (PQ inert).
       uint8_t pq_hf_version = 0;
+      // HIDERING Phase 5 (HFv16): post-quantum side table, one entry per tx in `txes`.
+      // Empty for every classic transfer, which is what keeps v3 files byte-identical.
+      std::vector<tx_pq_data> pq_data;
+
+      // True when this set actually carries post-quantum material and therefore needs the
+      // v4 encoding (and the bumped file-level version byte, see dump_tx_to_str).
+      bool has_pq_data() const
+      {
+        for (const auto &d: pq_data) if (!d.empty()) return true;
+        return false;
+      }
 
       BEGIN_SERIALIZE_OBJECT()
-        VERSION_FIELD(3)
+        // HIDERING: VERSION_FIELD(4) unconditionally would rewrite the version varint of
+        // EVERY set, including purely classic ones. Emit 4 only when there is post-quantum
+        // material to describe, so a classic unsigned tx still serialises to exactly the
+        // bytes it did before this field existed. Expanded by hand for that reason.
+        uint32_t version = has_pq_data() ? 4 : 3;
+        do {
+          ar.tag("version");
+          ar.serialize_varint(version);
+          if (!ar.good()) return false;
+        } while(0);
         FIELD(txes)
         if (version == 0)
         {
@@ -725,6 +804,10 @@ private:
         // HIDERING audit F-1: present from unsigned_tx_set v3 onward; older sets default to 0.
         if (version >= 3)
           FIELD(pq_hf_version)
+        // HIDERING Phase 5: present from v4 onward. A v3 set leaves pq_data empty, which is
+        // exactly right — it cannot describe a BQ spend, and a v3 set never contains one.
+        if (version >= 4)
+          FIELD(pq_data)
       END_SERIALIZE()
     };
 
@@ -1209,6 +1292,13 @@ private:
     // sign unsigned tx. Takes unsigned_tx_set as argument. Used by GUI
     bool sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, bool export_raw = false);
     bool sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txs);
+    // HIDERING Phase 5 (HFv16): cold-signing step that rebuilds the post-quantum fields of
+    // sources and destinations from unsigned_tx_set::pq_data — decapsulating each transmitted
+    // ML-KEM-768 ciphertext with THIS wallet's own key to recompute the shared secret locally.
+    // Called by sign_tx; public so the offline half of the split can be exercised and audited
+    // on its own. A no-op for a classic set, whose pq_data is empty.
+    void restore_pq_construction_data(unsigned_tx_set &exported_txs) const;
+
     std::string sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txes);
     // load unsigned_tx_set from file. 
     bool load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx_set &exported_txs) const;
@@ -1891,7 +1981,10 @@ private:
     // un-tweak match), so the spend path can re-derive the per-output ML-DSA-65 key. Returns false
     // (leaving `ss` untouched) for a classic output or a wallet without pq_keys → is_pq stays
     // false and the source is spent as a normal ring input. Used by transfer_selected_rct.
-    bool recover_pq_spend_secret(const transfer_details &td, crypto::pqc::kyber_shared_secret &ss) const;
+    // `ct_out`, when given, also returns the ML-KEM-768 ciphertext the secret came from —
+    // that is the half safe to put in an unsigned-tx file for cold signing.
+    bool recover_pq_spend_secret(const transfer_details &td, crypto::pqc::kyber_shared_secret &ss,
+                                 crypto::pqc::kyber_ciphertext *ct_out = nullptr) const;
     void parse_block_round(const cryptonote::blobdata &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const;
     uint64_t get_upper_transaction_weight_limit();
     std::vector<uint64_t> get_unspent_amounts_vector(bool strict);

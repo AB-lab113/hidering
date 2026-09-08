@@ -116,6 +116,14 @@ using namespace cryptonote;
 #define TX_WEIGHT_TARGET(bytes) (bytes*2/3)
 
 #define UNSIGNED_TX_PREFIX "Monero unsigned tx set\005"
+// HIDERING Phase 5 (HFv16): a set carrying post-quantum material (unsigned_tx_set v4) is
+// written under a BUMPED file version byte. The point is what an OLD binary does with it:
+// the struct-level version varint would not stop one — it reads version 4, handles the
+// fields it knows, and silently ignores the trailing pq_data, which would make it sign a
+// BQ spend as if it were a classic ring spend. The file byte is the only thing an already
+// published binary rejects, so a v4 set gets \006 and old wallets refuse it loudly
+// ("Unsupported version in unsigned tx"). Classic sets keep \005 and stay byte-identical.
+#define UNSIGNED_TX_PREFIX_PQ "Monero unsigned tx set\006"
 #define SIGNED_TX_PREFIX "Monero signed tx set\005"
 #define MULTISIG_UNSIGNED_TX_PREFIX "Monero multisig unsigned tx set\001"
 
@@ -2442,7 +2450,8 @@ bool wallet2::get_pq_output_shared_secrets(const cryptonote::transaction &tx, st
   return !ss_list.empty();
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::recover_pq_spend_secret(const transfer_details &td, crypto::pqc::kyber_shared_secret &ss) const
+bool wallet2::recover_pq_spend_secret(const transfer_details &td, crypto::pqc::kyber_shared_secret &ss,
+                                      crypto::pqc::kyber_ciphertext *ct_out) const
 {
   // HIDERING Phase 5 (HFv16, A3). Re-derive the ML-KEM-768 shared secret that encapsulated to
   // the BQ... output recorded in `td`, so the spend path can rebuild the per-output ML-DSA-65
@@ -2513,6 +2522,10 @@ bool wallet2::recover_pq_spend_secret(const transfer_details &td, crypto::pqc::k
       if (r)
       {
         ss = cand;
+        // Hand back the ciphertext too when asked: cold signing transmits THIS, and the
+        // offline machine re-derives `ss` from it locally (see dump_tx_to_str / sign_tx).
+        if (ct_out != nullptr)
+          *ct_out = ct;
         memwipe(&t, sizeof(t));
         memwipe(&cand, sizeof(cand));
         return true;
@@ -8046,6 +8059,51 @@ std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) c
   // returns 0 (PQ inert); offline / unreachable daemon also falls back to 0.
   try { txs.pq_hf_version = const_cast<wallet2*>(this)->get_pq_hf_version(); }
   catch (...) { txs.pq_hf_version = 0; }
+
+  // HIDERING Phase 5 (HFv16): build the post-quantum side table (see unsigned_tx_set::pq_data).
+  // Every entry here is PUBLIC material — ML-KEM-768 ciphertexts and recipients' encapsulation
+  // keys. pq_ss is deliberately never written: the offline signer decapsulates the ciphertext
+  // with its own key instead, so the file cannot authorise a BQ spend on its own.
+  // For a classic transfer every entry stays empty, has_pq_data() is false, and the set
+  // serialises as v3 exactly as before.
+  txs.pq_data.resize(txs.txes.size());
+  for (size_t n = 0; n < txs.txes.size(); ++n)
+  {
+    const tx_construction_data &sd = txs.txes[n];
+    tx_pq_data &pd = txs.pq_data[n];
+
+    for (size_t i = 0; i < sd.sources.size(); ++i)
+    {
+      if (!sd.sources[i].is_pq)
+        continue;
+      // A BQ source with no ciphertext cannot be reconstructed offline; refuse to export a
+      // set that would be silently unsignable rather than ship a half-described spend.
+      THROW_WALLET_EXCEPTION_IF(!sd.sources[i].pq_ct, error::wallet_internal_error,
+          "BQ source has no ML-KEM-768 ciphertext to export for cold signing");
+      pq_source_ct e;
+      e.index = (uint32_t)i;
+      e.ct = *sd.sources[i].pq_ct;
+      pd.source_cts.push_back(e);
+    }
+
+    const auto collect = [](const std::vector<cryptonote::tx_destination_entry> &dsts,
+                            std::vector<pq_dest_kem_pk> &out)
+    {
+      for (size_t i = 0; i < dsts.size(); ++i)
+      {
+        if (!dsts[i].addr.is_pq())
+          continue;
+        pq_dest_kem_pk e;
+        e.index = (uint32_t)i;
+        e.kem_pk.assign((const char*)dsts[i].addr.pq_kyber_pk->data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+        out.push_back(e);
+      }
+    };
+    collect(sd.splitted_dsts, pd.dest_kem_pks);
+    collect(sd.dests, pd.orig_dest_kem_pks);
+    if (sd.change_dts.addr.is_pq())
+      pd.change_kem_pk.assign((const char*)sd.change_dts.addr.pq_kyber_pk->data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+  }
   // save as binary
   std::ostringstream oss;
   binary_archive<true> ar(oss);
@@ -8060,7 +8118,9 @@ std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) c
   }
   LOG_PRINT_L2("Saving unsigned tx data: " << oss.str());
   std::string ciphertext = encrypt_with_view_secret_key(oss.str());
-  return std::string(UNSIGNED_TX_PREFIX) + ciphertext;
+  // HIDERING Phase 5: bump the file version byte only for a set that actually carries PQ
+  // material, so classic cold signing keeps producing (and older wallets keep reading) \005.
+  return std::string(txs.has_pq_data() ? UNSIGNED_TX_PREFIX_PQ : UNSIGNED_TX_PREFIX) + ciphertext;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx_set &exported_txs) const
@@ -8104,7 +8164,12 @@ bool wallet2::parse_unsigned_tx_from_str(const std::string &unsigned_tx_st, unsi
       LOG_PRINT_L0("Not loading deprecated format");
       return false;
   }
-  else if (version == '\005')
+  // HIDERING Phase 5 (HFv16): \005 is a classic set, \006 one carrying the post-quantum side
+  // table (unsigned_tx_set v4). Both decode identically here — the struct's own version varint
+  // decides whether pq_data is present. The separate file byte exists so that a wallet built
+  // before v4 REJECTS a BQ set outright instead of ignoring the trailing pq_data and signing
+  // the spend as a classic ring spend.
+  else if (version == '\005' || version == '\006')
   {
     try { s = decrypt_with_view_secret_key(s); }
     catch(const std::exception &e) { LOG_PRINT_L0("Failed to decrypt unsigned tx: " << e.what()); return false; }
@@ -8147,12 +8212,101 @@ bool wallet2::sign_tx(const std::string &unsigned_filename, const std::string &s
   return sign_tx(exported_txs, signed_filename, txs, export_raw);
 }
 //----------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------
+void wallet2::restore_pq_construction_data(unsigned_tx_set &exported_txs) const
+{
+  // HIDERING Phase 5 (HFv16). Cold-signing side of the pq_data side table.
+  //
+  // Inputs: decapsulate the transmitted ML-KEM-768 ciphertext with THIS wallet's own
+  // decapsulation key to recompute the shared secret, then flag the source is_pq so
+  // construct_tx spends it transparently as a txin_to_key_pq. The secret is produced here and
+  // stays here; the transfer file only ever held the ciphertext.
+  //
+  // Outputs: put the recipients' ML-KEM-768 encapsulation keys back onto the destination
+  // addresses, which the binary address serialiser dropped. construct_tx derives is_pq from
+  // addr.is_pq(), so restoring the key is all that a BQ destination needs.
+  if (exported_txs.pq_data.empty())
+    return;
+
+  THROW_WALLET_EXCEPTION_IF(exported_txs.pq_data.size() != exported_txs.txes.size(),
+      error::wallet_internal_error, "post-quantum side table does not match the transaction count");
+
+  const cryptonote::account_keys &keys = m_account.get_keys();
+
+  const auto restore_dsts = [](const std::vector<pq_dest_kem_pk> &src,
+                               std::vector<cryptonote::tx_destination_entry> &dsts)
+  {
+    for (const pq_dest_kem_pk &e : src)
+    {
+      THROW_WALLET_EXCEPTION_IF(e.index >= dsts.size(), error::wallet_internal_error,
+          "post-quantum destination index out of range");
+      THROW_WALLET_EXCEPTION_IF(e.kem_pk.size() != crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES,
+          error::wallet_internal_error, "post-quantum destination key has the wrong size");
+      std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kem_pk;
+      memcpy(kem_pk.data(), e.kem_pk.data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+      dsts[e.index].addr.pq_kyber_pk = kem_pk;
+      dsts[e.index].is_pq = true;
+    }
+  };
+
+  for (size_t n = 0; n < exported_txs.txes.size(); ++n)
+  {
+    tx_construction_data &sd = exported_txs.txes[n];
+    const tx_pq_data &pd = exported_txs.pq_data[n];
+
+    if (!pd.source_cts.empty())
+    {
+      // Only a wallet that owns the BQ decapsulation key can sign this set at all.
+      THROW_WALLET_EXCEPTION_IF(!keys.pq_keys, error::wallet_internal_error,
+          "this transaction spends BQ... outputs but this wallet has no ML-KEM-768 key");
+    }
+    for (const pq_source_ct &e : pd.source_cts)
+    {
+      THROW_WALLET_EXCEPTION_IF(e.index >= sd.sources.size(), error::wallet_internal_error,
+          "post-quantum source index out of range");
+      crypto::pqc::kyber_shared_secret ss;
+      const bool ok = crypto::pqc::pqc_stealth_decaps(*keys.pq_keys, e.ct, ss);
+      THROW_WALLET_EXCEPTION_IF(!ok, error::wallet_internal_error,
+          "failed to decapsulate the ML-KEM-768 ciphertext of a BQ source");
+      sd.sources[e.index].is_pq = true;
+      sd.sources[e.index].pq_ss = ss;
+      sd.sources[e.index].pq_ct = e.ct;
+      memwipe(&ss, sizeof(ss));
+    }
+
+    restore_dsts(pd.dest_kem_pks, sd.splitted_dsts);
+    restore_dsts(pd.orig_dest_kem_pks, sd.dests);
+
+    if (!pd.change_kem_pk.empty())
+    {
+      THROW_WALLET_EXCEPTION_IF(pd.change_kem_pk.size() != crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES,
+          error::wallet_internal_error, "post-quantum change key has the wrong size");
+      std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kem_pk;
+      memcpy(kem_pk.data(), pd.change_kem_pk.data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+      sd.change_dts.addr.pq_kyber_pk = kem_pk;
+      sd.change_dts.is_pq = true;
+    }
+  }
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &txs, signed_tx_set &signed_txes)
 {
   if (!std::get<2>(exported_txs.new_transfers).empty())
     import_outputs(exported_txs.new_transfers);
   else if (!std::get<2>(exported_txs.transfers).empty())
     import_outputs(exported_txs.transfers);
+
+  // HIDERING Phase 5 (HFv16): rehydrate the post-quantum material the transfer format cannot
+  // carry inside tx_source_entry / tx_destination_entry (see unsigned_tx_set::pq_data).
+  //
+  // This is the offline half of the cold-signing split: the file gave us PUBLIC data only —
+  // ML-KEM-768 ciphertexts and recipients' encapsulation keys — and the shared secret that
+  // actually authorises the spend is derived HERE, on the cold machine, from our own pq_keys.
+  // It never existed in the file and never touched the hot machine's export.
+  //
+  // pq_data is empty for every classic transfer (and absent altogether from a v3 file), so this
+  // whole block is a no-op for B... cold signing.
+  restore_pq_construction_data(exported_txs);
 
   // sign the transactions
   for (size_t n = 0; n < exported_txs.txes.size(); ++n)
@@ -10386,10 +10540,14 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     // false and the source is spent as a normal ring input, so the live chain is untouched.
     {
       crypto::pqc::kyber_shared_secret pq_ss;
-      if (recover_pq_spend_secret(td, pq_ss))
+      crypto::pqc::kyber_ciphertext pq_ct;
+      if (recover_pq_spend_secret(td, pq_ss, &pq_ct))
       {
         src.is_pq = true;
         src.pq_ss = pq_ss;
+        // Kept so a cold-signing export can carry the ciphertext (never pq_ss) to the
+        // offline machine; unused, and harmless, for an online spend.
+        src.pq_ct = pq_ct;
       }
       memwipe(&pq_ss, sizeof(pq_ss));
     }
