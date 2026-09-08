@@ -23,25 +23,88 @@
 
 namespace
 {
-  // --- Deterministic SHAKE256 RNG backing pqc_keygen_from_seed (ML-DSA path) ---
+  // --- OQS entropy dispatch (deterministic keygen vs. real randomness) --------
   //
-  // liboqs exposes no derandomised keygen for ML-DSA-65; OQS_SIG_keypair pulls its
-  // 32-byte ξ through the process-global `randombytes` hook. We install a SHAKE256
-  // byte-stream as that hook so the keygen becomes a pure function of the seed.
-  // The hook is a global function pointer with no context argument, so the stream
-  // state must be static and is guarded by g_det_rng_mutex (held across the whole
-  // OQS_SIG_keypair call by the caller). Using a squeezable SHAKE stream rather than
-  // a fixed 32-byte buffer keeps it correct no matter how many bytes liboqs reads.
-  std::mutex g_det_rng_mutex;
-  OQS_SHA3_shake256_inc_ctx *g_det_rng_stream = nullptr;
+  // liboqs exposes no derandomised keygen for ML-DSA-65 — still true in 0.16.0,
+  // whose OQS_SIG struct carries only `keypair` — so OQS_SIG_keypair pulls its
+  // 32-byte seed through liboqs' PROCESS-GLOBAL `randombytes` hook. Deriving a BQ
+  // account deterministically from the wallet spend key (M-4) therefore has to
+  // drive that hook.
+  //
+  // audit MOYEN-4 (7 Sep 2026). The first implementation installed the
+  // deterministic SHAKE256 stream ON the global hook for the duration of the
+  // keygen and guarded it with a mutex. The mutex only serialised
+  // pqc_keygen_from_seed against ITSELF; the hook stayed global for that window,
+  // so any other thread that entered liboqs for real entropy meanwhile — a
+  // concurrent pqc_keygen, a pqc_kem_encaps building an output, a second
+  // wallet-rpc request — silently drew from the caller's deterministic stream.
+  // Both halves fail silently: the concurrent operation gets key material
+  // predictable from someone else's spend key, and the bytes it consumes
+  // desynchronise the stream so the BQ address derived from a given seed stops
+  // being reproducible (which is the whole point of M-4).
+  //
+  // The fix inverts ownership. The hook is installed EXACTLY ONCE per process and
+  // never swapped again; it dispatches on a THREAD-LOCAL stream pointer. A thread
+  // inside pqc_keygen_from_seed reads its own SHAKE256 stream; every other thread,
+  // and that same thread outside the keygen, falls through to liboqs' own default
+  // entropy. Threads cannot observe each other's state at all, so the mutex is
+  // gone and two seeds can be derived concurrently.
+  //
+  // Regression test: src/crypto/pq_rng_isolation_test.cpp.
 
-  void det_rng_fill(uint8_t *out, size_t len)
+  // liboqs' default entropy sources. rand.c gives them external linkage but does
+  // not declare them in <oqs/rand.h>; we mirror rand.c's own load-time selection
+  // so that "not deterministic" means exactly what it meant before this hook
+  // existed. A liboqs that renames them breaks the LINK, loudly — the same
+  // fail-fast posture as the compile-time size cross-checks in this file.
+  extern "C" void OQS_randombytes_system(uint8_t *random_array, size_t bytes_to_read);
+#ifdef OQS_USE_OPENSSL
+  extern "C" void OQS_randombytes_openssl(uint8_t *random_array, size_t bytes_to_read);
+#endif
+
+  void oqs_default_entropy(uint8_t *out, size_t len)
   {
-    if (g_det_rng_stream != nullptr)
-      OQS_SHA3_shake256_inc_squeeze(out, len, g_det_rng_stream);
-    else if (len > 0)
-      std::memset(out, 0, len); // unreachable: stream is always set under the lock
+#ifdef OQS_USE_OPENSSL
+    OQS_randombytes_openssl(out, len); // OpenSSL RAND_bytes — liboqs' default in our build
+#else
+    OQS_randombytes_system(out, len);
+#endif
   }
+
+  // Non-null only on a thread currently inside pqc_keygen_from_seed.
+  thread_local OQS_SHA3_shake256_inc_ctx *tl_det_rng_stream = nullptr;
+
+  void hrg_oqs_randombytes(uint8_t *out, size_t len)
+  {
+    if (len == 0)
+      return;
+    OQS_SHA3_shake256_inc_ctx *stream = tl_det_rng_stream;
+    if (stream != nullptr)
+      OQS_SHA3_shake256_inc_squeeze(out, len, stream);
+    else
+      oqs_default_entropy(out, len);
+  }
+
+  // Every pqc_* entry point calls this before touching liboqs, so the global hook
+  // pointer is written once, ordered by call_once against every later OQS read of
+  // it: no data race, and no window in which the hook is anything else.
+  void ensure_oqs_rng_installed()
+  {
+    static std::once_flag once;
+    std::call_once(once, [] { OQS_randombytes_custom_algorithm(hrg_oqs_randombytes); });
+  }
+
+  // RAII binding of a deterministic stream to the CURRENT thread only. Restores the
+  // previous binding (nullptr in practice — nesting is not used) so an early return
+  // or a throw can never leave a dangling stream visible to later calls.
+  struct scoped_det_rng
+  {
+    OQS_SHA3_shake256_inc_ctx *prev;
+    explicit scoped_det_rng(OQS_SHA3_shake256_inc_ctx *stream) : prev(tl_det_rng_stream) { tl_det_rng_stream = stream; }
+    ~scoped_det_rng() { tl_det_rng_stream = prev; }
+    scoped_det_rng(const scoped_det_rng &) = delete;
+    scoped_det_rng &operator=(const scoped_det_rng &) = delete;
+  };
 
   // Domain-separated SHAKE256 expansion of a master seed into a fixed-length sub-seed.
   void derive_subseed(const char *domain, const uint8_t *seed, size_t seed_len,
@@ -63,6 +126,7 @@ namespace pqc
 {
   bool pqc_keygen(pq_public_key &pk, pq_secret_key &sk)
   {
+    ensure_oqs_rng_installed();
     bool ok = false;
     OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
     OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
@@ -86,6 +150,8 @@ namespace pqc
     if (seed == nullptr || seed_len == 0)
       return false;
 
+    ensure_oqs_rng_installed();
+
     // Domain-separated sub-seeds derived from the master seed (the wallet spend key).
     uint8_t kem_seed[ML_KEM_768_KEYPAIR_SEED_BYTES];
     uint8_t dsa_seed[ML_DSA_65_KEYGEN_SEED_BYTES];
@@ -107,24 +173,22 @@ namespace pqc
       bool kem_ok = OQS_KEM_keypair_derand(kem, pk.kyber768_pk, sk.kyber768_sk, kem_seed) == OQS_SUCCESS;
 
       // ML-DSA-65: no derandomised keygen API → drive OQS_SIG_keypair with a
-      // deterministic SHAKE256 RNG over liboqs' global randombytes hook. The hook
-      // is process-global, so serialise and always restore the default RNG.
+      // deterministic SHAKE256 RNG. The stream is bound to THIS THREAD ONLY
+      // (audit MOYEN-4): concurrent OQS users on other threads keep drawing real
+      // entropy, and nothing they do can consume bytes out of this stream.
       bool sig_ok = false;
       {
-        std::lock_guard<std::mutex> lock(g_det_rng_mutex);
         OQS_SHA3_shake256_inc_ctx stream;
         OQS_SHA3_shake256_inc_init(&stream);
         OQS_SHA3_shake256_inc_absorb(&stream, dsa_seed, sizeof(dsa_seed));
         OQS_SHA3_shake256_inc_finalize(&stream);
-        g_det_rng_stream = &stream;
-        OQS_randombytes_custom_algorithm(det_rng_fill);
 
-        sig_ok = OQS_SIG_keypair(sig, pk.dilithium3_pk, sk.dilithium3_sk) == OQS_SUCCESS;
-
-        // Restore the default system RNG BEFORE releasing the stream, so no later
-        // OQS_randombytes call can dereference a freed context.
-        OQS_randombytes_switch_algorithm(OQS_RAND_alg_system);
-        g_det_rng_stream = nullptr;
+        {
+          // Unbind before releasing the context, so no later OQS_randombytes on
+          // this thread can dereference a freed stream.
+          scoped_det_rng bind(&stream);
+          sig_ok = OQS_SIG_keypair(sig, pk.dilithium3_pk, sk.dilithium3_sk) == OQS_SUCCESS;
+        }
         OQS_SHA3_shake256_inc_ctx_release(&stream);
       }
       ok = kem_ok && sig_ok;
@@ -141,6 +205,7 @@ namespace pqc
   bool pqc_sign(const pq_secret_key &sk, const uint8_t *msg, size_t msg_len,
                 pq_signature &sig_out, size_t &sig_len)
   {
+    ensure_oqs_rng_installed(); // ML-DSA signing is hedged → it reads randombytes
     bool ok = false;
     sig_len = 0;
     OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
@@ -179,6 +244,7 @@ namespace pqc
   bool pqc_kem_encaps(const pq_public_key &pk, kyber_ciphertext &ct,
                       kyber_shared_secret &ss)
   {
+    ensure_oqs_rng_installed();
     bool ok = false;
     OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
     if (kem != nullptr
@@ -209,6 +275,7 @@ namespace pqc
                    const uint8_t *pk, size_t pk_len,
                    pq_tx_sig &out_sig)
   {
+    ensure_oqs_rng_installed(); // hedged ML-DSA signing reads randombytes
     if (tx_prefix_hash == nullptr || sk == nullptr || pk == nullptr
         || sk_len != ML_DSA_65_SECRET_KEY_BYTES
         || pk_len != ML_DSA_65_PUBLIC_KEY_BYTES)
@@ -259,6 +326,8 @@ namespace pqc
   {
     if (recipient_kyber_pk == nullptr || pk_len != ML_KEM_768_PUBLIC_KEY_BYTES)
       return false;
+
+    ensure_oqs_rng_installed();
 
     bool ok = false;
     OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
