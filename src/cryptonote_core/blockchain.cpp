@@ -3013,9 +3013,16 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   // RCTTypeNull=0, from v14 on). None of them apply to a transparent PQ spend: its output amounts
   // are public and its balance is enforced by the revealed-amount conservation rule in
   // check_tx_inputs (check e); output *types* (view-tagged) are validated by check_output_types.
-  // Detect such a tx by a txin_to_key_pq input and accept it here. Only possible at/after HFv16;
-  // every classic v2 tx (including a B...→BQ output-creating RingCT tx) keeps all rules below.
-  if (hf_version >= HF_VERSION_PQ)
+  // Detect such a tx by a txin_to_key_pq input AND the absence of a RingCT signature.
+  //
+  // The RCTTypeNull condition is load-bearing, not decoration: a HYBRID transaction also has
+  // txin_to_key_pq inputs, but it IS a RingCT transaction — zeroed output amounts, real
+  // commitments, range proofs. Waving it through here would exempt it from the v2 zero-amount
+  // rule and the rct-type ladder, i.e. let a transaction carrying post-quantum inputs publish
+  // outputs under rules nothing else checks. It must take every rule below, exactly like the
+  // classic RingCT transaction it is. Only possible at/after HFv16; every classic v2 tx
+  // (including a B...→BQ output-creating RingCT tx) keeps all rules below.
+  if (hf_version >= HF_VERSION_PQ && tx.version >= 2 && tx.rct_signatures.type == rct::RCTTypeNull)
   {
     for (const auto& in : tx.vin)
       if (in.type() == typeid(txin_to_key_pq))
@@ -3191,6 +3198,26 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
   // message - hash of the transaction prefix
   rv.message = rct::hash2rct(tx_prefix_hash);
 
+  // HIDERING Phase 5 (HFv16): in a hybrid transaction the ring signatures cover only the RING
+  // inputs, so CLSAGs/MGs/pseudoOuts are indexed over those, not over tx.vin. Construction puts
+  // every ring input before every transparent post-quantum one (and the validator enforces that
+  // ordering), so the ring inputs are exactly vin[0, n_ring) and the 1:1 indexing below holds
+  // unchanged for them. n_ring == tx.vin.size() for every classic transaction.
+  size_t n_ring = 0;
+  for (const auto &txin: tx.vin)
+    if (txin.type() != typeid(txin_to_key_pq))
+      ++n_ring;
+  for (size_t n = 0; n < n_ring; ++n)
+    CHECK_AND_ASSERT_MES(tx.vin[n].type() == typeid(txin_to_key), false,
+        "ring inputs must precede transparent post-quantum inputs");
+
+  // Also reconstruct the transparent term the balance needs (0 for a classic tx).
+  {
+    uint64_t pq_in = 0;
+    CHECK_AND_ASSERT_MES(get_pq_transparent_input_sum(tx, pq_in), false, "bad transparent PQ input sum");
+    rv.pq_transparent_in = pq_in;
+  }
+
   // mixRing - full and simple store it in opposite ways
   if (rv.type == rct::RCTTypeFull)
   {
@@ -3240,8 +3267,8 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
   {
     if (!tx.pruned)
     {
-      CHECK_AND_ASSERT_MES(rv.p.MGs.size() == tx.vin.size(), false, "Bad MGs size");
-      for (size_t n = 0; n < tx.vin.size(); ++n)
+      CHECK_AND_ASSERT_MES(rv.p.MGs.size() == n_ring, false, "Bad MGs size");
+      for (size_t n = 0; n < n_ring; ++n)
       {
         rv.p.MGs[n].II.resize(1);
         rv.p.MGs[n].II[0] = rct::ki2rct(boost::get<txin_to_key>(tx.vin[n]).k_image);
@@ -3252,8 +3279,8 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
   {
     if (!tx.pruned)
     {
-      CHECK_AND_ASSERT_MES(rv.p.CLSAGs.size() == tx.vin.size(), false, "Bad CLSAGs size");
-      for (size_t n = 0; n < tx.vin.size(); ++n)
+      CHECK_AND_ASSERT_MES(rv.p.CLSAGs.size() == n_ring, false, "Bad CLSAGs size");
+      for (size_t n = 0; n < n_ring; ++n)
       {
         rv.p.CLSAGs[n].I = rct::ki2rct(boost::get<txin_to_key>(tx.vin[n]).k_image);
       }
@@ -3471,6 +3498,27 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           tvc.m_verifivation_failed = true;
           return false;
         }
+        // (b2) BIND THE DECLARED AMOUNT TO THE ON-CHAIN COMMITMENT.
+        //
+        // Checks (a)-(d) establish that the spender OWNS the referenced output. None of them
+        // says what it is WORTH: `amount` arrives from the transaction and, before this check
+        // existed, nothing constrained it. Since a transparent PQ spend is balanced by plain
+        // arithmetic on revealed amounts (check e), and — for a hybrid tx — by feeding that
+        // sum into the RingCT balance, an unbound `amount` is direct money creation: the owner
+        // of a dust BQ output could declare it worth millions and keep the difference.
+        //
+        // The commitment stored on chain is the only record of the value, and it is hiding, so
+        // the spender opens it here: C == amount*H + mask*G. Both creation paths are covered —
+        // a BQ output from a classic RingCT tx carries its ECDH-derived mask, and one from a
+        // transparent BQ spend is stored with an identity mask (CRIT-1), for which
+        // commit(a, I) is precisely the zeroCommit(a) that was stored.
+        if (!(od.commitment == rct::commit(in.amount, in.mask)))
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input declares an amount that does not "
+                     "open the on-chain commitment of output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
         // (c) the on-chain binding tag commits real_output_key to this dsa_pk. Retrieve the
         // bind_tag published in the output's CREATING tx (TX_EXTRA_TAG_PQ_BIND, that output's
         // local index) and compare to the recomputed expected value.
@@ -3527,6 +3575,33 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       //     the difference being the fee (collected by the miner; see get_tx_fee).
       // Without this rule an attacker could pair revealed PQ inputs with hidden RingCT outputs to
       // mint coins. All gated on HFv16 → the live chain never reaches this code.
+      //
+      // HYBRID (added after A3): a transaction MAY now mix transparent PQ inputs with ring
+      // inputs. It is then an ordinary RingCT transaction — hidden output amounts, range
+      // proofs — whose balance closes because the revealed PQ totals are added to the RingCT
+      // sum check as a public zero-mask term (rctSigBase::pq_transparent_in). The arithmetic
+      // rule below applies only to the FULLY transparent shape, where there is no RingCT
+      // balance to lean on. Note the hybrid is strictly MORE private than the fully
+      // transparent shape: only the PQ inputs' amounts are revealed.
+      size_t n_ring_in = 0;
+      for (const auto& txin : tx.vin)
+        if (txin.type() != typeid(txin_to_key_pq)) ++n_ring_in;
+
+      if (n_ring_in > 0)
+      {
+        // Hybrid: the outputs are committed, not revealed, so no arithmetic check is possible
+        // or needed here — verRctSemanticsSimple does the balance with the transparent term.
+        // What must be enforced is that it really IS a RingCT transaction: were it RCTTypeNull
+        // the revealed PQ inputs would be paired with unbalanced outputs.
+        if (tx.version != 2 || tx.rct_signatures.type == rct::RCTTypeNull)
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " mixes ring and transparent post-quantum inputs but is not a RingCT transaction");
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+      }
+      else
+      {
       uint64_t pq_in_sum = 0;
       for (const auto& txin : tx.vin)
       {
@@ -3568,6 +3643,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         tvc.m_verifivation_failed = true;
         return false;
       }
+      } // end fully-transparent branch
     }
   }
 
@@ -3702,6 +3778,25 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
   }
 
+  // HIDERING Phase 5 (HFv16): in a transaction that mixes ring and transparent post-quantum
+  // inputs, EVERY ring input must precede EVERY post-quantum one. This is what keeps the
+  // RingCT signatures, pseudoOuts and mixRing indexed 1:1 with vin[0, n_ring) — otherwise the
+  // verifier would need an index-mapping table threaded through consensus-critical code, and a
+  // mismatch there is the kind of bug that mints money. Trivially true for any classic tx.
+  {
+    bool seen_pq = false;
+    for (const auto &txin: tx.vin)
+    {
+      if (txin.type() == typeid(txin_to_key_pq)) { seen_pq = true; continue; }
+      if (seen_pq)
+      {
+        MERROR_VER("Tx " << get_transaction_hash(tx) << " has a ring input after a transparent post-quantum input");
+        tvc.m_verifivation_failed = true;
+        return false;
+      }
+    }
+  }
+
   // from v7, sorted ins
   if (hf_version >= 7) {
     const crypto::key_image *last_key_image = NULL;
@@ -3826,6 +3921,19 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   {
     CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),
         false, "Transaction spends at least one output which is too young");
+  }
+
+  // HIDERING Phase 5 (HFv16): `pubkeys` was sized on tx.vin but filled by sig_index, which
+  // counts RING inputs only — a transparent post-quantum input contributes no ring. Drop the
+  // unused tail so the mixRing handed to the RingCT verifier has exactly one entry per ring
+  // input, matching the CLSAGs and pseudoOuts. A no-op for any classic transaction.
+  {
+    size_t n_ring_inputs = 0;
+    for (const auto &txin: tx.vin)
+      if (txin.type() != typeid(txin_to_key_pq))
+        ++n_ring_inputs;
+    if (n_ring_inputs != pubkeys.size())
+      pubkeys.resize(n_ring_inputs);
   }
 
   // Warn that new RCT types are present, and thus the cache is not being used effectively

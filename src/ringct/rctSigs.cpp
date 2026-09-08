@@ -1412,6 +1412,16 @@ namespace rct {
           key sumPseudoOuts = addKeys(pseudoOuts);
           DP(sumPseudoOuts);
 
+          // HIDERING Phase 5 (HFv16): a hybrid transaction also spends TRANSPARENT
+          // post-quantum inputs, which have no commitment of their own. Their revealed total
+          // enters here as a public zero-mask commitment sum(a_pq)*H — the only commitment a
+          // verifier can recompute for a value with no blinding factor. Zero for every classic
+          // transaction, so the equation below is bit-for-bit the one it has always been.
+          if (rv.pq_transparent_in != 0) {
+            addKeys(sumPseudoOuts, sumPseudoOuts, scalarmultH(d2h(rv.pq_transparent_in)));
+            DP(sumPseudoOuts);
+          }
+
           //check pseudoOuts vs Outs..
           if (!equalKeys(sumPseudoOuts, sumOutpks)) {
             LOG_PRINT_L1("Sum check failed");

@@ -293,18 +293,40 @@ namespace cryptonote
     // amounts for these spends. Everything is gated on hf_version, and no current caller sets is_pq,
     // so the live B... chain is wholly unaffected.
     //
-    // A3 SCOPE: only an ALL-PQ-input transaction is supported (a BQ wallet spends BQ outputs).
-    // Mixing transparent PQ inputs with ring (B...) inputs in one tx would need a hybrid balance
-    // (transparent inputs as zero-mask pseudo-commitments inside RingCT) and is deferred to A4.
+    // THREE SHAPES, not two (the hybrid was added after A3):
+    //
+    //   * no PQ source            -> classic RingCT. Untouched, byte-identical, live chain.
+    //   * every source is PQ      -> the fully transparent A3 tx described above.
+    //   * a mix of both (HYBRID)  -> a normal RingCT transaction whose ring inputs are
+    //                                balanced as usual, plus transparent PQ inputs whose
+    //                                revealed amounts enter the balance as a public term.
+    //
+    // The hybrid exists because otherwise a wallet can never consolidate B... and BQ... funds,
+    // or pay an amount larger than either half. It is also strictly MORE private than the
+    // all-PQ shape: only the PQ inputs' amounts are revealed, while the OUTPUTS go back to
+    // being Pedersen commitments with range proofs instead of the cleartext of RCTTypeNull.
+    //
+    // How the balance closes (structure "H2"). RingCT verifies
+    //     sum(pseudoOuts) == sum(outPk) + fee*H.
+    // A transparent input of value a has no commitment, but the verifier can compute one from
+    // public data with a known (zero) mask: a*H. Adding those in gives
+    //     sum(pseudoOuts) + sum(a_pq)*H == sum(outPk) + fee*H,
+    // i.e. the transparent inputs behave exactly like a NEGATIVE FEE. pseudoOuts therefore
+    // stays indexed on the RING inputs only, 1:1 with the CLSAGs, so no index mapping is
+    // introduced into consensus-critical verification code; the whole delta is one public
+    // scalar term. The mask must be zero because there is no real commitment to prove an
+    // equality against — the only value a verifier can recompute is the one with no blinding.
     size_t num_pq_sources = 0;
     for (const tx_source_entry& s : sources)
       if (s.is_pq) ++num_pq_sources;
-    const bool pq_transparent_tx = (hf_version >= HF_VERSION_PQ) && num_pq_sources > 0;
-    if (pq_transparent_tx && num_pq_sources != sources.size())
+    const bool any_pq = (hf_version >= HF_VERSION_PQ) && num_pq_sources > 0;
+    // Fully transparent (A3) only when EVERY source is post-quantum.
+    const bool pq_transparent_tx = any_pq && num_pq_sources == sources.size();
+    // Hybrid: at least one PQ source AND at least one ring source.
+    const bool pq_hybrid_tx = any_pq && num_pq_sources < sources.size();
+    if (pq_hybrid_tx && !rct)
     {
-      LOG_ERROR("HIDERING A3: mixing transparent post-quantum (BQ...) inputs with classic ring "
-                "inputs in one transaction is not supported yet (deferred to A4). Spend BQ outputs "
-                "on their own.");
+      LOG_ERROR("HIDERING: a hybrid post-quantum/ring transaction requires RingCT");
       return false;
     }
 
@@ -443,6 +465,11 @@ namespace cryptonote
         in_pq.amount = src_entr.amount;
         in_pq.spent_output_index = src_entr.outputs[src_entr.real_output].first; // global output index
         in_pq.real_output_key = real_out_key;
+        // Open the on-chain commitment so the validator can bind `amount` to it (check b2).
+        // src_entr.mask is the output's blinding factor as recorded by the wallet at scan:
+        // the ECDH-derived mask for a BQ output made by a classic RingCT tx, or the identity
+        // mask for one made by a transparent BQ spend.
+        in_pq.mask = src_entr.mask;
         memcpy(in_pq.dsa.pk, out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
         memset(in_pq.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES); // signed below, once prefix hash is known
         // stash the signing key for the post-prefix-hash signing pass, keyed by vin position
@@ -489,16 +516,36 @@ namespace cryptonote
       std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
     }
 
-    // sort ins by their key image. HIDERING Phase 5 (HFv16, A3): the transparent PQ path has no
-    // key images (txin_to_key_pq) and casting to txin_to_key would throw; it keeps source order
-    // (a single-input BQ spend is the common case, and order is not consensus-critical for the
-    // synthetic-key-image double-spend check). Only the classic ring path is sorted.
+    // sort ins by their key image. HIDERING Phase 5 (HFv16, A3): the fully transparent PQ path
+    // has no key images (txin_to_key_pq) and casting to txin_to_key would throw; it keeps source
+    // order (a single-input BQ spend is the common case, and order is not consensus-critical for
+    // the synthetic-key-image double-spend check).
+    //
+    // HYBRID: ring and PQ inputs coexist, and the ordering is consensus-relevant in two ways.
+    // (1) The sorted-inputs rule (blockchain.cpp, from v7) requires strictly descending key
+    // images across the txin_to_key inputs — it skips other input types, so PQ inputs may sit
+    // anywhere. (2) Far more delicate: CLSAGs and pseudoOuts are indexed 1:1 with vin in the
+    // RingCT verification path. Putting ALL RING INPUTS FIRST keeps that identity intact for
+    // indices [0, n_ring) and needs no index-mapping table inside consensus code — the validator
+    // enforces the same ordering. PQ inputs follow, ordered by their revealed output key so the
+    // result is deterministic. apply_permutation moves tx.vin, in_contexts and sources together,
+    // so the source<->vin alignment every later stage relies on is preserved either way.
     if (!pq_transparent_tx)
     {
     std::vector<size_t> ins_order(sources.size());
     for (size_t n = 0; n < sources.size(); ++n)
       ins_order[n] = n;
     std::sort(ins_order.begin(), ins_order.end(), [&](const size_t i0, const size_t i1) {
+      const bool pq0 = tx.vin[i0].type() == typeid(txin_to_key_pq);
+      const bool pq1 = tx.vin[i1].type() == typeid(txin_to_key_pq);
+      if (pq0 != pq1)
+        return !pq0;                       // every ring input sorts before every PQ input
+      if (pq0)
+      {
+        const txin_to_key_pq &p0 = boost::get<txin_to_key_pq>(tx.vin[i0]);
+        const txin_to_key_pq &p1 = boost::get<txin_to_key_pq>(tx.vin[i1]);
+        return memcmp(&p0.real_output_key, &p1.real_output_key, sizeof(p0.real_output_key)) > 0;
+      }
       const txin_to_key &tk0 = boost::get<txin_to_key>(tx.vin[i0]);
       const txin_to_key &tk1 = boost::get<txin_to_key>(tx.vin[i1]);
       return memcmp(&tk0.k_image, &tk1.k_image, sizeof(tk0.k_image)) > 0;
@@ -706,7 +753,8 @@ namespace cryptonote
     // all dsa.sig AND drop the trailing pq_sig field, then hash). This runs before the external
     // pq_sig block below, so when that block hashes the prefix the inputs already carry their final
     // signatures. pq_input_signing_keys is empty unless this is a BQ spend → no-op on the live chain.
-    if (pq_transparent_tx)
+    // Runs for the hybrid shape too: its PQ inputs need exactly the same per-input authorisation.
+    if (any_pq)
     {
       crypto::hash pq_in_prefix_hash;
       get_transaction_prefix_hash(tx, pq_in_prefix_hash); // dsa.sig all zero, extra has no pq_sig yet
@@ -742,7 +790,7 @@ namespace cryptonote
     // message by stripping the trailing PQ field; the ring/rct signatures below still commit to
     // the full extra (PQ field included). Gated on hf_version (0 on the live chain) AND on the
     // presence of a transparent PQ input, so it is doubly inert pre-fork and for classic txs.
-    if (hf_version >= HF_VERSION_PQ && pq_transparent_tx)
+    if (hf_version >= HF_VERSION_PQ && any_pq)
     {
       crypto::hash pq_prefix_hash;
       get_transaction_prefix_hash(tx, pq_prefix_hash);
@@ -847,7 +895,33 @@ namespace cryptonote
 
       // the non-simple version is slightly smaller, but assumes all real inputs
       // are on the same index, so can only be used if there just one ring.
-      bool use_simple_rct = sources.size() > 1 || rct_config.range_proof_type != rct::RangeProofBorromean;
+      // HYBRID: the non-simple (RCTTypeFull) form has a single aggregate signature over all
+      // inputs and no per-input pseudoOuts, so there is nowhere to put the transparent term.
+      // Force the simple form, which is what every current caller uses anyway.
+      bool use_simple_rct = pq_hybrid_tx || sources.size() > 1 || rct_config.range_proof_type != rct::RangeProofBorromean;
+
+      // HYBRID: the RingCT machinery below sees ONLY the ring sources. The transparent PQ
+      // inputs contribute their revealed amounts to the balance as a public term instead
+      // (structure H2 — see the note at the top of this function), so pseudoOuts and the
+      // CLSAGs stay 1:1 with the ring inputs and with vin[0, n_ring).
+      std::vector<size_t> ring_srcs;
+      ring_srcs.reserve(sources.size());
+      uint64_t pq_amount_in = 0;
+      for (size_t i = 0; i < sources.size(); ++i)
+      {
+        if (sources[i].is_pq && hf_version >= HF_VERSION_PQ)
+        {
+          if (pq_amount_in > std::numeric_limits<uint64_t>::max() - sources[i].amount)
+          {
+            LOG_ERROR("Transparent post-quantum input amount overflow");
+            return false;
+          }
+          pq_amount_in += sources[i].amount;
+        }
+        else
+          ring_srcs.push_back(i);
+      }
+      CHECK_AND_ASSERT_MES(!ring_srcs.empty(), false, "RingCT transaction with no ring input");
 
       if (!use_simple_rct)
       {
@@ -872,14 +946,19 @@ namespace cryptonote
 
       uint64_t amount_in = 0, amount_out = 0;
       rct::ctkeyV inSk;
-      inSk.reserve(sources.size());
+      inSk.reserve(ring_srcs.size());
       // mixRing indexing is done the other way round for simple
-      rct::ctkeyM mixRing(use_simple_rct ? sources.size() : n_total_outs);
+      rct::ctkeyM mixRing(use_simple_rct ? ring_srcs.size() : n_total_outs);
       rct::keyV destinations;
       std::vector<uint64_t> inamounts, outamounts;
       std::vector<unsigned int> index;
-      for (size_t i = 0; i < sources.size(); ++i)
+      // Ring inputs only. amount_in is the TOTAL going in, transparent inputs included, so the
+      // fee below is the real fee; inamounts carries just the ring half, which is what the
+      // pseudoOuts commit to.
+      amount_in = pq_amount_in;
+      for (size_t r = 0; r < ring_srcs.size(); ++r)
       {
+        const size_t i = ring_srcs[r];
         rct::ctkey ctkey;
         amount_in += sources[i].amount;
         inamounts.push_back(sources[i].amount);
@@ -904,12 +983,13 @@ namespace cryptonote
       if (use_simple_rct)
       {
         // mixRing indexing is done the other way round for simple
-        for (size_t i = 0; i < sources.size(); ++i)
+        for (size_t r = 0; r < ring_srcs.size(); ++r)
         {
-          mixRing[i].resize(sources[i].outputs.size());
+          const size_t i = ring_srcs[r];
+          mixRing[r].resize(sources[i].outputs.size());
           for (size_t n = 0; n < sources[i].outputs.size(); ++n)
           {
-            mixRing[i][n] = sources[i].outputs[n].second;
+            mixRing[r][n] = sources[i].outputs[n].second;
           }
         }
       }
@@ -929,9 +1009,13 @@ namespace cryptonote
       if (!use_simple_rct && amount_in > amount_out)
         outamounts.push_back(amount_in - amount_out);
 
-      // zero out all amounts to mask rct outputs, real amounts are now encrypted
+      // zero out all amounts to mask rct outputs, real amounts are now encrypted.
+      // A transparent PQ input KEEPS its revealed amount: the validator needs it to bind the
+      // input to the on-chain commitment (check b2) and to add the public term to the balance.
       for (size_t i = 0; i < tx.vin.size(); ++i)
       {
+        if (tx.vin[i].type() == typeid(txin_to_key_pq))
+          continue;
         if (sources[i].rct)
           boost::get<txin_to_key>(tx.vin[i]).amount = 0;
       }
@@ -942,10 +1026,20 @@ namespace cryptonote
       get_transaction_prefix_hash(tx, tx_prefix_hash, hwdev);
       rct::ctkeyV outSk;
       if (use_simple_rct)
+        // amount_in includes the transparent PQ inputs, so `amount_in - amount_out` is the real
+        // fee stored in rv.txnFee; inamounts holds only the ring half, which is what pseudoOuts
+        // commit to. The gap between the two is exactly the public term the validator adds back
+        // (sum(a_pq)*H) — see verRctSemanticsSimple.
         tx.rct_signatures = rct::genRctSimple(rct::hash2rct(tx_prefix_hash), inSk, destinations, inamounts, outamounts, amount_in - amount_out, mixRing, amount_keys, index, outSk, rct_config, hwdev);
       else
         tx.rct_signatures = rct::genRct(rct::hash2rct(tx_prefix_hash), inSk, destinations, outamounts, mixRing, amount_keys, sources[0].real_output, outSk, rct_config, hwdev); // same index assumption
       memwipe(inSk.data(), inSk.size() * sizeof(rct::ctkey));
+
+      // HYBRID: record the transparent term so that verifying this transaction locally (the
+      // wallet's own sanity check, and any in-process verification before it is relayed) closes
+      // the balance the same way a node will. Nodes recompute it from tx.vin rather than trust
+      // it — it is not serialized. Zero for a classic transaction.
+      tx.rct_signatures.pq_transparent_in = pq_amount_in;
 
       CHECK_AND_ASSERT_MES(tx.vout.size() == outSk.size(), false, "outSk size does not match vout");
 

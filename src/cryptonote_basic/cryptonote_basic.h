@@ -169,12 +169,29 @@ namespace cryptonote
     uint64_t amount;
     uint64_t spent_output_index;        // direct global-output reference (no ring)
     crypto::public_key real_output_key; // P'_i revealed (32 bytes)
+    // Blinding factor of the output being spent, revealed so the validator can BIND the
+    // declared `amount` to the commitment stored on chain: C == amount*H + mask*G.
+    //
+    // Without this the spend is uncheckable for value. `amount` is attacker-supplied and
+    // nothing else in the transaction constrains it: checks (a)-(d) prove the spender OWNS
+    // the referenced output, never what it is WORTH. An owner of a dust BQ output could
+    // declare it worth millions and mint the difference. The commitment is the only on-chain
+    // record of the value, and it is hiding, so the spender must open it.
+    //
+    // Revealing the mask leaks nothing the transparent spend does not already publish: the
+    // amount is revealed on the wire anyway, and the mask only lets anyone confirm it.
+    // Both ways a BQ output can be created are covered: one made by a classic RingCT tx has
+    // the ECDH-derived mask the wallet recorded at scan, and one made by a transparent BQ
+    // spend is stored with an identity mask (see CRIT-1), for which commit(a, I) is exactly
+    // the zeroCommit(a) the daemon stored.
+    rct::key mask;
     crypto::pqc::pq_tx_sig dsa;         // ML-DSA-65 pk(1952) || sig(3309), per-output
 
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(amount)
       VARINT_FIELD(spent_output_index)
       FIELD(real_output_key)
+      FIELD(mask)
       // dsa is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
       // (no BLOB_SERIALIZER registration needed in this TU — that lives in tx_extra.h).
       // The tag() is REQUIRED even for a blob: without it the JSON archive emits the blob

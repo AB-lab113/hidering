@@ -521,6 +521,7 @@ void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::t
   INSERT_INTO_JSON_OBJECT(dest, amount, txin.amount);
   INSERT_INTO_JSON_OBJECT(dest, spent_output_index, txin.spent_output_index);
   INSERT_INTO_JSON_OBJECT(dest, real_output_key, txin.real_output_key);
+  INSERT_INTO_JSON_OBJECT(dest, mask, txin.mask);
   // dsa is a 5261-byte POD (pk||sig) — too large for the stack-based to_hex::array generic
   // serializer, so emit it as a heap-allocated hex string.
   {
@@ -542,6 +543,7 @@ void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key_pq& txin
   GET_FROM_JSON_OBJECT(val, txin.amount, amount);
   GET_FROM_JSON_OBJECT(val, txin.spent_output_index, spent_output_index);
   GET_FROM_JSON_OBJECT(val, txin.real_output_key, real_output_key);
+  GET_FROM_JSON_OBJECT(val, txin.mask, mask);
   const auto dsa_it = val.FindMember("dsa");
   if (dsa_it == val.MemberEnd())
     throw MISSING_KEY("dsa");

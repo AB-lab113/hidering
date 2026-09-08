@@ -525,16 +525,42 @@ namespace cryptonote
     return tx.blob_size;
   }
   //---------------------------------------------------------------
+  //---------------------------------------------------------------
+  bool get_pq_transparent_input_sum(const transaction& tx, uint64_t& sum)
+  {
+    // HIDERING Phase 5 (HFv16): total revealed value of the transparent post-quantum inputs.
+    // This is the public term a hybrid transaction's RingCT balance needs (rctSigBase
+    // ::pq_transparent_in). Each contributing amount is separately bound to the on-chain
+    // commitment of the output it spends by consensus check b2 before this sum is trusted.
+    sum = 0;
+    for (const auto& in: tx.vin)
+    {
+      if (in.type() != typeid(txin_to_key_pq))
+        continue;
+      const uint64_t a = boost::get<txin_to_key_pq>(in).amount;
+      CHECK_AND_ASSERT_MES(sum <= std::numeric_limits<uint64_t>::max() - a, false,
+          "transparent post-quantum input amount overflow in transaction id=" << get_transaction_hash(tx));
+      sum += a;
+    }
+    return true;
+  }
+  //---------------------------------------------------------------
   bool get_tx_fee(const transaction& tx, uint64_t & fee)
   {
-    // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with
-    // NO RingCT signature (RCTTypeNull) — its input AND output amounts are revealed, so the fee is
-    // plain arithmetic, not rct_signatures.txnFee (which is 0 for such txs). Detect it by the
-    // presence of a txin_to_key_pq input. Only ever produced at/after HFv16; classic txs unaffected.
+    // HIDERING Phase 5 (HFv16): a FULLY transparent post-quantum (BQ...) spend is a version-2 tx
+    // with NO RingCT signature (RCTTypeNull) — its input AND output amounts are revealed, so the
+    // fee is plain arithmetic, not rct_signatures.txnFee (which is 0 for such txs). Detect it by
+    // the presence of a txin_to_key_pq input. Only ever produced at/after HFv16; classic txs
+    // unaffected.
+    //
+    // A HYBRID transaction also has txin_to_key_pq inputs but IS a RingCT transaction: its ring
+    // inputs and all its outputs carry zeroed amounts, so the arithmetic below would read the
+    // whole transparent input total as fee. Its fee is the explicit rct txnFee, like any other
+    // RingCT tx — so require RCTTypeNull here, not merely the presence of a PQ input.
     bool has_pq_in = false;
     for (const auto& in: tx.vin)
       if (in.type() == typeid(txin_to_key_pq)) { has_pq_in = true; break; }
-    if (has_pq_in)
+    if (has_pq_in && tx.version >= 2 && tx.rct_signatures.type == rct::RCTTypeNull)
     {
       uint64_t amount_in = 0, amount_out = 0;
       for (const auto& in: tx.vin)

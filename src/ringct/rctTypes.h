@@ -325,9 +325,26 @@ namespace rct {
         std::vector<ecdhTuple> ecdhInfo;
         ctkeyV outPk;
         xmr_amount txnFee; // contains b
+        // HIDERING Phase 5 (HFv16) — sum of the revealed amounts of this transaction's
+        // TRANSPARENT post-quantum inputs (txin_to_key_pq). NOT SERIALIZED: like `message` and
+        // `mixRing`, it is reconstructed from the transaction by the verifier, never taken from
+        // the wire, so it is not attacker-controlled here — and each contributing amount is
+        // separately bound to the on-chain commitment of the output it spends (blockchain.cpp
+        // check b2) before it is ever summed.
+        //
+        // A transparent input carries no Pedersen commitment, so the balance
+        //     sum(pseudoOuts) == sum(outPk) + txnFee*H
+        // gets this value added to its left-hand side as a public term with zero mask: the
+        // transparent inputs behave exactly like a negative fee. pseudoOuts therefore stays
+        // indexed on the ring inputs alone, 1:1 with the CLSAGs.
+        //
+        // Defaulting to 0 fails CLOSED: a hybrid transaction reaching a verification path that
+        // forgot to populate this is short by sum(a_pq)*H and is REJECTED, never accepted.
+        xmr_amount pq_transparent_in;
 
         rctSigBase() :
-          type(RCTTypeNull), message{}, mixRing{}, pseudoOuts{}, ecdhInfo{}, outPk{}, txnFee(0)
+          type(RCTTypeNull), message{}, mixRing{}, pseudoOuts{}, ecdhInfo{}, outPk{}, txnFee(0),
+          pq_transparent_in(0)
         {}
 
         template<bool W, template <bool> class Archive>

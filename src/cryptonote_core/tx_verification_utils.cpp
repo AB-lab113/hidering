@@ -59,13 +59,23 @@ static bool expand_tx_and_ver_rct_non_sem(transaction& tx, const rct::ctkeyM& mi
     // Check that expanded RCT mixring == input mixring
     VER_ASSERT(rv.mixRing == mix_ring, "Failed to check ringct signatures: mismatched pubkeys/mixRing");
 
-    // Check CLSAG/MLSAG size against transaction input
+    // Check CLSAG/MLSAG size against transaction input.
+    // HIDERING Phase 5 (HFv16): a hybrid transaction's ring signatures cover its RING inputs
+    // only — the transparent post-quantum ones are authorised by per-input ML-DSA-65 signatures
+    // instead. Construction and consensus both put every ring input first, so the signatures
+    // line up with vin[0, n_ring). n_ring == tx.vin.size() for every classic transaction.
+    size_t n_ring = 0;
+    for (const auto &txin: tx.vin)
+      if (txin.type() != typeid(txin_to_key_pq))
+        ++n_ring;
     const size_t n_sigs = rct::is_rct_clsag(rv.type) ? rv.p.CLSAGs.size() : rv.p.MGs.size();
-    VER_ASSERT(n_sigs == tx.vin.size(), "Failed to check ringct signatures: mismatched input sigs/vin sizes");
+    VER_ASSERT(n_sigs == n_ring, "Failed to check ringct signatures: mismatched input sigs/vin sizes");
 
     // For each input, check that the key images were copied into the expanded RCT sig correctly
     for (size_t n = 0; n < n_sigs; ++n)
     {
+        VER_ASSERT(tx.vin[n].type() == typeid(txin_to_key),
+            "Failed to check ringct signatures: ring inputs must precede transparent post-quantum inputs");
         const crypto::key_image& nth_vin_image = boost::get<txin_to_key>(tx.vin[n]).k_image;
 
         if (rct::is_rct_clsag(rv.type))
@@ -185,7 +195,25 @@ static bool ver_non_input_consensus_templated(TxForwardIt tx_begin, TxForwardIt 
         // be fed to ver_mixed_rct_semantics (which would fail it). Exclude RCTTypeNull v2 txs (only
         // produced at/after HFv16); every classic RingCT v2 tx is still batch-verified as before.
         if (tx.version >= 2 && tx.rct_signatures.type != rct::RCTTypeNull)
+        {
+            // HIDERING Phase 5 (HFv16): a hybrid tx's balance needs the revealed total of its
+            // transparent post-quantum inputs. It is reconstructed from tx.vin here (never read
+            // from the wire) and is 0 for every classic transaction. If this were left unset a
+            // hybrid tx would simply fail the sum check — the safe direction.
+            uint64_t pq_in = 0;
+            if (!get_pq_transparent_input_sum(tx, pq_in))
+            {
+                tvc.m_verifivation_failed = true;
+                return false;
+            }
+            // const_cast: pq_transparent_in is verifier scratch space, not wire data — the same
+            // category as rctSigBase::message and ::mixRing, which expand_transaction_2 likewise
+            // writes into the transaction during verification. The value is derived here from
+            // tx.vin, so this cannot import anything from the serialized blob. The public
+            // entry points take a const transaction&, hence the cast at this single site.
+            const_cast<rct::rctSig&>(tx.rct_signatures).pq_transparent_in = pq_in;
             rvv.push_back(&tx.rct_signatures);
+        }
     }
 
     // Rule 7
