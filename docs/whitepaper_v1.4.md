@@ -177,7 +177,73 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (juin 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet d'un audit de sécurité interne. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16). **Implémentation complète (juin 2026)** : spec binding C-1 finalisée, validateur checks a–d implémentés, spend-side wallet2 câblé, fix H-5 multi-ciphertext, mempool acceptance, activation wallet HFv16. Flow e2e complet B...→BQ...→dépense validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). En cas de menace quantique réelle, activation possible en 24–48h via changement de constante `HF_HEIGHT_PQ`. Cible mainnet : **T2 2027** (inchangée).
+**État (septembre 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet de plusieurs audits de sécurité internes. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16, `HF_HEIGHT_PQ` = 2 000 000). Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible mainnet : **T2 2027** (inchangée).
+
+### 6.1 Délai réel d'activation — ce qu'il faut vraiment pour passer à HFv16
+
+Les versions antérieures de ce document annonçaient une « activation possible en 24–48h via
+changement de la constante `HF_HEIGHT_PQ` ». **Cette affirmation était fausse et est retirée.**
+Modifier une constante prend effectivement quelques minutes ; ce n'est pas ce qui gouverne le
+délai. Une activation HFv16 est aujourd'hui bloquée par des points ouverts, et le sera encore
+au minimum plusieurs mois :
+
+**Bloquants de sécurité.** La bibliothèque post-quantique utilisée (liboqs) porte toujours,
+dans sa version courante, l'avertissement de ses auteurs : *« nous ne recommandons pas de vous
+reposer sur cette bibliothèque en environnement de production ni pour protéger des données
+sensibles »*. Elle ne détient aucune validation FIPS 140-3 — seuls les **algorithmes**
+(ML-KEM/ML-DSA) sont des standards NIST finaux, pas l'implémentation. Tant que ce point n'est
+pas résolu (audit tiers, implémentation validée, ou posture hybride formalisée), **HFv16 ne
+sera pas activé.**
+
+**Points fonctionnels ouverts.** Le cold-signing d'une dépense BQ (signature hors-ligne) n'est
+pas opérationnel ; une transaction ne peut pas mélanger des fonds B... et BQ... (pas de
+consolidation possible entre les deux mondes) ; les subaddresses BQ n'existent pas encore.
+
+**Le coût réel, c'est la coordination.** Un hard fork n'est pas un déploiement logiciel : il
+faut publier des binaires pour toutes les plateformes, laisser mineurs, pools, services et
+détenteurs de wallets mettre à jour, et annoncer la hauteur d'activation **très en avance**
+pour que le réseau converge. Un nœud non mis à jour se retrouve sur une chaîne morte. C'est un
+processus de **plusieurs semaines**, irréductible, quelle que soit l'urgence.
+
+**En cas de menace quantique réelle**, le calendrier serait resserré au maximum et la
+communication faite en urgence — mais l'ordre de grandeur reste **des semaines**, pas des
+heures. Tout engagement contraire serait malhonnête.
+
+### 6.2 Compromis assumé : une dépense BQ est transparente
+
+Ce point est essentiel et n'apparaissait pas dans les versions précédentes de ce document.
+
+HIDERING revendique une confidentialité forte, assurée par les signatures de cercle (ring
+32–64), les adresses furtives et RingCT (montants masqués par engagements de Pedersen). **Ces
+garanties ne s'appliquent pas de la même façon à une dépense d'output BQ.**
+
+Techniquement : une entrée post-quantique (`txin_to_key_pq`) ne porte pas d'engagement de
+Pedersen, donc sa valeur ne peut pas être équilibrée par RingCT. La transaction est par
+conséquent construite en **v2 `RCTTypeNull`** — c'est-à-dire :
+
+- **les montants sont révélés en clair** sur la chaîne (entrées comme sorties) ;
+- **il n'y a pas de signature de cercle** sur l'entrée BQ : l'output dépensé est désigné
+  directement, sans leurres. L'anonymat de cercle est donc **nul** sur cette entrée ;
+- l'autorisation repose sur la signature ML-DSA-65 par sortie et le bind tag, pas sur un ring.
+
+Ce que cela veut dire concrètement : **une dépense depuis une adresse BQ est aussi
+transparente qu'une transaction Bitcoin.** La confidentialité HIDERING complète reste celle des
+adresses classiques B... . Les adresses BQ achètent une résistance quantique **au prix de la
+confidentialité de la dépense.**
+
+Ce qui reste protégé : *recevoir* sur une adresse BQ ne révèle rien de plus qu'une réception
+classique — la sortie est furtive et non liée à l'adresse publiée. C'est la **dépense** de cet
+output qui est transparente.
+
+Pistes d'amélioration à l'étude (non implémentées, non promises) : une transaction *hybride*,
+mêlant une entrée transparente PQ et des entrées ring, rendrait aux sorties leurs engagements
+de Pedersen et donc leurs montants masqués. Une véritable signature de cercle post-quantique
+est un problème de recherche ouvert, et HIDERING ne prétend pas l'avoir résolu.
+
+**Recommandation aux utilisateurs, tant que ce compromis existe :** utilisez les adresses
+classiques B... pour vos usages courants. Les adresses BQ sont destinées à ceux dont le modèle
+de menace inclut un adversaire quantique et qui acceptent, en connaissance de cause, la
+transparence des montants et l'absence de ring sur leurs dépenses.
 
 ---
 
@@ -275,7 +341,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 

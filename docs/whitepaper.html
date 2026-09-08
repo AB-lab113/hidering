@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Whitepaper v1.4 — HIDERING (HRG)</title>
-<meta name="description" content="HIDERING (HRG) whitepaper v1.4 — enhanced-privacy cryptocurrency with Bitcoin-style emission: 18M hard cap, 100% RandomX PoW, dynamic ring 32–64, post-quantum roadmap.">
+<title>Whitepaper v1.4.2 — HIDERING (HRG)</title>
+<meta name="description" content="HIDERING (HRG) whitepaper v1.4.2 — enhanced-privacy cryptocurrency with Bitcoin-style emission: 18M hard cap, 100% RandomX PoW, dynamic ring 32–64, post-quantum roadmap.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -185,7 +185,30 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (June 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone an internal security audit. All PQ code remains <strong>inert</strong> until the hard fork (HFv16). <strong>Implementation complete (June 2026):</strong> the C-1 key-binding spec is finalised, validator checks a–d implemented, the wallet2 spend-side wired, the H-5 multi-ciphertext fix landed, mempool acceptance and HFv16 wallet activation done. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). If a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant. Mainnet target: <strong>Q2 2027</strong> (unchanged).</div>
+    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits. All PQ code remains <strong>inert</strong> until the hard fork (HFv16, <code class="inline">HF_HEIGHT_PQ</code> = 2,000,000). The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Mainnet target: <strong>Q2 2027</strong> (unchanged).</div>
+
+    <h3>6.1 · What activating HFv16 actually takes</h3>
+    <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
+    <ul>
+      <li><strong>Security blockers.</strong> The post-quantum library we use (liboqs) still carries its authors' own warning, in its current release: <em>"we do not currently recommend relying on this library in a production environment or to protect any sensitive data"</em>. It holds no FIPS 140-3 validation — only the <em>algorithms</em> (ML-KEM, ML-DSA) are final NIST standards, not the implementation. Until that is resolved (third-party audit, a validated implementation, or a formalised hybrid posture), <strong>HFv16 will not be activated</strong>.</li>
+      <li><strong>Open functional gaps.</strong> Cold-signing a BQ spend (offline signing) is not operational; a transaction cannot mix B... and BQ... funds, so the two worlds cannot be consolidated; BQ subaddresses do not exist yet.</li>
+      <li><strong>The real cost is coordination.</strong> A hard fork is not a software deployment. Binaries must be published for every platform, miners, pools, services and wallet holders must upgrade, and the activation height must be announced well in advance so the network converges. A node that has not upgraded ends up on a dead chain. That process takes <strong>weeks</strong>, and no amount of urgency compresses it.</li>
+    </ul>
+    <p><strong>If a real quantum threat emerged</strong>, the schedule would be compressed as far as it can go and communicated as an emergency — but the order of magnitude remains <strong>weeks, not hours</strong>. Any promise to the contrary would be dishonest.</p>
+
+    <h3>6.2 · The trade-off we are making: a BQ spend is transparent</h3>
+    <p>This point matters and was absent from previous revisions of this document.</p>
+    <p>HIDERING claims strong privacy, delivered by ring signatures (ring 32–64), stealth addresses and RingCT (amounts hidden behind Pedersen commitments). <strong>Those guarantees do not apply in the same way when you spend a BQ output.</strong></p>
+    <p>Technically: a post-quantum input (<code class="inline">txin_to_key_pq</code>) carries no Pedersen commitment, so its value cannot be balanced by RingCT. The transaction is therefore built as <strong>v2 <code class="inline">RCTTypeNull</code></strong>, which means:</p>
+    <ul>
+      <li><strong>amounts are revealed in cleartext</strong> on chain, both inputs and outputs;</li>
+      <li><strong>there is no ring signature</strong> on the BQ input: the output being spent is named directly, with no decoys. Ring anonymity on that input is <strong>zero</strong>;</li>
+      <li>authorisation rests on the per-output ML-DSA-65 signature and the bind tag, not on a ring.</li>
+    </ul>
+    <p>In plain terms: <strong>spending from a BQ address is as transparent as a Bitcoin transaction.</strong> Full HIDERING privacy remains the property of classic B... addresses. BQ addresses buy quantum resistance <strong>at the cost of spend privacy</strong>.</p>
+    <p>What is still protected: <em>receiving</em> to a BQ address reveals no more than a classic receive — the output is stealthy and unlinkable to the published address. It is <em>spending</em> that output that is transparent.</p>
+    <p>Under study, neither implemented nor promised: a <em>hybrid</em> transaction mixing a transparent PQ input with ring inputs would give the outputs back their Pedersen commitments, and therefore their hidden amounts. A genuine post-quantum ring signature is an open research problem, and HIDERING does not claim to have solved it.</p>
+    <p><strong>Guidance while this trade-off stands:</strong> use classic B... addresses for everyday use. BQ addresses are for those whose threat model includes a quantum adversary and who knowingly accept revealed amounts and no ring on their spends.</p>
 
     <h2 id="fairlaunch">7 · Fair Launch Distribution</h2>
     <p><strong>Principle:</strong> 100% emission via RandomX PoW, no private sale, no seed round. Block 0 is a genesis with 157.14 HRG locked under a NUMS key (unspendable). From block 1 onward, rewards are distributed by pure PoW competition.</p>
@@ -211,7 +234,7 @@
       </tbody>
     </table>
     <div class="code-block" style="margin-top:1.25rem;">xmrig -o pool.hidering.org:3333 -u <span class="cmd">&lt;your_B..._address&gt;</span> -p x -a rx/0</div>
-    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW.</p>
+    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000, 25000, 80386) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW.</p>
 
     <h2 id="specs">9 · Technical Specifications</h2>
     <table class="data-table">
@@ -245,7 +268,7 @@
       <li><strong>OTC desk:</strong> <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a></li>
       <li><strong>Seed nodes:</strong> seed1.hidering.org · seed2.hidering.org</li>
     </ul>
-    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Fair by launch.</strong><br>Whitepaper v1.4 — June 2026 (revised after the June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
+    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Fair by launch.</strong><br>Whitepaper v1.4.2 — revised September 2026 (post-quantum activation timeline and the BQ transparency trade-off; earlier revisions: HFv16 implementation June 2026, June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
 
   </article>
 </div>
