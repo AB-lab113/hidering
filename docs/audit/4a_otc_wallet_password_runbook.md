@@ -257,3 +257,110 @@ du pool à terre sans filet.
 **Séquence recommandée, à traiter comme une opération distincte :** (1) réconcilier
 unit systemd ↔ processus détaché, (2) *ensuite seulement* poser un mot de passe via
 `change_wallet_password` + `--password-file`, en dehors d'une fenêtre de paiement.
+
+---
+
+# 10 septembre 2026 (soir) — clôture complète de 4a
+
+Contabo-2 uniquement. Aucun fonds déplacé, aucun process pm2 touché.
+
+## Point A — wallet du pool : supervision + mot de passe
+
+### A.1 La cause racine : l'unit n'a JAMAIS fonctionné
+
+Le diagnostic de ce matin (« unit `enabled` mais `dead`, process lancé à la main ») était
+exact mais incomplet. La raison est dans l'`ExecStart` :
+
+```
+--wallet-file /root/hrg-wallet-v2 --password  --rpc-bind-port 19743 ...
+```
+
+**systemd n'est pas un shell : il découpe sur les espaces et ne crée pas d'argument vide.**
+`--password` a donc avalé `--rpc-bind-port` comme valeur, `19743` est devenu un positionnel
+inconnu, et le binaire a répondu en affichant son aide puis `status=1/FAILURE`. C'est
+pourquoi quelqu'un avait démarré le wallet-rpc à la main le 25 mai — l'unit ne pouvait pas
+marcher. Le process manuel n'était pas une négligence, c'était un contournement.
+
+Découvert **en production** : `systemctl start` a échoué, le port 19743 est resté fermé
+~2 min. Sans impact (voir A.3). Correctif : `--password ""` — systemd honore les guillemets
+et passe un vrai argument vide. Service actif en 7 s.
+
+### A.2 Séquence appliquée
+
+| Étape | Action |
+|---|---|
+| Sauvegardes (0600) | `hrg-wallet-rpc.service.bak.20260910-2006`, `hrg-wallet-v2.keys.bak.20260910-2006` |
+| Arrêt du process manuel | RPC `stop_wallet` (sauvegarde l'état) — sorti proprement en 2 s, **pas de `kill -9`** |
+| Supervision | `systemctl start` → actif, `Restart=always`, `RestartSec=10` |
+| Mot de passe | `change_wallet_password` (ancien vide → 40 caractères aléatoires, ~238 bits) |
+| Référence | unit passée à `--password-file /root/.hrg-pool-wallet.pass` (0600), unit en 0600 |
+
+Le fichier `.keys` a bien été réécrit : `9233007…` → `03e78ad…`. Le redémarrage suivant
+**prouve** que le nouveau mot de passe fonctionne (le wallet s'ouvre via le fichier).
+
+### A.3 Aucun paiement mineur ne pouvait être perdu — vérifié dans le code
+
+`lib/paymentProcessor.js:237-242` : en cas d'échec RPC, `cback(false)` **précède toute
+écriture Redis**. Les décréments de solde (`hincrby balance -amount`) et l'incrément `paid`
+ne sont poussés qu'après un `transfer` réussi. Un wallet-rpc indisponible ne fait donc
+que **reporter** le paiement au cycle suivant, sans jamais toucher au dû du mineur.
+
+Fenêtre choisie en conséquence : opération lancée juste après le paiement de **20:05:52**,
+soit ~29 min de marge avant le suivant. Solde inchangé de bout en bout
+(`55057135329183092` avant / après).
+
+## Point B — rotation du mot de passe OTC
+
+Ancien mot de passe (`otc2026secure`) exposé dans `ps` et dans un fichier world-readable
+depuis juin → considéré comme grillé. Le masquer d'hier ne suffisait pas.
+
+| Étape | Action |
+|---|---|
+| Sauvegarde (0600) | `hrg-wallet-otc.keys.prepw.20260910-201103` |
+| Rotation | `change_wallet_password` → 40 caractères aléatoires |
+| Fichier | `/root/.hrg-otc-wallet.pass` réécrit, 0600 root:root |
+| Redémarrage | `systemctl restart` — actif, `NRestarts=0`, `ExecMainStatus=0` |
+
+`.keys` réécrit : `a1493c7…` → `d2f046d…`. **Preuve cryptographique de la rotation :** une
+tentative `change_wallet_password` avec l'ancien mot de passe est refusée —
+`Invalid original password`.
+
+Vérifications : solde **4350 HRG identique**, chemin de code du bot
+(`hrg.getBalance()`) → 4350 HRG, pm2 `hidering-otc`/`hrg-pool` PIDs inchangés.
+
+## Où l'ancien mot de passe subsiste — et pourquoi ce n'est plus une fuite
+
+Supprimés (`shred`) : `/root/.hrg-otc-wallet.pass.old` et la sauvegarde d'unit de la
+veille. Cette dernière n'avait plus de valeur de rollback : elle porte l'ancien mot de
+passe, la restaurer **casserait** désormais le service.
+
+Il reste dans **~45 fichiers du journal systemd** (`/var/log/journal/`, `0640
+root:systemd-journal`) : systemd journalise l'`ExecStart` à chaque démarrage. **Ce n'est
+plus un identifiant** — le wallet le rejette, c'est vérifié. C'est précisément pourquoi la
+rotation était nécessaire et pourquoi le masquage seul ne l'était pas. Purger le journal
+détruirait tout l'historique d'exploitation pour neutraliser une chaîne déjà morte : non
+fait, délibérément.
+
+**Les deux NOUVEAUX mots de passe sont propres** : absents de `/root`, `/etc`, `/opt`
+(hors leurs fichiers 0600), absents du journal, absents de tout `/proc/*/cmdline`.
+
+## ⚠️ Point de décision laissé à l'opérateur
+
+Les sauvegardes `.keys` **antérieures à la rotation** sont conservées en 0600 :
+`hrg-wallet-otc.keys.prepw.*`, `hrg-wallet-v2.keys.*`. Elles portent **les mêmes clés de
+dépense**, chiffrées avec les **anciens** mots de passe — pour l'OTC, un mot de passe que
+toute personne ayant lu `ps` avant hier connaît, et qui traîne dans les journaux.
+
+Tant qu'elles existent, « ancienne sauvegarde exfiltrée + ancien mot de passe connu » =
+**accès aux fonds**, malgré la rotation. Elles ne sont conservées que comme filet de
+sécurité de l'opération du jour, désormais vérifiée. **Recommandation : les `shred` une
+fois la confiance acquise** (le wallet reste restaurable depuis sa seed de 25 mots).
+Non fait ici : détruire du matériel de récupération est votre décision, pas la mienne.
+
+## Constats annexes, non traités (aucun lien avec cette opération)
+
+* **`[unlocker]` du pool : ~30 `ECONNRESET`/minute** sur `getblockheaderbyheight` vers le
+  daemon, pour 34 blocs en attente. **Antérieur** à l'opération — mesuré dès 19:46, soit
+  20 min avant toute intervention. À investiguer séparément.
+* **`/root/.pm2/logs/hrg-pool-out.log` fait 1,0 Go** — pas de rotation. Risque de
+  saturation disque.
