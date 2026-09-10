@@ -380,3 +380,93 @@ Non fait ici : détruire du matériel de récupération est votre décision, pas
   20 min avant toute intervention. À investiguer séparément.
 * **`/root/.pm2/logs/hrg-pool-out.log` fait 1,0 Go** — pas de rotation. Risque de
   saturation disque.
+
+---
+
+# 10 septembre 2026 (clôture) — destruction des sauvegardes de clés pré-rotation
+
+Contabo-2 uniquement. Aucun fonds déplacé, aucun process pm2 touché.
+
+## Comment les fichiers ont été trouvés (pas par leur nom)
+
+Chercher `*.prepw.*` / `*.bak.*` n'aurait rien prouvé : une sauvegarde peut porter
+n'importe quel nom. Recherche par **contenu**, en trois passes :
+
+1. **Signature d'octets — échec, et c'est instructif.** Un fichier `.keys` commence par un
+   **IV ChaCha aléatoire** : il n'y a **pas** de nombre magique constant. Toute recherche
+   par en-tête est vouée à l'échec ici.
+2. **Test structurel.** Le format est `chacha_iv(8) || varint(longueur) || blob`. Un fichier
+   est un candidat si le varint en offset 8 vaut **exactement** le nombre d'octets
+   restants. Validé d'abord contre les deux `.keys` vivants (les deux détectés), puis
+   appliqué aux **163 759** fichiers < 64 Ko de tous les systèmes de fichiers locaux.
+3. **Filtrage entropie + taille**, car le test structurel produit des faux positifs sur de
+   petits fichiers texte (un varint qui coïncide). Les vrais `.keys` font 1,2–2 Ko avec une
+   entropie ≈ 7,9 bits/octet. Passe complémentaire par nom **sans limite de taille**, pour
+   ne pas rater une sauvegarde de cache (> 64 Ko), plus archives et tâches planifiées.
+
+## Supprimés (`shred -n 3 -z -u`)
+
+| Chemin | Taille | mtime source | sha256 (avant destruction) |
+|---|---|---|---|
+| `/root/hrg-wallet-otc.keys.prepw.20260910-201103` | 1716 | 2026-06-16 19:21:43 | `a1493c7c3a6502e61b1dbc4b9d9755bdfbe223a3a7e29e0f063090c39060294a` |
+| `/root/hrg-wallet-v2.keys.bak.20260910-2006` | 1699 | 2026-05-25 19:25:57 | `923300708874a7b98b1ee2e92e95b2b0a7ca829044be0e3adac27cb072a2010a` |
+| `/root/hrg-wallet-v2.keys.prepw.20260910-201015` | 1699 | 2026-05-25 19:25:57 | `923300708874a7b98b1ee2e92e95b2b0a7ca829044be0e3adac27cb072a2010a` |
+
+Les deux sauvegardes du pool sont **byte-identiques** (même sha256) : deux copies de la
+même source, prises à deux étapes de l'opération.
+
+**Preuve qu'il s'agissait bien de copies pré-rotation** : leurs empreintes diffèrent de
+celles des fichiers vivants (`d2f046d…` pour l'OTC, `03e78ad…` pour le pool), lesquels ont
+été réécrits par `change_wallet_password`.
+
+## Conservés délibérément
+
+* **`/root/hrg-wallet-otc.keys`, `/root/hrg-wallet-v2.keys`** et les caches
+  `/root/hrg-wallet-otc`, `/root/hrg-wallet-v2` — **fichiers vivants**. Empreintes
+  vérifiées identiques avant et après la suppression.
+* **`/root/hidering/tests/data/wallet_*.keys`** (3 fichiers, 16 mai) — **fixtures de test
+  Monero amont**, versionnées dans le dépôt, sans rapport avec nos wallets et sans fonds.
+  Les supprimer salirait l'arbre git. Elles sont en **0644** — c'est le finding connu et
+  distinct « matériel de test dans l'historique git », **hors périmètre ici**.
+* **`/root/hrg-wallet-rpc.service.bak.20260910-2006`** — sauvegarde d'unit, pas de `.keys`.
+  Ne contient **aucun secret** (l'ancien mot de passe du pool était vide). Conservée comme
+  trace de l'`ExecStart` d'origine cassé. ⚠️ Ne pas la restaurer telle quelle : elle porte
+  la syntaxe `--password ` qui empêche systemd de démarrer le service.
+
+## Recréation impossible
+
+Aucune tâche planifiée ne peut régénérer une copie chiffrée avec un ancien mot de passe :
+crontab root **vide** de toute tâche wallet, aucune référence wallet dans `/etc/cron*`,
+et les seuls timers systemd sont ceux du système (apt, logrotate, sysstat, fwupd,
+dpkg-db-backup). Les seules units mentionnant un wallet sont les deux services eux-mêmes,
+qui pointent vers les fichiers **vivants**. Aucune archive contenant du matériel wallet
+(seuls des `.gz` d'apt/dpkg). Pas de répertoire `backup_wallets/` sur cet hôte.
+
+## Vérification finale
+
+| Contrôle | Résultat |
+|---|---|
+| Chemins supprimés | les 3 absents |
+| `*.prepw.*` / `*.keys.bak*` restants sur tout le disque | aucun |
+| Recherche par empreinte des deux anciens blobs, tout le disque | **aucune occurrence** |
+| Scan structurel de `/root` | seuls les 2 `.keys` vivants |
+| `.keys` vivants | empreintes **identiques** à l'avant-suppression |
+| Soldes | OTC **4350 HRG**, pool 55 564 HRG (croît : récompenses de blocs) |
+| Services | tous deux `active`, `enabled`, `NRestarts=0` |
+| Bot OTC | `hrg.getBalance()` → 4350 HRG |
+| Pool | `daemon:"ok" wallet:"ok"`, stratum 3333 à l'écoute |
+| pm2 | 2427471 / 456876 inchangés |
+| Journaux des services depuis la suppression | **0 ligne d'erreur** |
+
+## ⚠️ Limite honnête de `shred`
+
+`shred` réécrit les blocs **via le système de fichiers**. Sur **ext4** (ici, `/dev/sda1`)
+le journal peut conserver des restes, et surtout il s'agit d'un **VPS** : le stockage est
+virtualisé, potentiellement en copy-on-write / thin provisioning côté hyperviseur, où
+l'écrasement logique **ne garantit pas** que les blocs physiques sous-jacents ont été
+réécrits. Des instantanés ou sauvegardes pris par l'hébergeur **avant** aujourd'hui peuvent
+donc encore contenir ces fichiers.
+
+Ce que la suppression garantit réellement : plus aucun accès **par le système de fichiers**
+sur cet hôte. La protection de fond reste la **rotation** — les clés vivantes sont
+désormais chiffrées avec des mots de passe qui n'ont jamais été exposés.
