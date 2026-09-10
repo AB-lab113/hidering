@@ -470,3 +470,79 @@ donc encore contenir ces fichiers.
 Ce que la suppression garantit réellement : plus aucun accès **par le système de fichiers**
 sur cet hôte. La protection de fond reste la **rotation** — les clés vivantes sont
 désormais chiffrées avec des mots de passe qui n'ont jamais été exposés.
+
+---
+
+# 10 septembre 2026 — mot de passe Redis (Contabo-2)
+
+Redis détient **toute la comptabilité du pool** : soldes des mineurs, parts, historique des
+paiements. Il tournait **sans authentification**. Bien qu'en `bind 127.0.0.1` +
+`protected-mode yes` (donc injoignable à distance), nginx/`www-data` sert l'API publique du
+pool en 80/8117 **depuis la même machine** : la compromission d'un processus local non
+privilégié donnait un accès **lecture/écriture non authentifié aux soldes des mineurs**.
+C'est la même classe de risque que l'exposition OTC d'origine.
+
+## Pourquoi un redémarrage du pool était indispensable
+
+Redis **ne dé-authentifie pas** les connexions déjà établies quand on pose `requirepass` à
+chaud. Poser le mot de passe **sans** redémarrer le pool aurait donc laissé un système qui
+fonctionne… jusqu'à la première reconnexion (coupure réseau, redémarrage de Redis), où le
+pool serait tombé **silencieusement**. Un changement à moitié appliqué est ici pire que
+l'un ou l'autre extrême — d'où le `pm2 restart hrg-pool`, seule entorse à la consigne
+« ne pas toucher aux process pm2 », assumée et vérifiée.
+
+## Fenêtre choisie
+
+Opération lancée **au milieu** du cycle de paiement (17 min après le précédent, 12 min
+avant le suivant). Raison : redémarrer le pool à l'instant exact d'un paiement pourrait
+tuer le processus **entre** le `transfer` réussi et le décrément Redis — le seul scénario
+produisant un **double paiement** (le code a d'ailleurs une branche
+`Double payments likely to be sent`).
+
+## Séquence appliquée
+
+| Étape | Action |
+|---|---|
+| Sauvegardes (0600) | `redis.conf.bak.*`, `hrg-pool-config.json.bak.*`, **`redis-dump.rdb.bak.*`** (BGSAVE) |
+| Mot de passe | 40 caractères aléatoires → `/root/.hrg-redis.pass` (0600 root) |
+| Runtime | `CONFIG SET requirepass` — effet immédiat |
+| Persistance | ligne `requirepass` ajoutée à `/etc/redis/redis.conf` (0640 redis:redis) → survit à un redémarrage de Redis |
+| Pool | `config.json` → `redis.auth` renseigné (édition ciblée, formatage préservé, JSON revalidé), fichier passé en 0600 |
+| Redémarrage | `pm2 restart hrg-pool` |
+
+## Vérifications
+
+| Contrôle | Résultat |
+|---|---|
+| Accès sans authentification | `NOAUTH Authentication required` (ping et dbsize) |
+| **Aucune clé perdue** | comparaison des noms de clés extraits des RDB avant/après : **0 manquante**, 2 nouvelles (`*:roundCurrent`, créées par le minage) |
+| Préfixes de clés | tous présents (charts, scores, shares_actual, workers_ip, payments, workers, blocks…) |
+| Mot de passe dans un cmdline | **0 processus** (`redis-server` n'affiche que `127.0.0.1:6379`) |
+| Fichiers le contenant | 3, tous correctement permissionnés (0600 root ×2, 0640 redis:redis pour redis.conf que Redis doit lire) |
+| Pool | `daemon:"ok" wallet:"ok"`, stratum 3333 à l'écoute, mineur connecté |
+| Bot OTC | pid 2427471 **inchangé** (Redis ne le concerne pas : il utilise SQLite) |
+
+**Piège de lecture à connaître :** `dbsize` est passé à 183 juste après le redémarrage
+(contre 184 avant) puis à 186. Ce n'est **pas** une perte : le pool crée et expire en
+permanence des clés transitoires (`roundCurrent`, charts, hashrate). La preuve solide n'est
+pas `dbsize` mais la **comparaison des noms de clés** entre les deux instantanés RDB —
+0 disparue.
+
+## Preuve de bout en bout
+
+Le redémarrage du pool déclenche un cycle de paiement immédiat. **14 secondes après le
+redémarrage**, à 21:55:08, le pool a payé 50 HRG :
+
+* tx `5718b3d7eadfe3e928755541dcc4465c86baf2249139d321677abe7075161a9d`
+* **confirmée en chaîne au bloc 83368** (`in_pool: false`)
+* `payments:all` : 555 → **556**
+
+Ce seul événement prouve la boucle complète : **lecture Redis authentifiée → transfert via
+le wallet-rpc (avec son nouveau mot de passe) → confirmation en chaîne → écriture Redis
+authentifiée.**
+
+## Reste ouvert
+
+`.env` du bot OTC : `HD_MNEMONIC` (81 caractères) est la seed HD Ethereum contrôlant les
+fonds USDT/USDC. Correctement en 0600 root, mais c'est le secret de plus grande valeur de
+la machine et il vit en clair dans un `.env`. Non traité.
