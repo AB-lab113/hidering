@@ -334,12 +334,28 @@ Supprimés (`shred`) : `/root/.hrg-otc-wallet.pass.old` et la sauvegarde d'unit 
 veille. Cette dernière n'avait plus de valeur de rollback : elle porte l'ancien mot de
 passe, la restaurer **casserait** désormais le service.
 
-Il reste dans **~45 fichiers du journal systemd** (`/var/log/journal/`, `0640
-root:systemd-journal`) : systemd journalise l'`ExecStart` à chaque démarrage. **Ce n'est
-plus un identifiant** — le wallet le rejette, c'est vérifié. C'est précisément pourquoi la
-rotation était nécessaire et pourquoi le masquage seul ne l'était pas. Purger le journal
-détruirait tout l'historique d'exploitation pour neutraliser une chaîne déjà morte : non
-fait, délibérément.
+Il reste dans le **journal systemd** — précisément dans le champ de métadonnées
+**`_CMDLINE=`** de **1709 entrées** réparties sur 44 fichiers (`/var/log/journal/`,
+`0640 root:systemd-journal`) : systemd enregistre la ligne de commande du processus pour
+**chaque ligne de log** émise par le service, pas seulement au démarrage.
+
+Nuance de mesure à connaître : `journalctl | grep` renvoie **0** — la sortie par défaut
+n'affiche que `MESSAGE`. Il faut `journalctl -o verbose` (ou un grep sur les fichiers
+bruts) pour le voir. Un « rien trouvé » avec le grep naïf aurait été un faux négatif.
+
+**Ce n'est plus un identifiant** — le wallet le rejette, c'est vérifié. Et l'accès y est
+**root uniquement** : le groupe `systemd-journal` est **vide** et la machine n'a **aucun
+compte non-root** (aucun UID ≥ 1000). Purger le journal détruirait tout l'historique
+d'exploitation pour neutraliser une chaîne déjà morte : non fait, délibérément.
+
+**Ce que cela dit du risque d'origine, rétrospectivement.** L'exposition corrigée hier
+n'était pas théorique : la machine fait tourner 9 comptes de service non privilégiés, dont
+**`redis`** et **`www-data`/nginx**, tous deux exposés au réseau (API du pool en 80/8117).
+La compromission de l'un d'eux donnait le mot de passe du wallet OTC via `ps` ou l'unit en
+0644 — mais **jamais** le journal ni les fichiers wallet, tous en 0600/0640 root. Les deux
+correctifs ferment donc deux chemins distincts et réels : hier « service non privilégié
+compromis → mot de passe », aujourd'hui la fenêtre historique de toute personne l'ayant
+déjà lu.
 
 **Les deux NOUVEAUX mots de passe sont propres** : absents de `/root`, `/etc`, `/opt`
 (hors leurs fichiers 0600), absents du journal, absents de tout `/proc/*/cmdline`.
