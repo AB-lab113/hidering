@@ -1,7 +1,9 @@
 # Design 2b — Subaddresses BQ
 
 **Date :** 8 septembre 2026 — item 2b de la revue post-audit du 7 septembre.
-**Statut : RAPPORT DE DESIGN. Aucun code écrit. En attente de validation.**
+**Statut : ✅ DÉCIDÉ (décision 4, option B3) et IMPLÉMENTÉ le 11 septembre 2026** — voir §7
+à §10 en fin de document. §0 à §6 sont le rapport de design d'origine, conservé tel quel à
+l'exception du point 3 de §5 (budget de taille), qui était faux et est corrigé en §9.
 
 ## 0. État actuel
 
@@ -116,9 +118,10 @@ l'est.
 2. **Le tag de 8 octets** est un ajout au format de sortie BQ. Il doit être posé **avant**
    l'activation de HFv16 — après, ce serait un nouveau hard fork. Ça en fait un item à
    traiter *avec* la finalisation du binding C-1, pas après.
-3. **Budget de taille** : chaque sortie BQ coûte déjà 1088 octets de ciphertext ML-KEM ;
+3. ~~**Budget de taille** : chaque sortie BQ coûte déjà 1088 octets de ciphertext ML-KEM ;
    avec ML-DSA (5261 o) on est loin au-dessus de `MAX_TX_EXTRA_SIZE_PQ` (8192) dès quelques
-   sorties. À re-vérifier globalement avant d'ajouter quoi que ce soit.
+   sorties.~~ **Faux — corrigé en §9.** La signature ML-DSA de 5261 o n'est pas par sortie :
+   c'est une signature **par transaction**, émise seulement pour une dépense BQ.
 4. **Wallet** : `m_subaddresses` devient une table à deux entrées (clé Ed25519 → index, et
    tag → index) ; `generate_pq_keys` doit se décliner en `generate_pq_subaddress_keys(i)` ;
    `.keys` ne doit stocker que la seed de compte (les clés par subaddress se redérivent), sinon
@@ -133,3 +136,132 @@ l'est.
 3. Priorité relative à l'hybride (2a) et au binding C-1 ?
 
 **Aucune ligne de code ne sera écrite avant réponse.**
+
+---
+
+## 7. Décision (11 septembre 2026)
+
+1. **B3** : les subaddresses BQ sont **non-liables**. B2 écarté.
+2. Le tag de sélection aveuglé est accepté comme ajout au format de sortie BQ, à figer avant
+   HFv16 au même titre que le binding C-1.
+3. Aucun ordre imposé avec 2a et C-1 (§4 : pas de dépendance).
+
+## 8. Ce qui a été implémenté — et où ça s'écarte de la spec
+
+Trois écarts à la formule demandée, chacun pour une raison de sécurité ou de coût. Tous sont
+isolés dans une seule fonction : revenir à la lettre de la spec est un changement local.
+
+### 8.1 Racine de dérivation : la racine PQ du compte, **pas** la clé de vue `a`
+
+```
+kem_seed(major, minor) = SHAKE256("HRG_BQ_SUBADDR_KEM_v1" ‖ racine ‖ major_le4 ‖ minor_le4)
+(pk, sk)               = OQS_KEM_keypair_derand(kem_seed)
+```
+
+`racine = get_pq_root_secret(keys)`, c'est-à-dire aujourd'hui la clé de dépense — la même que
+la clé BQ primaire (M-4). La spec disait `a`. Refusé, parce qu'une dépense BQ transparente est
+autorisée par le secret partagé ML-KEM : une clé ML-KEM dérivée de `a` aurait donné le **pouvoir
+de dépense** à tout détenteur de la clé de vue (wallet view-only, auditeur, serveur de scan).
+
+⚠️ La racine actuelle a elle-même un défaut, **CRIT-4** (hors périmètre de ce chantier) : la clé
+de dépense est le logarithme discret de la clé publique de dépense publiée dans l'adresse BQ,
+donc un adversaire quantique la retrouve, et avec elle toutes les clés BQ — primaire comme
+subaddresses. C'est précisément pourquoi la racine est derrière **une seule** fonction : le jour
+où le format wallet la remplace, les subaddresses suivent sans autre changement.
+
+`(0,0)` reste l'adresse BQ primaire et garde sa dérivation M-4 (le vecteur figé
+`pq_vector_test` est inchangé).
+
+### 8.2 Le tag : `fp(kem_pk) XOR pad(d, i)`, pas `H(d ‖ kem_pk)[0..8)`
+
+```
+fp(kem_pk) = Keccak("HRG_BQ_KEMPK_v1" ‖ kem_pk)[0..8)        statique, par subaddress
+pad(d, i)  = Keccak("HRG_BQ_SEL_v1" ‖ d ‖ i_le8)[0..8)       frais, par sortie
+sel_tag    = fp(kem_pk) XOR pad(d, i)
+```
+
+* **Coût O(1) au lieu de O(N).** Avec `H(d ‖ kem_pk)`, le destinataire doit calculer un hash
+  par subaddress et par sortie — ~10 000 hashs par sortie BQ pour la lookahead par défaut
+  (50×200). Avec le XOR, il calcule **un** pad, le retire, et cherche `fp` dans une table
+  statique. C'est exactement la « table à deux entrées (clé Ed25519 → index, **tag → index**) »
+  demandée, qui n'est pas réalisable si le tag dépend de `d` de façon non inversible.
+* **L'index de sortie est dans le pad.** Sans lui, deux sorties d'une même tx vers la même
+  subaddress, sans clés additionnelles, porteraient le **même** tag : un observateur verrait
+  qu'elles vont au même destinataire. Le view tag Monero inclut l'index pour la même raison.
+* **Non-liabilité inchangée.** `pad` est inconnu sans `d` : pour un observateur, le tag est une
+  empreinte chiffrée par masque jetable — uniforme, et sans rapport entre deux paiements à la
+  même subaddress. Le détenteur de `d` (émetteur, détenteur de la clé de vue) apprend `fp`, ce
+  qu'il pouvait déjà tester avec la formule d'origine.
+
+### 8.3 Le champ `0x07` porte l'index de sortie
+
+`[ 0x07 | output_index:varint | sel_tag:8 | ct:1088 ]` — 1098 o pour un index < 128.
+Avant, l'association ciphertext ↔ sortie n'existait que par l'ordre d'émission. Nouvelle règle
+consensus (`check_pq_output_field_indices`, appelée par `Blockchain::check_tx_inputs` à HFv16) :
+les index des champs ML-KEM et des champs de binding sont dans les bornes, sans doublon, et
+**nomment le même ensemble de sorties**.
+
+### 8.4 Le reste
+
+* **Adresse** : même charge utile de 1249 o, marqueur `0x35` au lieu de `0x33` → rend toujours
+  « BQ » (vérifié sur 2000 charges aléatoires) et le parseur renvoie `is_subaddress = true`.
+  L'émetteur en a besoin : clé de tx `R = r·D`, clés additionnelles — exactement la raison
+  d'être du couple de préfixes 60/62 classique.
+* **Wallet** : `m_pq_subaddresses` (empreinte → index), en mémoire uniquement, reconstruit depuis
+  la seed (≈17 µs par subaddress, ~0,2 s pour la lookahead par défaut). **Rien de nouveau dans
+  `.keys`.** Commande `address bq <index>` dans `simplewallet`.
+* **Cold-sign** : `pq_source_ct` (unsigned_tx_set v4) porte l'index de subaddress ; la machine
+  froide re-dérive la clé et **vérifie** que le ciphertext ouvre bien une sortie de cette
+  subaddress (un index faux est refusé au lieu de produire une dépense invalide). v4 n'a jamais
+  été publié dans un binaire.
+* **`sort_tx_extra`** gère désormais le champ de binding `0x08` (il l'aurait fait échouer).
+
+### 8.5 Défaut préexistant corrigé au passage (gravité ÉLEVÉE)
+
+En mode par défaut (`AskPasswordToDecrypt`), la clé de dépense **et `kyber_sk`** sont chiffrées en
+mémoire pendant le refresh ; seule la clé de vue est en clair. L'ancienne détection BQ
+décapsulait avec ce `kyber_sk` brouillé : **aucune sortie BQ n'était jamais détectée par un wallet
+interactif ordinaire**, silencieusement. (L'e2e A4 passait parce que le wallet utilisé ne chiffrait
+pas ses clés.) Le tag règle ça proprement : le pré-filtre ne demande que la clé de vue ; le mot de
+passe n'est demandé que si un tag correspond à l'une de nos subaddresses, avec la même politique
+que `scan_output`. Et `get_pq_subaddress_as_str` **refuse** de dériver une adresse depuis des clés
+verrouillées — sinon il afficherait une adresse bien formée pour laquelle personne ne pourra jamais
+décapsuler.
+
+## 9. Budget `tx_extra` — correction (mesuré, pas calculé)
+
+La note du §5.3 comptait la signature ML-DSA (5261 o) **par sortie**. C'est faux :
+
+| Élément de `tx_extra` | Taille | Fréquence |
+|---|---|---|
+| clé publique de tx | 33 o | par tx |
+| payment ID chiffré factice | 11 o | par tx, si ≤ 2 destinations |
+| clés additionnelles | 2 + 32 o/sortie | par tx, si paiement à des subaddresses |
+| champ ML-KEM `0x07` (dont tag 8 o) | 1098 o | **par sortie BQ** |
+| champ de binding `0x08` | 34 o | **par sortie BQ** |
+| signature ML-DSA-65 de compte `0x06` | 5262 o | **par tx**, seulement pour une dépense BQ |
+
+La ML-DSA **par entrée** (5261 o) vit dans `vin` (`txin_to_key_pq`), pas dans `tx_extra`, et ne
+compte donc pas contre `MAX_TX_EXTRA_SIZE_PQ` (8192).
+
+**Mesuré sur des transactions réelles** (`pq_subaddress_test`, `construct_tx` réel) :
+
+| Forme de transaction | Max de sorties BQ | `tx_extra` au max |
+|---|---|---|
+| paiement B... → BQ | **7** | 7957 o |
+| dépense BQ transparente | **2** | 7570 o |
+
+Le tag de 8 o ne fait franchir **aucun** seuil (sans lui : 7 et 2 aussi). La vraie contrainte est
+la dépense BQ : **2 sorties BQ au plus**, soit un paiement BQ + un change BQ. Payer deux
+destinataires BQ depuis un wallet BQ (dont le change est BQ) échoue à la construction. Options,
+à trancher avant HFv16 (changement consensus dans les deux cas) : relever
+`MAX_TX_EXTRA_SIZE_PQ` (16384 → ~9 sorties BQ en dépense), ou sortir la signature de compte de
+`tx_extra`.
+
+## 10. Reste ouvert
+
+* Un wallet **view-only** ne peut pas détecter de sortie BQ (les empreintes dérivent de la racine
+  secrète) — préexistant pour l'adresse primaire.
+* Le change d'une dépense depuis un compte `major > 0` retombe sur une subaddress **classique**
+  (non-BQ) — politique de change à décider.
+* Le budget du §9.
