@@ -371,13 +371,27 @@ static bool test_extra_budget()
   size_t max_spend = 0, spend_extra_at_max = 0;
   for (size_t n = 1; n <= 3; ++n)
   {
+    // A genuine BQ output of the spender (CRIT-3: construct_tx must be able to derive its
+    // one-time secret): P' = H_s(r*A, 0)*G + B + t*G, t from the output's ML-KEM secret.
+    const account_keys &k = bqs.get_keys();
+    kyber_shared_secret ss; for (auto &b : ss.ss) b = crypto::rand<uint8_t>();
+    const crypto::secret_key r = rct::rct2sk(rct::skGen());
+    crypto::key_derivation der;
+    crypto::generate_key_derivation(k.m_account_address.m_view_public_key, r, der);
+    crypto::public_key P;
+    crypto::derive_public_key(der, 0, k.m_account_address.m_spend_public_key, P);
+    crypto::secret_key t;
+    derive_bq_output_tweak(ss, 0, t);
+    crypto::public_key tG;
+    crypto::secret_key_to_public_key(t, tG);
     tx_source_entry src;
     src.amount = (n + 1) * HRG; src.rct = true; src.real_output = 0; src.real_output_in_tx_index = 0;
     src.mask = rct::identity();
-    tx_source_entry::output_entry oe; oe.first = 42; oe.second.dest = rct::pkGen(); oe.second.mask = rct::zeroCommit(src.amount);
+    src.real_out_tx_key = rct::rct2pk(rct::scalarmultBase(rct::sk2rct(r)));
+    tx_source_entry::output_entry oe; oe.first = 42;
+    oe.second.dest = rct::addKeys(rct::pk2rct(P), rct::pk2rct(tG)); oe.second.mask = rct::zeroCommit(src.amount);
     src.outputs.push_back(oe);
     src.is_pq = true;
-    kyber_shared_secret ss; for (auto &b : ss.ss) b = crypto::rand<uint8_t>();
     src.pq_ss = ss;
     std::vector<tx_destination_entry> dests(n, tx_destination_entry(1 * HRG, bq, false));
     transaction tx;

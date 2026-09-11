@@ -432,10 +432,21 @@ namespace cryptonote
     std::vector<input_generation_context_data> in_contexts;
 
     uint64_t summary_inputs_money = 0;
-    // HIDERING Phase 5 (HFv16, A3): per-output ML-DSA-65 signing keys for transparent PQ inputs,
-    // paired with the vin index they belong to. Filled while building the inputs, consumed by the
-    // post-prefix-hash signing pass (a signature cannot cover itself, so sigs are zero until then).
-    std::vector<std::pair<size_t, crypto::pqc::pq_secret_key>> pq_input_signing_keys;
+    // HIDERING Phase 5 (HFv16, A3): the signing material of each transparent PQ input — the
+    // per-output ML-DSA-65 key and (CRIT-3) the output's one-time Ed25519 secret — filled while
+    // building the inputs and consumed by the post-prefix-hash signing pass (a signature cannot
+    // cover itself, so the signatures are zero until then).
+    //
+    // Keyed by the input's real_output_key, NOT by its vin position: the inputs are sorted after
+    // this loop (ring inputs first, for a hybrid), so a position recorded here can point at a
+    // different input — or at a ring input — by the time the signing pass runs.
+    struct pq_input_signing_material
+    {
+      crypto::public_key real_output_key;
+      crypto::pqc::pq_secret_key dsa_sk;
+      crypto::secret_key owner_sk;
+    };
+    std::vector<pq_input_signing_material> pq_input_signing_keys;
     //fill inputs
     int idx = -1;
     for(const tx_source_entry& src_entr:  sources)
@@ -454,20 +465,60 @@ namespace cryptonote
 
       // HIDERING Phase 5 (HFv16, A3): a transparent post-quantum source becomes a txin_to_key_pq.
       // It carries no Ed25519 key image (double-spend is tracked by a synthetic key image derived
-      // from real_output_key, validator-side) and is authorised by a per-output ML-DSA-65 signature
-      // produced after the prefix hash is known (below). Skip the ring key-image derivation — the
-      // BQ output key is tweaked, so generate_key_image_helper would derive the un-tweaked key and
-      // fail the consistency check. The per-output ML-DSA key is re-derived here from (pq_ss,
-      // real_output_in_tx_index), matching what the sender bound at output creation.
+      // from real_output_key, validator-side). It is authorised by TWO signatures produced after
+      // the prefix hash is known (below): the per-output ML-DSA-65 key re-derived here from
+      // (pq_ss, real_output_in_tx_index), matching what the sender bound at output creation, and
+      // (audit CRIT-3) an Ed25519 signature by the output's one-time secret key.
+      //
+      // CRIT-3: pq_ss is a SHARED secret. The sender obtained it from pqc_stealth_encaps when it
+      // built the output, so a key derived from it alone authorises the sender just as well as
+      // the recipient. The one-time secret x' (P' = x'*G) needs the recipient's spend key, which
+      // the sender never has. It is recovered as for a ring input — generate_key_image_helper on
+      // the UN-tweaked key P = P' - t*G, which it can match — and then x' = x + t.
       if (src_entr.is_pq)
       {
         CHECK_AND_ASSERT_MES((bool)src_entr.pq_ss, false, "is_pq source carries no ML-KEM-768 shared secret (pq_ss)");
         const crypto::public_key real_out_key = rct::rct2pk(src_entr.outputs[src_entr.real_output].second.dest);
+
+        crypto::secret_key tweak;
+        if (!derive_bq_output_tweak(*src_entr.pq_ss, src_entr.real_output_in_tx_index, tweak))
+        {
+          LOG_ERROR("Degenerate (zero) BQ output tweak for a BQ spend");
+          return false;
+        }
+        crypto::public_key tweak_pub;
+        crypto::secret_key_to_public_key(tweak, tweak_pub);
+        rct::key untweaked_rct;
+        rct::subKeys(untweaked_rct, rct::pk2rct(real_out_key), rct::pk2rct(tweak_pub));
+        const crypto::public_key untweaked = rct::rct2pk(untweaked_rct);
+        crypto::key_image unused_ki;
+        if (!generate_key_image_helper(sender_account_keys, subaddresses, untweaked, src_entr.real_out_tx_key,
+                                       src_entr.real_out_additional_tx_keys, src_entr.real_output_in_tx_index,
+                                       in_ephemeral, unused_ki, hwdev))
+        {
+          LOG_ERROR("Cannot derive the one-time secret of the BQ output being spent — it does not belong to this account");
+          memwipe(&tweak, sizeof(tweak));
+          return false;
+        }
+        crypto::secret_key owner_sk;
+        sc_add(reinterpret_cast<unsigned char*>(&owner_sk), reinterpret_cast<const unsigned char*>(&in_ephemeral.sec),
+               reinterpret_cast<const unsigned char*>(&tweak));
+        memwipe(&tweak, sizeof(tweak));
+        crypto::public_key owner_pub;
+        crypto::secret_key_to_public_key(owner_sk, owner_pub);
+        if (owner_pub != real_out_key)
+        {
+          LOG_ERROR("One-time secret of the BQ output being spent does not match its on-chain key");
+          memwipe(&owner_sk, sizeof(owner_sk));
+          return false;
+        }
+
         crypto::pqc::pq_public_key out_dsa_pk;
         crypto::pqc::pq_secret_key out_dsa_sk;
         if (!crypto::pqc::pqc_keygen_output_dsa(*src_entr.pq_ss, src_entr.real_output_in_tx_index, out_dsa_pk, out_dsa_sk))
         {
           LOG_ERROR("Failed to re-derive per-output ML-DSA-65 key for BQ spend");
+          memwipe(&owner_sk, sizeof(owner_sk));
           return false;
         }
         txin_to_key_pq in_pq;
@@ -481,9 +532,11 @@ namespace cryptonote
         in_pq.mask = src_entr.mask;
         memcpy(in_pq.dsa.pk, out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
         memset(in_pq.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES); // signed below, once prefix hash is known
-        // stash the signing key for the post-prefix-hash signing pass, keyed by vin position
-        pq_input_signing_keys.emplace_back(tx.vin.size(), out_dsa_sk);
+        memset(&in_pq.owner_sig, 0, sizeof(in_pq.owner_sig));               // likewise (CRIT-3)
+        // stash the signing material for the post-prefix-hash signing pass, keyed by output key
+        pq_input_signing_keys.push_back({real_out_key, out_dsa_sk, owner_sk});
         memwipe(&out_dsa_sk, sizeof(out_dsa_sk));
+        memwipe(&owner_sk, sizeof(owner_sk));
         tx.vin.push_back(in_pq);
         continue;
       }
@@ -790,34 +843,75 @@ namespace cryptonote
     }
 
     // HIDERING Phase 5 (HFv16, A3): sign every transparent post-quantum input. A txin_to_key_pq is
-    // authorised by an ML-DSA-65 signature over the tx prefix hash computed with ALL dsa.sig fields
-    // zeroed (a signature cannot cover itself) and BEFORE the external ML-DSA-65 tx signature is
-    // appended to tx.extra — exactly the message the validator reconstructs (blockchain.cpp: zero
-    // all dsa.sig AND drop the trailing pq_sig field, then hash). This runs before the external
-    // pq_sig block below, so when that block hashes the prefix the inputs already carry their final
-    // signatures. pq_input_signing_keys is empty unless this is a BQ spend → no-op on the live chain.
-    // Runs for the hybrid shape too: its PQ inputs need exactly the same per-input authorisation.
+    // authorised by an ML-DSA-65 signature AND (audit CRIT-3) an Ed25519 signature by the spent
+    // output's one-time secret, both over the tx prefix hash computed with ALL dsa.sig and
+    // owner_sig fields zeroed (a signature cannot cover itself) and BEFORE the external ML-DSA-65
+    // tx signature is appended to tx.extra — exactly the message the validator reconstructs
+    // (blockchain.cpp: zero every dsa.sig and owner_sig AND drop the trailing pq_sig field, then
+    // hash). This runs before the external pq_sig block below, so when that block hashes the prefix
+    // the inputs already carry their final signatures. pq_input_signing_keys is empty unless this is
+    // a BQ spend → no-op on the live chain. Runs for the hybrid shape too: its PQ inputs need exactly
+    // the same per-input authorisation, and are matched to their material by output key because the
+    // input sort above has moved them.
+    // Every signature must commit to the prefix as it will be BROADCAST. A RingCT transaction
+    // zeroes its ring-input and output amounts just before genRct (below) — after the PQ
+    // signatures here are produced. For a hybrid (the only RingCT shape with PQ inputs) those
+    // signatures must therefore hash the prefix with that zeroing already applied; hashing the
+    // live tx signed amounts the validator never sees, and every hybrid was rejected. One rule,
+    // zero_rct_amounts, serves both the signing hash and the real zeroing, so they cannot drift.
+    const bool rct_zeroes_amounts = tx.version == 2 && !pq_transparent_tx;
+    auto zero_rct_amounts = [&](transaction_prefix &p)
+    {
+      // A transparent PQ input KEEPS its revealed amount: the validator needs it to bind the
+      // input to the on-chain commitment (check b2) and to add the public term to the balance.
+      for (size_t i = 0; i < p.vin.size(); ++i)
+      {
+        if (p.vin[i].type() == typeid(txin_to_key_pq))
+          continue;
+        if (sources[i].rct)
+          boost::get<txin_to_key>(p.vin[i]).amount = 0;
+      }
+      for (size_t i = 0; i < p.vout.size(); ++i)
+        p.vout[i].amount = 0;
+    };
+    auto broadcast_prefix_hash = [&]() -> crypto::hash
+    {
+      if (!rct_zeroes_amounts)
+        return get_transaction_prefix_hash(tx);
+      transaction_prefix p = tx;
+      zero_rct_amounts(p);
+      return get_transaction_prefix_hash(p);
+    };
+
     if (any_pq)
     {
-      crypto::hash pq_in_prefix_hash;
-      get_transaction_prefix_hash(tx, pq_in_prefix_hash); // dsa.sig all zero, extra has no pq_sig yet
-      for (auto& vk : pq_input_signing_keys)
+      // input sigs all zero, extra has no pq_sig yet
+      const crypto::hash pq_in_prefix_hash = broadcast_prefix_hash();
+      size_t signed_inputs = 0;
+      for (auto& in_v : tx.vin)
       {
+        if (in_v.type() != typeid(txin_to_key_pq))
+          continue;
+        txin_to_key_pq& in = boost::get<txin_to_key_pq>(in_v);
+        auto mat = std::find_if(pq_input_signing_keys.begin(), pq_input_signing_keys.end(),
+            [&](const pq_input_signing_material &m) { return m.real_output_key == in.real_output_key; });
+        CHECK_AND_ASSERT_MES(mat != pq_input_signing_keys.end(), false, "No signing material for a transparent BQ input");
         crypto::pqc::pq_tx_sig in_sig;
-        // out_dsa public key for this input is already stored in the vin; sign with the matching sk.
-        txin_to_key_pq& in = boost::get<txin_to_key_pq>(tx.vin[vk.first]);
         if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_in_prefix_hash), sizeof(pq_in_prefix_hash),
-                                      vk.second.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
+                                      mat->dsa_sk.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
                                       in.dsa.pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
                                       in_sig))
         {
           LOG_ERROR("Failed to sign transparent post-quantum (BQ...) input");
-          memwipe(&vk.second, sizeof(vk.second));
+          for (auto &m : pq_input_signing_keys) memwipe(&m, sizeof(m));
           return false;
         }
         memcpy(in.dsa.sig, in_sig.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
-        memwipe(&vk.second, sizeof(vk.second));
+        crypto::generate_signature(pq_in_prefix_hash, in.real_output_key, mat->owner_sk, in.owner_sig);
+        ++signed_inputs;
       }
+      for (auto &m : pq_input_signing_keys) memwipe(&m, sizeof(m));
+      CHECK_AND_ASSERT_MES(signed_inputs == pq_input_signing_keys.size(), false, "Transparent BQ input count mismatch while signing");
       pq_input_signing_keys.clear();
     }
 
@@ -835,8 +929,7 @@ namespace cryptonote
     // presence of a transparent PQ input, so it is doubly inert pre-fork and for classic txs.
     if (hf_version >= HF_VERSION_PQ && any_pq)
     {
-      crypto::hash pq_prefix_hash;
-      get_transaction_prefix_hash(tx, pq_prefix_hash);
+      const crypto::hash pq_prefix_hash = broadcast_prefix_hash();
       // audit C-1: sign with the sender's PERSISTENT ML-DSA-65 key (account_keys
       // .pq_dilithium), NOT a per-tx throwaway. A stable per-account key is what gives the
       // signature real authority — one that still holds when the Ed25519 ring signature is
@@ -1052,18 +1145,9 @@ namespace cryptonote
       if (!use_simple_rct && amount_in > amount_out)
         outamounts.push_back(amount_in - amount_out);
 
-      // zero out all amounts to mask rct outputs, real amounts are now encrypted.
-      // A transparent PQ input KEEPS its revealed amount: the validator needs it to bind the
-      // input to the on-chain commitment (check b2) and to add the public term to the balance.
-      for (size_t i = 0; i < tx.vin.size(); ++i)
-      {
-        if (tx.vin[i].type() == typeid(txin_to_key_pq))
-          continue;
-        if (sources[i].rct)
-          boost::get<txin_to_key>(tx.vin[i]).amount = 0;
-      }
-      for (size_t i = 0; i < tx.vout.size(); ++i)
-        tx.vout[i].amount = 0;
+      // zero out all amounts to mask rct outputs, real amounts are now encrypted
+      // (the same rule the PQ signatures above were computed against)
+      zero_rct_amounts(tx);
 
       crypto::hash tx_prefix_hash;
       get_transaction_prefix_hash(tx, tx_prefix_hash, hwdev);

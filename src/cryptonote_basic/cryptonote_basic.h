@@ -160,7 +160,8 @@ namespace cryptonote
   // resistance) and carries a per-output ML-DSA-65 verification key + signature over the tx
   // prefix hash. The validator (blockchain.cpp check_tx_inputs) checks the referenced output
   // exists/unspent, the revealed key matches the chain, the on-chain binding tag commits this
-  // dsa_pk to that key, and the signature verifies. There is NO key_image field: double-spend
+  // dsa_pk to that key, the signature verifies, and (CRIT-3) the output's one-time key signs
+  // too. There is NO key_image field: double-spend
   // is prevented by a synthetic key image derived from real_output_key (get_pq_input_key_image),
   // recorded in the same spent-key DB. Only ever produced/accepted once hf_version >= HF_VERSION_PQ;
   // classic B... transactions keep using txin_to_key untouched.
@@ -185,6 +186,12 @@ namespace cryptonote
     // spend is stored with an identity mask (see CRIT-1), for which commit(a, I) is exactly
     // the zeroCommit(a) the daemon stored.
     rct::key mask;
+    // audit CRIT-3: an Ed25519 signature by the spent output's ONE-TIME secret key x'
+    // (real_output_key = x'*G), over the same message as dsa.sig. The ML-DSA key in `dsa` is
+    // derived from the ML-KEM shared secret, which the SENDER of the output also knows — on its
+    // own it let the sender spend what it paid. x' needs the recipient's spend key. Validator
+    // check (d2). Not quantum-resistant by itself; see the CRIT-3 audit note.
+    crypto::signature owner_sig;
     crypto::pqc::pq_tx_sig dsa;         // ML-DSA-65 pk(1952) || sig(3309), per-output
 
     BEGIN_SERIALIZE_OBJECT()
@@ -192,6 +199,7 @@ namespace cryptonote
       VARINT_FIELD(spent_output_index)
       FIELD(real_output_key)
       FIELD(mask)
+      FIELD(owner_sig)
       // dsa is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
       // (no BLOB_SERIALIZER registration needed in this TU — that lives in tx_extra.h).
       // The tag() is REQUIRED even for a blob: without it the JSON archive emits the blob

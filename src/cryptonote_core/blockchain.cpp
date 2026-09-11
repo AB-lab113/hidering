@@ -3437,7 +3437,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   //   (b) the revealed real_output_key matches the on-chain output key,
   //   (c) the binding tag published when that output was CREATED commits real_output_key
   //       to the supplied per-output ML-DSA-65 public key, and
-  //   (d) the ML-DSA-65 signature verifies over the tx prefix hash.
+  //   (d) the ML-DSA-65 signature verifies over the tx prefix hash,
+  //   (d2) the spent output's ONE-TIME Ed25519 key signs the same message (audit CRIT-3), and
   //   (e) money conservation over the revealed amounts (added in A3, see below).
   // Wholly skipped below HF_VERSION_PQ → the live chain is untouched; a PQ input appearing
   // before the fork is rejected outright in the main input loop further down (audit HAUT-2).
@@ -3449,8 +3450,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
     if (any_pq)
     {
-      // The per-input ML-DSA-65 signatures sign the tx prefix hash computed with ALL
-      // txin_to_key_pq.dsa.sig fields zeroed (a signature cannot cover itself) AND with the
+      // The per-input signatures (ML-DSA-65 dsa.sig and Ed25519 owner_sig) sign the tx prefix hash
+      // computed with ALL txin_to_key_pq.dsa.sig and owner_sig fields zeroed (a signature cannot
+      // cover itself) AND with the
       // trailing external ML-DSA-65 signature field dropped from tx.extra — exactly what
       // construct_tx signed: it produces the per-input signatures BEFORE appending the external
       // pq_sig. So we (1) zero each dsa.sig in place, (2) temporarily truncate the trailing pq_sig
@@ -3458,12 +3460,15 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       // then restore both. tx is non-const here. The dsa public keys are retained, so the signed
       // message commits to them.
       std::vector<std::pair<size_t, std::vector<uint8_t>>> saved_sigs;
+      std::vector<std::pair<size_t, crypto::signature>> saved_owner_sigs;
       for (size_t n = 0; n < tx.vin.size(); ++n)
       {
         if (tx.vin[n].type() != typeid(txin_to_key_pq)) continue;
         txin_to_key_pq& in = boost::get<txin_to_key_pq>(tx.vin[n]);
         saved_sigs.emplace_back(n, std::vector<uint8_t>(in.dsa.sig, in.dsa.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
         memset(in.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
+        saved_owner_sigs.emplace_back(n, in.owner_sig);
+        memset(&in.owner_sig, 0, sizeof(in.owner_sig));
       }
       const size_t pq_field_len2 = 1 + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES;
       CHECK_AND_ASSERT_MES(tx.extra.size() >= pq_field_len2, false, "PQ sig field shorter than expected (input pass)");
@@ -3473,6 +3478,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       tx.extra.insert(tx.extra.end(), saved_pq_tail2.begin(), saved_pq_tail2.end());
       for (const auto& sv : saved_sigs)
         memcpy(boost::get<txin_to_key_pq>(tx.vin[sv.first]).dsa.sig, sv.second.data(), sv.second.size());
+      for (const auto& so : saved_owner_sigs)
+        boost::get<txin_to_key_pq>(tx.vin[so.first]).owner_sig = so.second;
 
       for (const auto& txin : tx.vin)
       {
@@ -3573,6 +3580,23 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         if (!crypto::pqc::pqc_tx_verify(reinterpret_cast<const uint8_t*>(&pq_in_hash), sizeof(pq_in_hash), in.dsa))
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input has invalid ML-DSA-65 signature for output " << in.spent_output_index);
+          tvc.m_verifivation_failed = true;
+          return false;
+        }
+        // (d2) audit CRIT-3: the spent output's OWNER signs. Checks (c) and (d) authorise whoever
+        // knows the ML-KEM shared secret the per-output ML-DSA key is derived from — and a KEM
+        // secret is shared: the sender got it from its own encapsulation when it built the output.
+        // Together with the amount it chose and the mask it derives from its tx key, that let the
+        // SENDER spend any BQ output it paid. The one-time secret x' (P' = x'*G) needs the
+        // recipient's spend key; require a signature by it over the same message.
+        //
+        // An Ed25519 signature is not quantum-resistant: a sender that can ALSO run Shor on P'
+        // is not stopped by this. Closing that case needs a recipient-held post-quantum key in the
+        // output binding — a design decision tracked with C-1, see
+        // docs/audit/CRIT-3_sender_can_reclaim_bq_output_2026-09-11.md.
+        if (!crypto::check_signature(pq_in_hash, in.real_output_key, in.owner_sig))
+        {
+          MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input is not signed by the owner of output " << in.spent_output_index);
           tvc.m_verifivation_failed = true;
           return false;
         }

@@ -432,14 +432,20 @@ TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
   tx.extra.push_back(TX_EXTRA_TAG_PUBKEY);
   tx.extra.insert(tx.extra.end(), 32, 0x11);
 
-  // (1) WIRE FORMAT IS UNCHANGED. Pinned against the blob produced before the tag("dsa")
-  // fix; binary_archive::tag() is a no-op so these must never move. A change here means
-  // the consensus-visible encoding of a PQ input moved — never acceptable.
+  // mask and owner_sig are left zero (value-initialised): the pin below was taken that way.
+
+  // (1) WIRE FORMAT PIN. binary_archive::tag() is a no-op, so the tag("dsa") JSON fix must not
+  // move these. They move ONLY when txin_to_key_pq deliberately gains a field — legitimate while
+  // HFv16 has never been active, and each move must be explained here:
+  //   5383  original pin (JSON fix, 7 Sep 2026)
+  //   5415  + mask, 32 bytes (CRIT-2, 8 Sep: bind the amount to the commitment) — the pin was
+  //         not updated then; unit_tests had not been rebuilt
+  //   5479  + owner_sig, 64 bytes (CRIT-3, 11 Sep: the output's one-time key must sign)
   const cryptonote::blobdata blob = cryptonote::tx_to_blob(tx);
-  EXPECT_EQ(5383u, blob.size());
+  EXPECT_EQ(5479u, blob.size());
   crypto::hash blob_hash;
   crypto::cn_fast_hash(blob.data(), blob.size(), blob_hash);
-  EXPECT_EQ(std::string("aa202bc0fbe69e42d64438f7e3845457efeb7ad7568d4cbda89d0e8a7e101879"), epee::string_tools::pod_to_hex(blob_hash));
+  EXPECT_EQ(std::string("e05cafde0b5804188bbd6a87e35607e5f9f0cda3d977dd33e72a4e796010a9e3"), epee::string_tools::pod_to_hex(blob_hash));
 
   // (2) the blob still round-trips
   cryptonote::transaction tx2{};
@@ -452,11 +458,14 @@ TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
   EXPECT_EQ(in.real_output_key, in2.real_output_key);
   EXPECT_EQ(0, memcmp(in.dsa.pk,  in2.dsa.pk,  crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES));
   EXPECT_EQ(0, memcmp(in.dsa.sig, in2.dsa.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
+  EXPECT_EQ(0, memcmp(&in.mask, &in2.mask, sizeof(in.mask)));
+  EXPECT_EQ(0, memcmp(&in.owner_sig, &in2.owner_sig, sizeof(in.owner_sig)));
 
   // (3) THE BUG: the JSON the daemon serves must name the dsa field and must PARSE.
   const std::string js = cryptonote::obj_to_json_str(tx);
   EXPECT_NE(std::string::npos, js.find("\"dsa\""))
       << "dsa blob emitted without its key -> invalid JSON";
+  EXPECT_NE(std::string::npos, js.find("\"owner_sig\""));
   rapidjson::Document doc;
   doc.Parse(js.c_str());
   EXPECT_FALSE(doc.HasParseError())
