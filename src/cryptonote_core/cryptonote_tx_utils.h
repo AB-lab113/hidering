@@ -68,6 +68,10 @@ namespace cryptonote
     // it with its own pq_keys to recompute pq_ss locally (see unsigned_tx_set::pq_data).
     // Shipping pq_ss instead would put spend authority for the output into the transfer file.
     boost::optional<crypto::pqc::kyber_ciphertext> pq_ct;
+    // Decision 4 (design 2b): the subaddress the BQ output was received on. Every BQ subaddress
+    // has its own ML-KEM key; cold signing ships this index with the ciphertext so the offline
+    // machine knows which key to decapsulate with. Not serialised here, like pq_ct.
+    boost::optional<cryptonote::subaddress_index> pq_subaddr;
 
     void push_output(uint64_t idx, const crypto::public_key &k, uint64_t amount) { outputs.push_back(std::make_pair(idx, rct::ctkey({rct::pk2rct(k), rct::zeroCommit(amount)}))); }
 

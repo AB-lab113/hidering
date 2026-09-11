@@ -29,6 +29,7 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <atomic>
+#include <set>
 #include <boost/algorithm/string.hpp>
 #include "wipeable_string.h"
 #include "string_tools.h"
@@ -719,6 +720,7 @@ namespace cryptonote
     // already carries PQ fields — they are appended AFTER sorting — so this only guards
     // against the "not empty after sorting" error if sort is ever run on a full PQ tx.
     if (!pick<tx_extra_kyber_ct>(nar, tx_extra_fields, TX_EXTRA_TAG_KYBER_CT)) return false;
+    if (!pick<tx_extra_pq_bind>(nar, tx_extra_fields, TX_EXTRA_TAG_PQ_BIND)) return false;
     if (!pick<tx_extra_pq_sig>(nar, tx_extra_fields, TX_EXTRA_TAG_PQ_SIG)) return false;
 
     // if not empty, someone added a new type and did not add a case above
@@ -970,6 +972,27 @@ namespace cryptonote
       if (in.type() == typeid(txin_to_key_pq))
         return true;
     return false;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool check_pq_output_field_indices(const std::vector<tx_extra_field>& fields, size_t n_outputs)
+  {
+    std::set<uint64_t> ct_indices, bind_indices;
+    for (const tx_extra_field &f : fields)
+    {
+      if (f.type() == typeid(tx_extra_kyber_ct))
+      {
+        const uint64_t idx = boost::get<tx_extra_kyber_ct>(f).output_index;
+        if (idx >= n_outputs || !ct_indices.insert(idx).second)
+          return false;
+      }
+      else if (f.type() == typeid(tx_extra_pq_bind))
+      {
+        const uint64_t idx = boost::get<tx_extra_pq_bind>(f).output_index;
+        if (idx >= n_outputs || !bind_indices.insert(idx).second)
+          return false;
+      }
+    }
+    return ct_indices == bind_indices;
   }
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)

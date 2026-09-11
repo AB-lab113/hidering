@@ -245,21 +245,31 @@ TEST(pq_consensus, invalid_ml_dsa_signature_is_rejected)
   ASSERT_FALSE(crypto::pqc::pqc_tx_verify((const uint8_t*)&msg, sizeof(msg), wrongkey));
 }
 
-// HIDERING Phase 5 (C3, negative consensus — malformed ML-KEM-768 ciphertext at parse). A
-// tx_extra_kyber_ct is a fixed-size 1088-byte blob; a truncated one must fail the canonical TLV
-// parser (the validator parses tx_extra canonically — audit E-3 — and rejects malformed extra).
+// HIDERING Phase 5 (C3, negative consensus — malformed ML-KEM-768 ciphertext at parse). Since
+// decision 4 (design 2b) a tx_extra_kyber_ct is [0x07 | output_index varint | sel_tag 8 | ct 1088];
+// a truncated one must fail the canonical TLV parser (the validator parses tx_extra canonically —
+// audit E-3 — and rejects malformed extra).
 TEST(pq_consensus, malformed_kyber_ct_fails_parse)
 {
-  // well-formed: [pubkey][kyber_ct 0x07 + 1088 bytes] parses
+  // well-formed: [pubkey][kyber_ct 0x07 + index 0 + tag + 1088 bytes] parses
   {
     std::vector<uint8_t> extra;
     extra.push_back(TX_EXTRA_TAG_PUBKEY);
     extra.insert(extra.end(), 32, 0x11);
     extra.push_back(0x07); // TX_EXTRA_TAG_KYBER_CT
+    extra.push_back(0x00); // output_index 0
+    extra.insert(extra.end(), crypto::pqc::BQ_SEL_TAG_BYTES, 0x5A);
     extra.insert(extra.end(), crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES, 0x00);
     std::vector<cryptonote::tx_extra_field> fields;
     ASSERT_TRUE(cryptonote::parse_tx_extra(extra, fields));
-    bool has_ct = false; for (const auto &f : fields) if (f.type() == typeid(cryptonote::tx_extra_kyber_ct)) has_ct = true;
+    bool has_ct = false;
+    for (const auto &f : fields)
+      if (f.type() == typeid(cryptonote::tx_extra_kyber_ct))
+      {
+        has_ct = true;
+        ASSERT_EQ(0u, boost::get<cryptonote::tx_extra_kyber_ct>(f).output_index);
+        ASSERT_EQ(0x5A, boost::get<cryptonote::tx_extra_kyber_ct>(f).sel_tag.data[0]);
+      }
     ASSERT_TRUE(has_ct);
   }
   // malformed: kyber_ct truncated (body shorter than 1088) → canonical parse fails
@@ -268,10 +278,39 @@ TEST(pq_consensus, malformed_kyber_ct_fails_parse)
     extra.push_back(TX_EXTRA_TAG_PUBKEY);
     extra.insert(extra.end(), 32, 0x11);
     extra.push_back(0x07);
+    extra.push_back(0x00);
+    extra.insert(extra.end(), crypto::pqc::BQ_SEL_TAG_BYTES, 0x5A);
     extra.insert(extra.end(), crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES - 50, 0x00); // truncated
     std::vector<cryptonote::tx_extra_field> fields;
     ASSERT_FALSE(cryptonote::parse_tx_extra(extra, fields));
   }
+  // the pre-decision-4 layout (bare 1088-byte ciphertext) no longer parses: the first ciphertext
+  // byte would be read as the index and the field would come out 9 bytes short
+  {
+    std::vector<uint8_t> extra;
+    extra.push_back(TX_EXTRA_TAG_PUBKEY);
+    extra.insert(extra.end(), 32, 0x11);
+    extra.push_back(0x07);
+    extra.insert(extra.end(), crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES, 0x00);
+    std::vector<cryptonote::tx_extra_field> fields;
+    ASSERT_FALSE(cryptonote::parse_tx_extra(extra, fields));
+  }
+}
+
+// Decision 4 (design 2b): the consensus rule tying ML-KEM ciphertext fields to binding fields.
+TEST(pq_consensus, pq_output_field_indices)
+{
+  auto ct = [](uint64_t i) { cryptonote::tx_extra_kyber_ct f{}; f.output_index = i; return cryptonote::tx_extra_field(f); };
+  auto bind = [](uint64_t i) { cryptonote::tx_extra_pq_bind f{}; f.output_index = i; return cryptonote::tx_extra_field(f); };
+  using V = std::vector<cryptonote::tx_extra_field>;
+  EXPECT_TRUE(cryptonote::check_pq_output_field_indices(V{}, 2));                       // classic tx
+  EXPECT_TRUE(cryptonote::check_pq_output_field_indices(V{ct(1), bind(1)}, 2));
+  EXPECT_TRUE(cryptonote::check_pq_output_field_indices(V{ct(0), ct(1), bind(1), bind(0)}, 2));
+  EXPECT_FALSE(cryptonote::check_pq_output_field_indices(V{ct(2), bind(2)}, 2));        // out of range
+  EXPECT_FALSE(cryptonote::check_pq_output_field_indices(V{ct(1), ct(1), bind(1)}, 2)); // duplicate
+  EXPECT_FALSE(cryptonote::check_pq_output_field_indices(V{ct(0)}, 2));                 // no binding
+  EXPECT_FALSE(cryptonote::check_pq_output_field_indices(V{bind(0)}, 2));               // no ciphertext
+  EXPECT_FALSE(cryptonote::check_pq_output_field_indices(V{ct(0), bind(1)}, 2));        // mismatched
 }
 
 // HIDERING Phase 5 (C4, hf transition invariants). The PQ hard fork activates at exactly

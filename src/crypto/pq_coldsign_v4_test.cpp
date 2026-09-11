@@ -33,6 +33,8 @@
 #include "crypto/pqc.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
+#include "cryptonote_core/cryptonote_tx_utils.h"
+#include "ringct/rctOps.h"
 #include "wallet/wallet2.h"
 
 using namespace cryptonote;
@@ -47,9 +49,32 @@ namespace
     crypto::secret_key rec;
     for (int i = 0; i < 32; ++i) ((uint8_t *)rec.data)[i] = (uint8_t)(seed_byte + i);
     sc_reduce32((uint8_t *)rec.data);
-    w.generate("", "", rec, true /*recover*/, false /*two_random*/, false /*create_address_file*/);
-    if (with_bq)
-      generate_pq_keys(w.get_account().get_keys_nonconst());
+    // use_pq: the BQ keys are derived inside generate(), before the keys get encrypted in
+    // memory — deriving them afterwards would hash the ENCRYPTED spend key.
+    w.generate("", "", rec, true /*recover*/, false /*two_random*/, false /*create_address_file*/, with_bq);
+  }
+
+  // A genuine BQ output of `keys` on subaddress `index`, at position `out_index` of its tx:
+  // the one-time key a sender would build (P' = H_s(d, i)*G + D + t*G, with R = r*D for a
+  // subaddress), so the cold signer's check that the ciphertext really opens THIS output passes.
+  // Returns P' and the tx public key R.
+  void bq_output_for(const account_keys &keys, const subaddress_index &index, size_t out_index,
+                     const kyber_shared_secret &ss, crypto::public_key &P_out, crypto::public_key &R_out)
+  {
+    const account_public_address addr = index.is_zero() ? keys.m_account_address
+                                                        : keys.get_device().get_subaddress(keys, index);
+    const crypto::secret_key r = rct::rct2sk(rct::skGen());
+    R_out = index.is_zero() ? rct::rct2pk(rct::scalarmultBase(rct::sk2rct(r)))
+                            : rct::rct2pk(rct::scalarmultKey(rct::pk2rct(addr.m_spend_public_key), rct::sk2rct(r)));
+    crypto::key_derivation der;
+    crypto::generate_key_derivation(addr.m_view_public_key, r, der);
+    crypto::public_key P;
+    crypto::derive_public_key(der, out_index, addr.m_spend_public_key, P);
+    crypto::secret_key t;
+    cryptonote::derive_bq_output_tweak(ss, out_index, t);
+    crypto::public_key tG;
+    crypto::secret_key_to_public_key(t, tG);
+    P_out = rct::rct2pk(rct::addKeys(rct::pk2rct(P), rct::pk2rct(tG)));
   }
 
   bool contains(const std::string &haystack, const void *needle, size_t n)
@@ -74,6 +99,11 @@ static bool test_bq_roundtrip_and_no_secrets()
   tools::wallet2 hot(MAINNET), cold(MAINNET);
   make_wallet(hot, 0x21, true);
   make_wallet(cold, 0x21, true);   // same seed => same account, on the offline machine
+  // The offline signer works with its keys decrypted (simplewallet's sign_transfer unlocks).
+  // It also makes the secret-key searches below look for the real bytes, not the in-memory
+  // ciphertext of them.
+  const epee::wipeable_string pw("");
+  tools::wallet_keys_unlocker cold_unlock(cold, &pw);
   const account_keys &ck = cold.get_account().get_keys();
   if (!ck.pq_keys) { printf("FAIL: cold wallet has no ML-KEM-768 key (test setup)\n"); return false; }
 
@@ -95,10 +125,13 @@ static bool test_bq_roundtrip_and_no_secrets()
   src.rct = true;
   src.real_output = 0;
   src.real_output_in_tx_index = 3;
-  src.push_output(0, crypto::public_key{}, src.amount);
+  crypto::public_key P_out;
+  bq_output_for(ck, {0, 0}, src.real_output_in_tx_index, ss_hot, P_out, src.real_out_tx_key);
+  src.push_output(0, P_out, src.amount);
   src.is_pq = true;
   src.pq_ss = ss_hot;   // present in memory...
   src.pq_ct = ct;       // ...but only THIS is allowed to travel
+  src.pq_subaddr = cryptonote::subaddress_index{0, 0};
   cd.sources.push_back(src);
 
   cd.splitted_dsts.push_back(dst_for(3000, recip.get_keys().m_account_address));            // BQ payee
@@ -219,6 +252,68 @@ static bool test_bq_roundtrip_and_no_secrets()
   return true;
 }
 
+// Decision 4 (design 2b): a BQ output received on a SUBADDRESS decapsulates with that
+// subaddress' own ML-KEM key, so the set names the subaddress and the offline signer checks it.
+static bool test_bq_subaddress_source()
+{
+  tools::wallet2 hot(MAINNET), cold(MAINNET);
+  make_wallet(hot, 0x41, true);
+  make_wallet(cold, 0x41, true);
+  const epee::wipeable_string pw("");
+  tools::wallet_keys_unlocker cold_unlock(cold, &pw);
+  const account_keys &ck = cold.get_account().get_keys();
+
+  const subaddress_index sub{0, 4};
+  pq_stealth_keys subkeys;
+  if (!generate_pq_subaddress_keys(ck, sub, subkeys)) { printf("FAIL: subaddress keygen\n"); return false; }
+  kyber_ciphertext ct; kyber_shared_secret ss;
+  if (!pqc_stealth_encaps(subkeys.kyber_pk, ML_KEM_768_PUBLIC_KEY_BYTES, ct, ss)) { printf("FAIL: encaps\n"); return false; }
+
+  const auto export_with = [&](const subaddress_index &claimed, std::string &blob)
+  {
+    tools::wallet2::pending_tx ptx{};
+    tools::wallet2::tx_construction_data &cd = ptx.construction_data;
+    cryptonote::tx_source_entry src{};
+    src.amount = 7000; src.rct = true; src.real_output = 0; src.real_output_in_tx_index = 1;
+    crypto::public_key P_out;
+    bq_output_for(ck, sub, src.real_output_in_tx_index, ss, P_out, src.real_out_tx_key);
+    src.push_output(0, P_out, src.amount);
+    src.is_pq = true; src.pq_ss = ss; src.pq_ct = ct; src.pq_subaddr = claimed;
+    cd.sources.push_back(src);
+    account_base payee; payee.generate();
+    cd.splitted_dsts.push_back(dst_for(6000, payee.get_keys().m_account_address));
+    cd.dests.push_back(cd.splitted_dsts[0]);
+    cd.change_dts = cd.splitted_dsts[0];
+    cd.use_rct = true;
+    std::vector<tools::wallet2::pending_tx> ptxs{ptx};
+    blob = hot.dump_tx_to_str(ptxs);
+  };
+
+  std::string blob;
+  export_with(sub, blob);
+  tools::wallet2::unsigned_tx_set parsed{};
+  if (blob.empty() || !cold.parse_unsigned_tx_from_str(blob, parsed)) { printf("FAIL: subaddress set export/parse\n"); return false; }
+  if (parsed.pq_data[0].source_cts[0].subaddr_major != 0 || parsed.pq_data[0].source_cts[0].subaddr_minor != 4)
+  { printf("FAIL: the subaddress index did not travel with the ciphertext\n"); return false; }
+  cold.restore_pq_construction_data(parsed);
+  const auto &rsrc = parsed.txes[0].sources[0];
+  if (!rsrc.pq_ss || memcmp(rsrc.pq_ss->ss, ss.ss, ML_KEM_768_SHARED_SECRET_BYTES) != 0)
+  { printf("FAIL: the cold signer did not recover the subaddress output's secret\n"); return false; }
+
+  // A set naming the wrong subaddress must be refused, not signed into an invalid spend.
+  export_with({0, 5}, blob);
+  tools::wallet2::unsigned_tx_set lie{};
+  if (!cold.parse_unsigned_tx_from_str(blob, lie)) { printf("FAIL: parse\n"); return false; }
+  bool refused = false;
+  try { cold.restore_pq_construction_data(lie); }
+  catch (const std::exception &) { refused = true; }
+  if (!refused) { printf("FAIL: a set naming the wrong BQ subaddress was accepted by the cold signer\n"); return false; }
+
+  printf("PASS: a BQ subaddress source travels with its subaddress index; the offline signer\n"
+         "      recovers the secret with that subaddress' key and refuses a wrong index\n");
+  return true;
+}
+
 // (3): classic cold signing must be byte-for-byte what it was before v4 existed.
 static bool test_classic_set_is_unchanged()
 {
@@ -306,6 +401,7 @@ int main()
   bool ok = true;
   ok &= test_classic_set_is_unchanged();
   ok &= test_bq_roundtrip_and_no_secrets();
+  ok &= test_bq_subaddress_source();
   ok &= test_unknown_file_version_is_refused();
   printf("\nRESULT: %s\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

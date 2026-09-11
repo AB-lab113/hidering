@@ -257,12 +257,13 @@ namespace cryptonote {
           // so a sender can encapsulate to it. The dedicated parser also checks the marker byte.
           // Short-circuit: the generic two-Ed25519-key parse_binary below only knows the 64-byte
           // layout and would reject the 1249-byte BQ blob.
-          if (!get_account_address_from_str_pq(info.address, str))
+          bool pq_is_subaddress = false;
+          if (!get_account_address_from_str_pq(info.address, str, &pq_is_subaddress))
           {
             LOG_PRINT_L1("Failed to parse BQ... post-quantum address");
             return false;
           }
-          info.is_subaddress = false;
+          info.is_subaddress = pq_is_subaddress;
           info.has_payment_id = false;
           return true;
         }
@@ -360,6 +361,7 @@ namespace cryptonote {
   std::string get_account_address_as_str_pq(
       network_type /*nettype*/
     , account_public_address const & adr
+    , bool subaddress
     )
   {
     // BQ... addresses are mainnet-only for now (single ::config prefix).
@@ -367,7 +369,9 @@ namespace cryptonote {
 
     std::string blob;
     blob.reserve(PQ_ADDRESS_PAYLOAD_SIZE);
-    blob.push_back(static_cast<char>(::config::CRYPTONOTE_PQ_ADDRESS_MARKER)); // pins "BQ" prefix
+    // pins the "BQ" prefix, and says whether this is a subaddress (see the header)
+    blob.push_back(static_cast<char>(subaddress ? ::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER
+                                                : ::config::CRYPTONOTE_PQ_ADDRESS_MARKER));
     blob.append(reinterpret_cast<const char*>(&adr.m_spend_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(&adr.m_view_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
@@ -377,6 +381,7 @@ namespace cryptonote {
   bool get_account_address_from_str_pq(
       account_public_address& addr
     , std::string const & str
+    , bool* is_subaddress
     )
   {
     blobdata data;
@@ -404,10 +409,13 @@ namespace cryptonote {
     const char* p = data.data();
     // Step 6: leading marker byte pins the "BQ" prefix; reject anything else so a blob
     // that merely shares the (subaddress) prefix 62 and size can't masquerade as BQ.
-    if (static_cast<uint8_t>(*p) != ::config::CRYPTONOTE_PQ_ADDRESS_MARKER)
+    // Decision 4: the marker also tells a primary BQ address from a BQ subaddress.
+    const uint8_t marker = static_cast<uint8_t>(*p);
+    if (marker != ::config::CRYPTONOTE_PQ_ADDRESS_MARKER && marker != ::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER)
     {
-      LOG_PRINT_L1("Wrong BQ... address marker byte: " << (int)static_cast<uint8_t>(*p)
-        << ", expected " << (int)::config::CRYPTONOTE_PQ_ADDRESS_MARKER);
+      LOG_PRINT_L1("Wrong BQ... address marker byte: " << (int)marker
+        << ", expected " << (int)::config::CRYPTONOTE_PQ_ADDRESS_MARKER
+        << " or " << (int)::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER);
       return false;
     }
     p += 1;
@@ -426,6 +434,8 @@ namespace cryptonote {
     }
 
     addr = out;
+    if (is_subaddress)
+      *is_subaddress = (marker == ::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER);
     return true;
   }
   //--------------------------------------------------------------------------------

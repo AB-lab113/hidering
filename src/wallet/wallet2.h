@@ -340,6 +340,16 @@ private:
       tx_scan_info_t(): amount(0), money_transfered(0), error(true), received_via_pq_untweak(false), pq_ss{} {}
     };
 
+    // HIDERING Phase 5 (HFv16, decision 4 / design 2b B3): what a BQ output carries for its
+    // recipient in tx_extra — the blinded selection tag and the ML-KEM-768 ciphertext — read
+    // once per tx and indexed by output (see get_pq_output_fields).
+    struct pq_output_field
+    {
+      crypto::pqc::bq_sel_tag sel_tag;
+      crypto::pqc::kyber_ciphertext ct;
+    };
+    typedef std::vector<boost::optional<pq_output_field>> pq_output_fields;
+
     struct transfer_details
     {
       uint64_t m_block_height;
@@ -707,10 +717,18 @@ private:
     {
       uint32_t index;                       // index into tx_construction_data::sources
       crypto::pqc::kyber_ciphertext ct;     // 1088 bytes, BLOB_SERIALIZER'd in tx_extra.h
+      // Decision 4 (design 2b): the subaddress the spent output was received on. Each BQ
+      // subaddress has its own ML-KEM key, so the offline signer must know which one to
+      // decapsulate with; it re-derives that key itself and checks the claim (see
+      // restore_pq_construction_data). Public information, like the ciphertext.
+      uint32_t subaddr_major = 0;
+      uint32_t subaddr_minor = 0;
 
       BEGIN_SERIALIZE_OBJECT()
         VARINT_FIELD(index)
         FIELD(ct)
+        VARINT_FIELD(subaddr_major)
+        VARINT_FIELD(subaddr_minor)
       END_SERIALIZE()
     };
 
@@ -1219,6 +1237,13 @@ private:
     crypto::public_key get_subaddress_spend_public_key(const cryptonote::subaddress_index& index) const;
     std::vector<crypto::public_key> get_subaddress_spend_public_keys(uint32_t account, uint32_t begin, uint32_t end) const;
     std::string get_subaddress_as_str(const cryptonote::subaddress_index& index) const;
+    // HIDERING Phase 5 (HFv16, decision 4 / design 2b B3): the BQ... form of subaddress
+    // `index` — its classic Ed25519 half plus its own ML-KEM-768 key. (0,0) is the primary BQ
+    // address. Empty string for a wallet without BQ keys.
+    std::string get_pq_subaddress_as_str(const cryptonote::subaddress_index& index) const;
+    // HIDERING Phase 5 (HFv16, decision 4): bring m_pq_subaddresses up to the indices held in
+    // m_subaddresses (only the missing ones are derived). No-op for a wallet without BQ keys.
+    void update_pq_subaddresses();
     std::string get_address_as_str() const { return get_subaddress_as_str({0, 0}); }
     std::string get_integrated_address_as_str(const crypto::hash8& payment_id) const;
     void add_subaddress_account(const std::string& label);
@@ -1956,26 +1981,54 @@ private:
     bool generate_chacha_key_from_secret_keys(crypto::chacha_key &key) const;
     void generate_chacha_key_from_password(const epee::wipeable_string &pass, crypto::chacha_key &key) const;
     crypto::hash get_payment_id(const pending_tx &ptx) const;
-    // HIDERING Phase 5 (HFv16, fix H-5): `pq_ss_list`, when non-null, is the LIST of ML-KEM-768
-    // shared secrets recovered for this tx — one per ML-KEM-768 ciphertext it carries (a tx may
-    // pay several BQ... outputs, each with its own ciphertext). If the classic match fails, each
-    // candidate key P_onchain - t_i*G is retried for EVERY secret in the list (t_i =
-    // derive_bq_output_tweak(ss, i), per-output index-bound — audit E-4) so every BQ... output is
-    // detected with the secret that actually encapsulated to it; on a match
-    // tx_scan_info.received_via_pq_untweak is set and the matching secret stored in
+    // HIDERING Phase 5 (HFv16, decision 4 / design 2b B3): `pq_fields`, when non-null, holds this
+    // tx's per-output BQ material (ML-KEM ciphertext + blinded selection tag), indexed by output.
+    // If the classic match fails for output i and pq_fields has an entry for it, detect_pq_output
+    // unblinds the tag, looks the subaddress up in m_pq_subaddresses, decapsulates ONCE with that
+    // subaddress' key and retries the match on the un-tweaked key P_onchain - t_i*G (audit E-4).
+    // On a match tx_scan_info.received_via_pq_untweak is set and the secret stored in
     // tx_scan_info.pq_ss so the spend secret is tweaked with the SAME secret later (audit E-2).
     // nullptr for every classic wallet → unchanged on the live chain.
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
-    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
-    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const std::vector<crypto::pqc::kyber_shared_secret> *pq_ss_list = nullptr) const;
-    // HIDERING Phase 5 (HFv16, fix H-5): if this wallet owns a ML-KEM-768 decaps key, decapsulate
-    // EVERY ML-KEM-768 ciphertext carried in `tx` into `ss_list` (one shared secret per ciphertext,
-    // in tx_extra order) and return true if any were found. NB (audit E-1): ML-KEM uses implicit
-    // rejection, so decaps "succeeds" for ANY well-formed ciphertext — success only means
-    // "well-formed", NOT "ours". The authoritative ownership test is the per-output
-    // is_out_to_acc_precomp match on P_onchain - t_i*G, not this return. Returns false (empties
-    // the list) for every classic wallet (pq_keys none).
-    bool get_pq_output_shared_secrets(const cryptonote::transaction &tx, std::vector<crypto::pqc::kyber_shared_secret> &ss_list) const;
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info, const pq_output_fields *pq_fields = nullptr) const;
+    void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, const pq_output_fields *pq_fields = nullptr) const;
+    void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen, const pq_output_fields *pq_fields = nullptr) const;
+    // HIDERING Phase 5 (HFv16, decision 4): read the per-output BQ fields of a tx into `out`
+    // (one slot per output; empty where the output is classic). Returns false when the tx has
+    // none, or when this wallet cannot receive BQ outputs at all (no pq_keys, multisig,
+    // background sync) — the classic scan path is then byte-for-byte unchanged.
+    bool get_pq_output_fields(const cryptonote::transaction_prefix &tx, pq_output_fields &out) const;
+    // HIDERING Phase 5 (HFv16, decision 4): is output `i` a BQ output of ours? Tries the
+    // selection tag under each derivation the output may use, and for a subaddress the tag
+    // points to, decapsulates once and confirms with the real un-tweaked match — which must
+    // land on that SAME subaddress. Fills `received` / `ss` on success. The tag alone proves
+    // nothing (audit E-1 applies unchanged: ML-KEM decaps never says "not for you").
+    bool detect_pq_output(const crypto::public_key &output_public_key, const crypto::key_derivation &derivation,
+                          const std::vector<crypto::key_derivation> &additional_derivations, size_t i,
+                          const pq_output_field &field, const boost::optional<crypto::view_tag> &view_tag_opt,
+                          hw::device &hwdev, boost::optional<cryptonote::subaddress_receive_info> &received,
+                          crypto::pqc::kyber_shared_secret &ss) const;
+    // HIDERING Phase 5 (HFv16, decision 4): true iff the BQ secrets can be used right now, i.e.
+    // the keys are not encrypted in memory (checked on the spend key, which is encrypted and
+    // decrypted together with the PQ root and kyber_sk).
+    bool pq_secrets_usable() const;
+    // HIDERING Phase 5 (HFv16, decision 4): view key only — does any output's selection tag
+    // unblind to a fingerprint of ours? The gate for asking the password during a refresh.
+    bool pq_tags_match_any(const std::vector<cryptonote::tx_extra_field> &tx_extra_fields, const pq_output_fields &fields) const;
+    // HIDERING Phase 5 (HFv16, decision 4): prompt for the password (same policy as scan_output)
+    // so BQ detection can use the secret keys. False when they cannot be made usable.
+    bool unlock_keys_for_pq_scan(bool pool);
+    // HIDERING Phase 5 (HFv16, decision 4): complete the fingerprint table if needed and decide
+    // whether this tx deserves the BQ detection path. Unlocks the keys only on a tag match.
+    bool prepare_pq_detection(const cryptonote::transaction &tx, const std::vector<cryptonote::tx_extra_field> &tx_extra_fields,
+                              const pq_output_fields &fields, bool pool);
+    // HIDERING Phase 5 (HFv16, decision 4): given a claimed subaddress, decapsulate `ct` with its
+    // key and confirm that the un-tweaked output key really belongs to that subaddress.
+    bool confirm_pq_output(const crypto::public_key &output_public_key, const crypto::key_derivation &derivation,
+                           const std::vector<crypto::key_derivation> &additional_derivations, size_t i,
+                           const crypto::pqc::kyber_ciphertext &ct, const cryptonote::subaddress_index &claimed,
+                           const boost::optional<crypto::view_tag> &view_tag_opt, hw::device &hwdev,
+                           boost::optional<cryptonote::subaddress_receive_info> &received,
+                           crypto::pqc::kyber_shared_secret &ss) const;
     // HIDERING Phase 5 (HFv16, A3): recover the ML-KEM-768 shared secret that encapsulated to the
     // BQ... output held in `td` (re-decapsulating that output's ciphertext and confirming the
     // un-tweak match), so the spend path can re-derive the per-output ML-DSA-65 key. Returns false
@@ -2094,6 +2147,16 @@ private:
     std::unordered_map<crypto::public_key, size_t> m_pub_keys;
     cryptonote::account_public_address m_account_public_address;
     std::unordered_map<crypto::public_key, cryptonote::subaddress_index> m_subaddresses;
+    // HIDERING Phase 5 (HFv16, decision 4 / design 2b B3): the second lookup table of a BQ
+    // wallet — ML-KEM key fingerprint (fp(kem_pk), 8 bytes as a uint64) → subaddress index —
+    // covering the same indices as m_subaddresses. A selection tag unblinds to one of these
+    // fingerprints, so finding the subaddress to decapsulate with is a hash lookup whatever the
+    // number of subaddresses. A multimap only because two 64-bit fingerprints could in
+    // principle collide; every hit is confirmed by the real un-tweaked match anyway.
+    // In-memory only, never serialised: rebuilt from the account seed by update_pq_subaddresses
+    // (≈17 µs per subaddress), which is what keeps per-subaddress key material out of the files.
+    std::unordered_multimap<uint64_t, cryptonote::subaddress_index> m_pq_subaddresses;
+    std::unordered_set<cryptonote::subaddress_index> m_pq_subaddress_indices;
     std::vector<std::vector<std::string>> m_subaddress_labels;
     std::unordered_map<crypto::hash, std::string> m_tx_notes;
     std::unordered_map<std::string, std::string> m_attributes;

@@ -109,14 +109,21 @@ namespace cryptonote {
   // and carries the marker byte; otherwise it returns false and the caller should fall
   // back to get_account_address_from_str(). The size+marker checks keep it distinct from
   // a subaddress, which shares the numeric prefix 62.
+  //
+  // Decision 4 (design 2b): a BQ SUBADDRESS uses the same 1249-byte layout under a second
+  // marker byte (::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER), because a sender must know it
+  // is paying a subaddress — the tx public key becomes r*D and additional keys may be
+  // needed — exactly like the classic 60/62 prefix split. `is_subaddress` reports which.
   std::string get_account_address_as_str_pq(
       network_type nettype
     , const account_public_address& adr
+    , bool subaddress = false
     );
 
   bool get_account_address_from_str_pq(
       account_public_address& addr
     , const std::string& str
+    , bool* is_subaddress = nullptr
     );
 
   bool get_account_address_from_str_or_url(

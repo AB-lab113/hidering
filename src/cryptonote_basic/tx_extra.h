@@ -191,12 +191,12 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
-  // HIDERING Phase 5 (HFv16) — post-quantum tx_extra fields. The on-wire layout is
-  // byte-identical to the raw [tag | fixed-bytes] blobs that cryptonote_tx_utils.cpp
-  // appends (the pqc structs are fixed-size trivially-copyable PODs serialized as
-  // blobs), so registering them as proper variant types lets parse_tx_extra and
-  // sort_tx_extra handle them CANONICALLY (audit E-3) with zero change to the bytes
-  // on the wire. Tags 0x06/0x07 mirror TX_EXTRA_TAG_PQ_SIG / TX_EXTRA_TAG_KYBER_CT in
+  // HIDERING Phase 5 (HFv16) — post-quantum tx_extra fields, registered as proper variant
+  // types so parse_tx_extra and sort_tx_extra handle them CANONICALLY (audit E-3). The pq_sig
+  // field is byte-identical to the raw [tag | pk | sig] blob cryptonote_tx_utils.cpp appends
+  // (the validator strips it by its fixed length). The kyber_ct and pq_bind fields lead with
+  // a varint output index and are written through this serialiser. Tags 0x06/0x07/0x08
+  // mirror TX_EXTRA_TAG_PQ_SIG / TX_EXTRA_TAG_KYBER_CT / TX_EXTRA_TAG_PQ_BIND in
   // cryptonote_config.h. These fields only ever appear once hf_version >= HF_VERSION_PQ.
   struct tx_extra_pq_sig
   {
@@ -207,11 +207,24 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
+  // One per BQ... output. Layout: [ 0x07 | output_index:varint | sel_tag:8 | ct:1088 ].
+  //
+  // Decision 4 (design 2b, option B3) added output_index and sel_tag to what was a bare
+  // ciphertext blob. sel_tag is the blinded selection tag (pqc.h, pqc_compute_sel_tag) that
+  // tells the recipient which of its subaddress ML-KEM keys to decapsulate with, instead of
+  // trying every one. output_index says which output the tag and ciphertext belong to: the
+  // tag's blinding is bound to that index, and before this change the association between a
+  // ciphertext and its output was only the implicit emission order. Consensus requires the
+  // indices to be in range, unique, and to match the tx_extra_pq_bind indices one for one.
   struct tx_extra_kyber_ct
   {
+    uint64_t output_index;
+    crypto::pqc::bq_sel_tag sel_tag;  // 8 bytes
     crypto::pqc::kyber_ciphertext ct; // 1088 bytes
 
     BEGIN_SERIALIZE()
+      VARINT_FIELD(output_index)
+      FIELD(sel_tag)
       FIELD(ct)
     END_SERIALIZE()
   };
@@ -244,6 +257,7 @@ namespace cryptonote
 
 BLOB_SERIALIZER(crypto::pqc::pq_tx_sig);
 BLOB_SERIALIZER(crypto::pqc::kyber_ciphertext);
+BLOB_SERIALIZER(crypto::pqc::bq_sel_tag);
 
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_padding, TX_EXTRA_TAG_PADDING);
 VARIANT_TAG(binary_archive, cryptonote::tx_extra_pub_key, TX_EXTRA_TAG_PUBKEY);

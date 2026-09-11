@@ -64,16 +64,25 @@ namespace cryptonote
     extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
   }
   //---------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): serialise a ML-KEM-768 KEM ciphertext into tx.extra as
-  // [ TX_EXTRA_TAG_KYBER_CT | ct(1088) ]. Fixed length, no length prefix. Appended
-  // after the classic extra fields are sorted and BEFORE the trailing ML-DSA-65
-  // signature field, so that field stays last (the validator in blockchain.cpp
-  // relies on the PQ signature being the final field). Only emitted for BQ...
-  // outputs once the chain reaches HF_VERSION_PQ (inactive on the live chain).
-  void add_kyber_ct_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::kyber_ciphertext& ct)
+  // HIDERING Phase 5 (HFv16): serialise a BQ... output's ML-KEM-768 ciphertext into tx.extra as
+  // [ TX_EXTRA_TAG_KYBER_CT | output_index:varint | sel_tag:8 | ct:1088 ] through the canonical
+  // tx_extra_kyber_ct variant, so parse_tx_extra round-trips it. Appended after the classic
+  // extra fields are sorted and BEFORE the trailing ML-DSA-65 signature, so that signature
+  // stays the last field. Only emitted for BQ... outputs once hf_version >= HF_VERSION_PQ.
+  bool add_kyber_ct_to_extra(std::vector<uint8_t>& extra, uint64_t output_index,
+                             const crypto::pqc::bq_sel_tag& sel_tag, const crypto::pqc::kyber_ciphertext& ct)
   {
-    extra.push_back(TX_EXTRA_TAG_KYBER_CT);
-    extra.insert(extra.end(), ct.ct, ct.ct + crypto::pqc::ML_KEM_768_CIPHERTEXT_BYTES);
+    tx_extra_field field = tx_extra_kyber_ct{output_index, sel_tag, ct};
+    std::ostringstream oss;
+    binary_archive<true> ar(oss);
+    if (!::do_serialize(ar, field))
+    {
+      LOG_ERROR("Failed to serialise tx_extra_kyber_ct");
+      return false;
+    }
+    const std::string s = oss.str();
+    extra.insert(extra.end(), s.begin(), s.end());
+    return true;
   }
   //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16, A1): serialise a per-output binding tag into tx.extra using the
@@ -588,7 +597,7 @@ namespace cryptonote
     // HIDERING Phase 5 (HFv16): ML-KEM-768 ciphertexts for BQ... outputs, collected
     // here and appended to tx.extra after the classic fields are sorted (below).
     // Stays empty on the live chain (no destination is flagged is_pq pre-fork).
-    std::vector<crypto::pqc::kyber_ciphertext> kyber_cts;
+    std::vector<tx_extra_kyber_ct> kyber_cts;
     // HIDERING Phase 5 (HFv16, Option-2-transparent / A1): per-output binding tags for BQ...
     // outputs — (local output_index, bind_tag) — appended to tx.extra alongside the KEM
     // ciphertexts. Empty on the live chain (no destination is_pq pre-fork).
@@ -651,7 +660,40 @@ namespace cryptonote
         crypto::public_key tweak_pub;
         crypto::secret_key_to_public_key(kyber_tweak, tweak_pub);
         out_eph_public_key = rct::rct2pk(rct::addKeys(rct::pk2rct(out_eph_public_key), rct::pk2rct(tweak_pub)));
-        kyber_cts.push_back(kct);
+
+        // Decision 4 (design 2b, B3): the blinded selection tag, sel_tag = fp(kem_pk) XOR
+        // pad(d, i), so a recipient with many BQ subaddresses decapsulates once instead of once
+        // per subaddress. d must be exactly the derivation the recipient will recompute (a*R),
+        // i.e. the one the device just used for this output; it is not handed back, so it is
+        // rebuilt here with the device's own rule and then checked against the view tag the
+        // device produced from it. A mismatch would emit a tag the recipient can never match,
+        // silently stranding the output, so it aborts the construction instead.
+        crypto::key_derivation sel_derivation;
+        {
+          bool dr;
+          if (change_addr && dst_entr.addr == *change_addr)
+            dr = crypto::generate_key_derivation(txkey_pub, sender_account_keys.m_view_secret_key, sel_derivation);
+          else
+            dr = crypto::generate_key_derivation(dst_entr.addr.m_view_public_key,
+                (dst_entr.is_subaddress && need_additional_txkeys) ? additional_tx_keys[output_index] : tx_key,
+                sel_derivation);
+          CHECK_AND_ASSERT_MES(dr, false, "Failed to derive the BQ selection-tag derivation");
+          if (use_view_tags)
+          {
+            crypto::view_tag check_tag;
+            crypto::derive_view_tag(sel_derivation, output_index, check_tag);
+            CHECK_AND_ASSERT_MES(check_tag == view_tag, false,
+                "BQ selection-tag derivation disagrees with the device's output derivation");
+          }
+        }
+        tx_extra_kyber_ct ct_field;
+        ct_field.output_index = output_index;
+        ct_field.ct = kct;
+        const bool tag_ok = crypto::pqc::pqc_compute_sel_tag(reinterpret_cast<const uint8_t*>(&sel_derivation), sizeof(sel_derivation),
+            output_index, dst_entr.addr.pq_kyber_pk->data(), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES, ct_field.sel_tag);
+        memwipe(&sel_derivation, sizeof(sel_derivation));
+        CHECK_AND_ASSERT_MES(tag_ok, false, "Failed to compute the BQ selection tag");
+        kyber_cts.push_back(ct_field);
 
         // Phase 5 (A1): derive the per-output ML-DSA-65 keypair from the SAME KEM shared
         // secret (and this output's index) and publish the binding tag committing the final
@@ -707,7 +749,8 @@ namespace cryptonote
     // signature the last field. kyber_cts is empty on the live chain, so this is a
     // no-op there.
     for (const auto& kct : kyber_cts)
-      add_kyber_ct_to_extra(tx.extra, kct);
+      if (!add_kyber_ct_to_extra(tx.extra, kct.output_index, kct.sel_tag, kct.ct))
+        return false;
 
     // HIDERING Phase 5 (HFv16, A1): write the per-output binding tags (TX_EXTRA_TAG_PQ_BIND)
     // after the KEM ciphertexts and BEFORE the trailing ML-DSA-65 signature, so that signature

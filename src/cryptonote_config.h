@@ -232,9 +232,11 @@
 // hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 
-// Phase 5 (HFv16): tx_extra tag carrying a ML-KEM-768 KEM ciphertext (1088 bytes)
-// for a BQ... post-quantum stealth output. One such field is emitted per BQ...
-// destination, before the trailing ML-DSA-65 signature field. Tag 0x07 is unused
+// Phase 5 (HFv16): tx_extra tag carrying a ML-KEM-768 KEM ciphertext for a BQ...
+// post-quantum stealth output. Layout (decision 4, design 2b option B3):
+//   [ 0x07 | output_index:varint | sel_tag:8 | ct:1088 ]   (1098 bytes for index < 128)
+// sel_tag is the blinded subaddress selection tag (crypto/pqc.h). One such field is emitted
+// per BQ... destination, before the trailing ML-DSA-65 signature field. Tag 0x07 is unused
 // by the classic tx_extra tags. Only emitted once hf_version >= HF_VERSION_PQ;
 // pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;
@@ -319,6 +321,10 @@ namespace config
   // Fixed leading byte of the BQ... address payload (before spend|view|kyber). Its sole
   // purpose is to pin the rendered base58 prefix to "BQ"; the parser validates it.
   uint8_t const CRYPTONOTE_PQ_ADDRESS_MARKER = 0x33;
+  // Decision 4 (design 2b): the marker of a BQ SUBADDRESS. Same 1249-byte payload, second
+  // value in the [0x29,0x41] window so it still renders "BQ"; a sender needs to tell the two
+  // apart for the same reason the classic 60/62 prefixes exist (r*D tx key, additional keys).
+  uint8_t const CRYPTONOTE_PQ_SUBADDRESS_MARKER = 0x35;
   uint16_t const P2P_DEFAULT_PORT = 19740;
   uint16_t const RPC_DEFAULT_PORT = 19741;
   uint16_t const ZMQ_RPC_DEFAULT_PORT = 19742;

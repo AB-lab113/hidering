@@ -3357,6 +3357,18 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       if (f.type() == typeid(tx_extra_pq_sig)) ++pq_sig_count;
       else if (f.type() == typeid(tx_extra_kyber_ct)) ++kyber_ct_count;
     }
+    // Decision 4 (design 2b, B3): every ML-KEM ciphertext field names the output it belongs
+    // to, and so does every binding field. Both index sets must be in range, free of
+    // duplicates and IDENTICAL — a BQ output carries exactly one of each, a classic output
+    // neither. That leaves a single encoding of a BQ output, which is what lets the wallet
+    // read "the ciphertext and selection tag of output i" instead of inferring it from the
+    // order of appearance.
+    if (!check_pq_output_field_indices(pq_fields, tx.vout.size()))
+    {
+      MERROR_VER("Tx " << get_transaction_hash(tx) << " has ML-KEM-768 ciphertext / PQ binding fields with out-of-range, duplicate or mismatched output indices");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
     if (kyber_ct_count > tx.vout.size())
     {
       MERROR_VER("Tx " << get_transaction_hash(tx) << " has more ML-KEM-768 ciphertexts (" << kyber_ct_count << ") than outputs (" << tx.vout.size() << ")");

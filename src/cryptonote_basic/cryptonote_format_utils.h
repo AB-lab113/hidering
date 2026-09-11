@@ -86,6 +86,12 @@ namespace cryptonote
   // (enforced in check_inputs_types_supported / Blockchain::check_tx_inputs), so this
   // variant test IS the hard-fork gate wherever no hf_version is in scope.
   bool has_transparent_pq_input(const transaction& tx);
+  // HIDERING Phase 5 (HFv16, decision 4 / design 2b): a BQ output is described by exactly one
+  // ML-KEM ciphertext field (with its selection tag) and exactly one binding-tag field, each
+  // naming the output by index. True iff every such index is < n_outputs, no index repeats
+  // within either kind, and both kinds name the SAME set of outputs. Consensus rule from HFv16
+  // (Blockchain::check_tx_inputs); kept here so it can be tested without a blockchain.
+  bool check_pq_output_field_indices(const std::vector<tx_extra_field>& fields, size_t n_outputs);
   crypto::public_key get_tx_pub_key_from_extra(const std::vector<uint8_t>& tx_extra, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction_prefix& tx, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction& tx, size_t pk_index = 0);

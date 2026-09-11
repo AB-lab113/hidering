@@ -209,5 +209,57 @@ namespace pqc
   // sign) reproduce the same keypair from the same (ss, index). Returns false on failure.
   bool pqc_keygen_output_dsa(const kyber_shared_secret &ss, uint64_t output_index,
                              pq_public_key &pk, pq_secret_key &sk);
+
+  // Phase 5 (HFv16, decision 4 / design 2b option B3) — BQ subaddresses.
+  //
+  // ML-KEM has no additive structure: a subaddress key cannot be obtained by shifting the
+  // account key by a scalar, the way Ed25519 subaddresses are. Every BQ subaddress therefore
+  // owns its OWN ML-KEM-768 keypair, derived deterministically so a restore regenerates it:
+  //
+  //   kem_seed(major, minor) = SHAKE256("HRG_BQ_SUBADDR_KEM_v1" || root || major_le4 || minor_le4)
+  //   (pk, sk)               = OQS_KEM_keypair_derand(kem_seed)          (64-byte seed)
+  //
+  // `root` is the account's PQ root secret (cryptonote::get_pq_root_secret). It is never the
+  // view key: a transparent BQ spend is authorised by the ML-KEM shared secret, so a KEM key
+  // derived from the view key would hand spend authority to every view-key holder.
+  // (0,0) is the primary BQ address and keeps its own derivation — callers route it there.
+  bool pqc_kem_keygen_subaddress(const uint8_t *root, size_t root_len,
+                                 uint32_t major, uint32_t minor, pq_stealth_keys &out);
+
+  // The 8-byte BLINDED SELECTION TAG carried next to each BQ output's ML-KEM ciphertext.
+  //
+  // Without it a wallet with N subaddresses must try N decapsulations per ciphertext, because
+  // ML-KEM's implicit rejection never says "not for you". The tag lets the recipient find the
+  // one subaddress to decapsulate with, at the cost of one hash:
+  //
+  //   fp(kem_pk)       = Keccak("HRG_BQ_KEMPK_v1" || kem_pk)[0..8)      (static, per subaddress)
+  //   pad(d, i)        = Keccak("HRG_BQ_SEL_v1"   || d || i_le8)[0..8)  (fresh, per output)
+  //   sel_tag          = fp(kem_pk) XOR pad(d, i)
+  //
+  // where d is the output's Ed25519 key derivation (r*C for the sender, a*R for the
+  // recipient). The recipient computes pad(d, i), XORs it off, and looks fp up in a static
+  // table — O(1) in the number of subaddresses. pad is unknown to anyone without d, so to an
+  // observer the tag is a one-time-padded fingerprint: uniformly random, and unrelated
+  // between two payments to the same subaddress. A bare fp(kem_pk) would be constant per
+  // subaddress and link every payment to it — worse than having no subaddresses at all.
+  constexpr size_t BQ_SEL_TAG_BYTES = 8;
+  struct bq_sel_tag
+  {
+    uint8_t data[BQ_SEL_TAG_BYTES];
+  };
+
+  void pqc_kem_pk_fingerprint(const uint8_t *kem_pk, size_t pk_len, bq_sel_tag &out);
+  // derivation_len must be 32 (a crypto::key_derivation); false otherwise.
+  bool pqc_sel_pad(const uint8_t *derivation, size_t derivation_len, uint64_t output_index, bq_sel_tag &out);
+  // Sender side: sel_tag = fp(kem_pk) XOR pad(derivation, output_index).
+  bool pqc_compute_sel_tag(const uint8_t *derivation, size_t derivation_len, uint64_t output_index,
+                           const uint8_t *kem_pk, size_t pk_len, bq_sel_tag &out);
+  inline bq_sel_tag bq_sel_tag_xor(const bq_sel_tag &a, const bq_sel_tag &b)
+  {
+    bq_sel_tag r;
+    for (size_t n = 0; n < BQ_SEL_TAG_BYTES; ++n)
+      r.data[n] = a.data[n] ^ b.data[n];
+    return r;
+  }
 }
 }

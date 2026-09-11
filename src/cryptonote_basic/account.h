@@ -31,6 +31,7 @@
 #pragma once
 
 #include "cryptonote_basic.h"
+#include "subaddress_index.h"
 #include "crypto/crypto.h"
 #include "crypto/pqc.h"
 #include "serialization/keyvalue_serialization.h"
@@ -231,4 +232,28 @@ namespace cryptonote
   // Render the BQ... address string for an account that owns a ML-KEM-768 key. Returns an
   // empty string if keys.m_account_address.is_pq() is false.
   std::string get_pq_address_str(const account_keys& keys, network_type nettype);
+
+  // HIDERING Phase 5 (HFv16, decision 4 / design 2b option B3) — BQ subaddresses.
+  //
+  // The secret every BQ key of the account is derived from: the primary keypair
+  // (generate_pq_keys, M-4) and every subaddress ML-KEM keypair. ONE definition, on purpose:
+  // it is currently the Ed25519 spend secret key, and that is a known weakness (audit
+  // CRIT-4, 11 Sep 2026): the spend key is the discrete log of the spend public key the BQ
+  // address publishes, so a quantum adversary recovers it and, through it, every BQ key.
+  // Replacing the root is a wallet-format decision still to be taken; keeping it behind this
+  // single function means the subaddress derivation follows automatically when it is.
+  const crypto::secret_key& get_pq_root_secret(const account_keys& keys);
+
+  // The ML-KEM-768 keypair of BQ subaddress `index`. (0,0) is the primary BQ address and
+  // returns keys.pq_keys as is; any other index is derived from get_pq_root_secret with
+  // crypto::pqc::pqc_kem_keygen_subaddress. Nothing is stored: a subaddress keypair is
+  // recomputed on demand (≈17 µs), so the .keys file only ever carries the account keys.
+  // Returns false for an account without pq_keys, or on a liboqs failure.
+  bool generate_pq_subaddress_keys(const account_keys& keys, const subaddress_index& index,
+                                   crypto::pqc::pq_stealth_keys& out);
+
+  // The public BQ address of subaddress `index`: the Ed25519 half of the classic subaddress
+  // (D, C) plus that subaddress' own ML-KEM-768 key. For (0,0) it is the primary BQ address.
+  bool get_pq_subaddress(const account_keys& keys, const subaddress_index& index,
+                         account_public_address& out);
 }

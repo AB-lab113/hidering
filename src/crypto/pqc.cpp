@@ -388,5 +388,84 @@ namespace pqc
     if (!seed.empty()) std::memset(&seed[0], 0, seed.size());
     return r;
   }
+
+  bool pqc_kem_keygen_subaddress(const uint8_t *root, size_t root_len,
+                                 uint32_t major, uint32_t minor, pq_stealth_keys &out)
+  {
+    if (root == nullptr || root_len == 0)
+      return false;
+
+    ensure_oqs_rng_installed();
+
+    // root || major_le4 || minor_le4, expanded under its own domain into the 64-byte d||z seed.
+    std::string buf;
+    buf.reserve(root_len + 8);
+    buf.append(reinterpret_cast<const char*>(root), root_len);
+    for (int n = 0; n < 4; ++n) buf.push_back(static_cast<char>((major >> (8 * n)) & 0xff));
+    for (int n = 0; n < 4; ++n) buf.push_back(static_cast<char>((minor >> (8 * n)) & 0xff));
+    uint8_t kem_seed[ML_KEM_768_KEYPAIR_SEED_BYTES];
+    derive_subseed("HRG_BQ_SUBADDR_KEM_v1", reinterpret_cast<const uint8_t*>(buf.data()), buf.size(),
+                   kem_seed, sizeof(kem_seed));
+    OQS_MEM_cleanse(&buf[0], buf.size());
+
+    bool ok = false;
+    OQS_KEM *kem = OQS_KEM_new(OQS_KEM_alg_ml_kem_768);
+    if (kem != nullptr
+        && kem->length_public_key == ML_KEM_768_PUBLIC_KEY_BYTES
+        && kem->length_secret_key == ML_KEM_768_SECRET_KEY_BYTES
+        && kem->length_keypair_seed == ML_KEM_768_KEYPAIR_SEED_BYTES
+        && kem->keypair_derand != nullptr)
+    {
+      // Pure function of the seed: no randombytes involved, so none of the MOYEN-4 hook
+      // machinery is needed here (unlike the ML-DSA half of pqc_keygen_from_seed).
+      ok = OQS_KEM_keypair_derand(kem, out.kyber_pk, out.kyber_sk, kem_seed) == OQS_SUCCESS;
+    }
+    if (kem != nullptr) OQS_KEM_free(kem);
+    OQS_MEM_cleanse(kem_seed, sizeof(kem_seed));
+    return ok;
+  }
+
+  void pqc_kem_pk_fingerprint(const uint8_t *kem_pk, size_t pk_len, bq_sel_tag &out)
+  {
+    static const char domain[] = "HRG_BQ_KEMPK_v1";
+    std::string buf;
+    buf.reserve((sizeof(domain) - 1) + pk_len);
+    buf.append(domain, sizeof(domain) - 1);
+    buf.append(reinterpret_cast<const char*>(kem_pk), pk_len);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf.data(), buf.size(), h);
+    std::memcpy(out.data, &h, BQ_SEL_TAG_BYTES);
+  }
+
+  bool pqc_sel_pad(const uint8_t *derivation, size_t derivation_len, uint64_t output_index, bq_sel_tag &out)
+  {
+    // 13 + 32 + 8 = 53 bytes: a single Keccak-f permutation, cheap enough for the scan path.
+    static const char domain[] = "HRG_BQ_SEL_v1";
+    uint8_t buf[(sizeof(domain) - 1) + 32 + 8];
+    if (derivation == nullptr || derivation_len != 32)
+      return false;
+    size_t off = 0;
+    std::memcpy(buf + off, domain, sizeof(domain) - 1); off += sizeof(domain) - 1;
+    std::memcpy(buf + off, derivation, 32);            off += 32;
+    for (int n = 0; n < 8; ++n) buf[off++] = static_cast<uint8_t>((output_index >> (8 * n)) & 0xff);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf, off, h);
+    std::memcpy(out.data, &h, BQ_SEL_TAG_BYTES);
+    // the derivation is a shared secret: scrub the copy
+    OQS_MEM_cleanse(buf, sizeof(buf));
+    OQS_MEM_cleanse(&h, sizeof(h));
+    return true;
+  }
+
+  bool pqc_compute_sel_tag(const uint8_t *derivation, size_t derivation_len, uint64_t output_index,
+                           const uint8_t *kem_pk, size_t pk_len, bq_sel_tag &out)
+  {
+    bq_sel_tag fp, pad;
+    if (!pqc_sel_pad(derivation, derivation_len, output_index, pad))
+      return false;
+    pqc_kem_pk_fingerprint(kem_pk, pk_len, fp);
+    out = bq_sel_tag_xor(fp, pad);
+    return true;
+  }
 }
 }

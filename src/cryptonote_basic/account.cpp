@@ -302,12 +302,19 @@ DISABLE_VS_WARNINGS(4244 4345)
   // 25-word seed therefore regenerates the exact same BQ... keys, instead of fresh random
   // ones that would strand any BQ funds. The spend key flows through domain-separated
   // SHAKE256 (see pqc_keygen_from_seed), so it is never recoverable from the PQ material.
+  const crypto::secret_key& get_pq_root_secret(const account_keys& keys)
+  {
+    // See account.h (audit CRIT-4): the spend secret key is the dlog of a published key.
+    return keys.m_spend_secret_key;
+  }
+  //-----------------------------------------------------------------
   bool generate_pq_keys(account_keys& keys)
   {
     crypto::pqc::pq_public_key pq_pk;
     crypto::pqc::pq_secret_key pq_sk;
+    const crypto::secret_key& root = get_pq_root_secret(keys);
     if (!crypto::pqc::pqc_keygen_from_seed(
-            reinterpret_cast<const uint8_t*>(&keys.m_spend_secret_key),
+            reinterpret_cast<const uint8_t*>(&root),
             sizeof(crypto::secret_key), pq_pk, pq_sk))
     {
       MERROR("generate_pq_keys: liboqs ML-KEM-768/ML-DSA-65 seed-derived keygen failed");
@@ -350,6 +357,42 @@ DISABLE_VS_WARNINGS(4244 4345)
       return std::string();
     }
     return get_account_address_as_str_pq(nettype, keys.m_account_address);
+  }
+  //-----------------------------------------------------------------
+  bool generate_pq_subaddress_keys(const account_keys& keys, const subaddress_index& index,
+                                   crypto::pqc::pq_stealth_keys& out)
+  {
+    if (!keys.pq_keys)
+      return false;
+    if (index.is_zero())
+    {
+      out = *keys.pq_keys;
+      return true;
+    }
+    const crypto::secret_key& root = get_pq_root_secret(keys);
+    return crypto::pqc::pqc_kem_keygen_subaddress(reinterpret_cast<const uint8_t*>(&root), sizeof(root),
+                                                  index.major, index.minor, out);
+  }
+  //-----------------------------------------------------------------
+  bool get_pq_subaddress(const account_keys& keys, const subaddress_index& index,
+                         account_public_address& out)
+  {
+    if (!keys.pq_keys || !keys.m_account_address.is_pq())
+      return false;
+    if (index.is_zero())
+    {
+      out = keys.m_account_address;
+      return true;
+    }
+    crypto::pqc::pq_stealth_keys sk;
+    if (!generate_pq_subaddress_keys(keys, index, sk))
+      return false;
+    out = keys.get_device().get_subaddress(keys, index);
+    std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kpk{};
+    memcpy(kpk.data(), sk.kyber_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+    out.pq_kyber_pk = kpk;
+    memwipe(&sk, sizeof(sk));
+    return true;
   }
   //-----------------------------------------------------------------
   std::string account_base::get_public_address_str(network_type nettype) const
