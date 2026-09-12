@@ -104,21 +104,18 @@ namespace
     return {{k.m_account_address.m_spend_public_key, {0, 0}}};
   }
 
-  const size_t PQ_SIG_FIELD = 1 + ML_DSA_65_PUBLIC_KEY_BYTES + ML_DSA_65_SIGNATURE_BYTES;
-
   // The message both per-input signatures sign: the prefix hash with every PQ input signature —
-  // dsa.sig AND owner_sig — zeroed, and the trailing account-level pq_sig field dropped. Exactly
-  // what Blockchain::check_tx_inputs reconstructs.
+  // auth.sig AND owner_sig — zeroed. Exactly what Blockchain::check_tx_inputs reconstructs.
+  // Spec 2e: no tx_extra truncation any more — the account-level 0x06 field is gone.
   crypto::hash pq_input_message(transaction tx)
   {
     for (auto &in : tx.vin)
       if (in.type() == typeid(txin_to_key_pq))
       {
         txin_to_key_pq &p = boost::get<txin_to_key_pq>(in);
-        memset(p.dsa.sig, 0, ML_DSA_65_SIGNATURE_BYTES);
+        memset(p.auth.sig, 0, ML_DSA_65_SIGNATURE_BYTES);
         memset(&p.owner_sig, 0, sizeof(p.owner_sig));
       }
-    tx.extra.resize(tx.extra.size() - PQ_SIG_FIELD);
     return get_transaction_prefix_hash(tx);
   }
 
@@ -145,9 +142,10 @@ namespace
 
   struct verdict
   {
-    bool b = false, b2 = false, c = false, d = false, d2 = false, ext = false, e = false;
-    bool all() const { return b && b2 && c && d && d2 && ext && e; }
-    bool all_but_d2() const { return b && b2 && c && d && ext && e; }
+    bool b = false, b2 = false, c = false, d = false, d2 = false, e = false;
+    bool all() const { return b && b2 && c && d && d2 && e; }
+    bool all_but_d2() const { return b && b2 && c && d && e; }
+    bool all_but_c() const { return b && b2 && d && d2 && e; }
   };
 
   // Validator checks for one input of `spend`, which spends `out`.
@@ -155,21 +153,28 @@ namespace
   {
     verdict v;
     std::vector<tx_extra_field> fields;
-    if (!parse_tx_extra(spend.extra, fields) || fields.empty() || fields.back().type() != typeid(tx_extra_pq_sig))
+    if (!parse_tx_extra(spend.extra, fields) || fields.empty())
       return v;
+    // Spec 2e §3.2: the removed account-level field must never be present.
+    for (const auto &f : fields)
+      if (f.type() == typeid(tx_extra_pq_sig))
+        return v;
     const txin_to_key_pq &in = boost::get<txin_to_key_pq>(spend.vin[vin_index]);
     v.b = in.real_output_key == out.P;
     v.b2 = out.C == rct::commit(in.amount, in.mask);
-    uint8_t expect[32];
-    pqc_compute_bind_tag((const uint8_t *)&in.real_output_key, 32, in.dsa.pk, ML_DSA_65_PUBLIC_KEY_BYTES, expect);
-    v.c = !memcmp(expect, &out.bind_tag, 32);
+    // (c) — the C-1 binding: the revealed authorisation key must open the commitment the
+    // creator of the output bound to it, under the per-output blind the spender reveals.
+    if (in.auth_type == PQ_AUTH_TYPE_MLDSA65)
+    {
+      uint8_t commit[32], expect[32];
+      pqc_compute_auth_commit(in.auth_type, in.auth.pk, ML_DSA_65_PUBLIC_KEY_BYTES, commit);
+      pqc_compute_bind_tag_v2(in.auth_type, (const uint8_t *)&in.real_output_key, 32,
+                              commit, (const uint8_t *)&in.auth_blind, expect);
+      v.c = !memcmp(expect, &out.bind_tag, 32);
+    }
     const crypto::hash msg = pq_input_message(spend);
-    v.d = pqc_tx_verify((const uint8_t *)&msg, sizeof(msg), in.dsa);
+    v.d = pqc_tx_verify((const uint8_t *)&msg, sizeof(msg), in.auth);
     v.d2 = crypto::check_signature(msg, in.real_output_key, in.owner_sig);
-    transaction stripped = spend;
-    stripped.extra.resize(stripped.extra.size() - PQ_SIG_FIELD);
-    const crypto::hash h = get_transaction_prefix_hash(stripped);
-    v.ext = pqc_tx_verify((const uint8_t *)&h, sizeof(h), boost::get<tx_extra_pq_sig>(fields.back()).sig);
     if (spend.rct_signatures.type != rct::RCTTypeNull)
     {
       // A hybrid is a RingCT tx: its balance is closed by verRctSemanticsSimple with the
@@ -188,8 +193,8 @@ namespace
   {
     auto a = [](bool x) { return x ? "accepted" : "REJECTED"; };
     printf("  %s:\n", who);
-    printf("    (b) %s  (b2) %s  (c) %s  (d) %s  (d2) %s  account sig %s  (e) %s\n",
-           a(v.b), a(v.b2), a(v.c), a(v.d), a(v.d2), a(v.ext), a(v.e));
+    printf("    (b) %s  (b2) %s  (c) %s  (d) %s  (d2) %s  (e) %s\n",
+           a(v.b), a(v.b2), a(v.c), a(v.d), a(v.d2), a(v.e));
   }
 }
 
@@ -241,7 +246,7 @@ int main()
       tx_source_entry::output_entry oe; oe.first = 4242 + td.m_internal_output_index;
       oe.second.dest = rct::pk2rct(td.get_public_key()); oe.second.mask = rct::commit(td.amount(), td.m_mask);
       s.outputs.push_back(oe);
-      s.is_pq = true; s.pq_ss = ss;
+      s.is_pq = true; s.pq_ss = ss; s.pq_subaddr = td.m_subaddr_index;
       srcs.push_back(s);
     }
     account_base payee; payee.generate();
@@ -278,7 +283,7 @@ int main()
     tx_source_entry::output_entry oe; oe.first = 4242 + i;
     oe.second.dest = rct::pk2rct(td_primary.get_public_key()); oe.second.mask = rct::commit(pq.amount, pq.mask);
     pq.outputs.push_back(oe);
-    pq.is_pq = true; pq.pq_ss = ss_p;
+    pq.is_pq = true; pq.pq_ss = ss_p; pq.pq_subaddr = td_primary.m_subaddr_index;
     account_base payee; payee.generate();
     transaction hybrid; crypto::secret_key unused;
     if (!build(vk, wallet_accessor_test::subaddresses(victim), {pq, owned_source(vk, 3 * HRG)},
@@ -324,6 +329,7 @@ int main()
   src.outputs.push_back(oe);
   src.is_pq = true;
   src.pq_ss = ss;
+  src.pq_subaddr = cryptonote::subaddress_index{0, 0}; // the attacker would claim its own index
   transaction via_builder; crypto::secret_key unused;
   const bool built = build(attacker.get_keys(), own_map(attacker.get_keys()), {src},
                            {tx_destination_entry(5 * HRG - HRG / 100, attacker.get_keys().m_account_address, false)}, via_builder, unused);
@@ -347,9 +353,13 @@ int main()
     in.spent_output_index = 4242;
     in.real_output_key = out.P;
     in.mask = sender_mask;
+    // Spec 2e: the best the sender can do is present ITS OWN authorisation key — it has no
+    // preimage of the victim's commitment. It fills the blind correctly (it has ss).
     pq_public_key dpk; pq_secret_key dsk;
-    pqc_keygen_output_dsa(ss, i, dpk, dsk);
-    memcpy(in.dsa.pk, dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES);
+    pqc_keygen(dpk, dsk);
+    in.auth_type = PQ_AUTH_TYPE_MLDSA65;
+    pqc_compute_auth_blind(ss, i, (uint8_t *)&in.auth_blind);
+    memcpy(in.auth.pk, dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES);
     forged.vin.push_back(in);
     tx_out o{};
     o.amount = 5 * HRG - HRG / 100;
@@ -360,7 +370,7 @@ int main()
     add_tx_pub_key_to_extra(forged, rct::rct2pk(rct::pkGen()));
     forged.rct_signatures.type = rct::RCTTypeNull;
 
-    const crypto::hash msg = get_transaction_prefix_hash(forged);   // sigs zero, no pq_sig yet
+    const crypto::hash msg = get_transaction_prefix_hash(forged);   // sigs zero
     pq_tx_sig s;
     pqc_tx_sign((const uint8_t *)&msg, sizeof(msg), dsk.dilithium3_sk, ML_DSA_65_SECRET_KEY_BYTES,
                 dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, s);
@@ -373,30 +383,62 @@ int main()
     crypto::signature owner;
     crypto::generate_signature(msg, x_guess_pub, x_guess, owner);
     txin_to_key_pq &fin = boost::get<txin_to_key_pq>(forged.vin[0]);
-    memcpy(fin.dsa.sig, s.sig, ML_DSA_65_SIGNATURE_BYTES);
+    memcpy(fin.auth.sig, s.sig, ML_DSA_65_SIGNATURE_BYTES);
     fin.owner_sig = owner;
-
-    const crypto::hash acct = get_transaction_prefix_hash(forged);
-    pq_tx_sig ext;
-    const auto &ad = *attacker.get_keys().pq_dilithium;
-    pqc_tx_sign((const uint8_t *)&acct, sizeof(acct), ad.dilithium_sk, ML_DSA_65_SECRET_KEY_BYTES,
-                ad.dilithium_pk, ML_DSA_65_PUBLIC_KEY_BYTES, ext);
-    forged.extra.push_back(TX_EXTRA_TAG_PQ_SIG);
-    forged.extra.insert(forged.extra.end(), ext.pk, ext.pk + ML_DSA_65_PUBLIC_KEY_BYTES);
-    forged.extra.insert(forged.extra.end(), ext.sig, ext.sig + ML_DSA_65_SIGNATURE_BYTES);
 
     const verdict v = validate(forged, 0, out);
     print("hand-forged spend by the sender (all it knows + best-guess owner key)", v);
     if (get_pq_input_key_image(fin.real_output_key) != get_pq_input_key_image(out.P))
     { printf("FAIL: test setup — the forgery does not target the victim's output\n"); ok = false; }
     if (v.all())
-    { printf("FAIL: CRIT-3 — the sender's hand-made spend passes every validator check\n"); ok = false; }
-    else if (!v.all_but_d2())
-    { printf("FAIL: test setup — the forgery should pass every check except (d2), so that the\n"
-             "      test shows (d2) is what stops it\n"); ok = false; }
-    else
-      printf("PASS: the sender's spend passes (b)(b2)(c)(d), the account signature and (e) —\n"
-             "      everything it could compute — and is rejected by (d2) alone\n");
+    { printf("FAIL: the sender's hand-made spend passes every validator check\n"); ok = false; }
+    if (v.c)
+    { printf("FAIL: spec 2e — the sender opened the victim's authorisation commitment\n"); ok = false; }
+    if (v.d2)
+    { printf("FAIL: CRIT-3 — the sender produced a valid owner signature\n"); ok = false; }
+    if (!v.b || !v.b2 || !v.d || !v.e)
+    { printf("FAIL: test setup — the forgery should still pass (b)(b2)(d)(e)\n"); ok = false; }
+    if (!v.all() && !v.c && !v.d2 && v.b && v.b2 && v.d && v.e)
+      printf("PASS: the sender's spend passes (b)(b2)(d)(e) and is rejected by BOTH (c) and (d2)\n");
+
+    // ---- 3b. THE QUANTUM SENDER (spec 2e §3.3) ------------------------------------------
+    // Hand the attacker the one-time secret x' outright — that is exactly what Shor on the
+    // revealed P' would give it — so (d2) can no longer stop it. It still holds ss, so its
+    // blind is right. The ONLY thing left between it and the victim's money is (c): a
+    // preimage of an authorisation commitment it has never seen. This is the assertion that
+    // the residual of CRIT-3 is closed.
+    {
+      crypto::secret_key x_real;
+      sc_add((unsigned char *)&x_real, (const unsigned char *)&hs,
+             (const unsigned char *)&vk.m_spend_secret_key);
+      sc_add((unsigned char *)&x_real, (const unsigned char *)&x_real, (const unsigned char *)&t_tweak);
+      crypto::public_key x_real_pub;
+      crypto::secret_key_to_public_key(x_real, x_real_pub);
+      if (x_real_pub != out.P)
+      { printf("FAIL: test setup — the simulated Shor result is not the output's one-time key\n"); ok = false; }
+      else
+      {
+        transaction q = forged;
+        txin_to_key_pq &qin = boost::get<txin_to_key_pq>(q.vin[0]);
+        memset(&qin.owner_sig, 0, sizeof(qin.owner_sig));
+        memset(qin.auth.sig, 0, ML_DSA_65_SIGNATURE_BYTES);
+        const crypto::hash qmsg = get_transaction_prefix_hash(q);
+        pq_tx_sig qs;
+        pqc_tx_sign((const uint8_t *)&qmsg, sizeof(qmsg), dsk.dilithium3_sk, ML_DSA_65_SECRET_KEY_BYTES,
+                    dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, qs);
+        memcpy(qin.auth.sig, qs.sig, ML_DSA_65_SIGNATURE_BYTES);
+        crypto::generate_signature(qmsg, out.P, x_real, qin.owner_sig);
+        const verdict qv = validate(q, 0, out);
+        print("QUANTUM sender: holds ss AND the one-time secret x' (as if by Shor)", qv);
+        if (!qv.d2)
+        { printf("FAIL: test setup — the simulated quantum sender should satisfy (d2)\n"); ok = false; }
+        if (qv.c || qv.all())
+        { printf("FAIL: spec 2e — a quantum sender still spends the victim's BQ output\n"); ok = false; }
+        if (qv.d2 && !qv.c && qv.all_but_c())
+          printf("PASS: the quantum sender satisfies (b)(b2)(d)(d2)(e) — everything Shor buys it —\n"
+                 "      and is rejected by (c) alone: the CRIT-3 residual is closed\n");
+      }
+    }
   }
 
   printf(ok ? "RESULT: PASS (only the recipient can spend a BQ output)\n"

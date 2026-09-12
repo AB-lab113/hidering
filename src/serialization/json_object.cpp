@@ -522,12 +522,15 @@ void toJsonValue(rapidjson::Writer<epee::byte_stream>& dest, const cryptonote::t
   INSERT_INTO_JSON_OBJECT(dest, spent_output_index, txin.spent_output_index);
   INSERT_INTO_JSON_OBJECT(dest, real_output_key, txin.real_output_key);
   INSERT_INTO_JSON_OBJECT(dest, mask, txin.mask);
-  // dsa is a 5261-byte POD (pk||sig) — too large for the stack-based to_hex::array generic
+  INSERT_INTO_JSON_OBJECT(dest, owner_sig, txin.owner_sig);
+  INSERT_INTO_JSON_OBJECT(dest, auth_type, txin.auth_type);
+  INSERT_INTO_JSON_OBJECT(dest, auth_blind, txin.auth_blind);
+  // auth is a 5261-byte POD (pk||sig) — too large for the stack-based to_hex::array generic
   // serializer, so emit it as a heap-allocated hex string.
   {
-    const std::string dsa_hex = epee::to_hex::string(epee::as_byte_span(txin.dsa));
-    dest.Key("dsa");
-    dest.String(dsa_hex.data(), dsa_hex.size());
+    const std::string auth_hex = epee::to_hex::string(epee::as_byte_span(txin.auth));
+    dest.Key("auth");
+    dest.String(auth_hex.data(), auth_hex.size());
   }
 
   dest.EndObject();
@@ -544,10 +547,13 @@ void fromJsonValue(const rapidjson::Value& val, cryptonote::txin_to_key_pq& txin
   GET_FROM_JSON_OBJECT(val, txin.spent_output_index, spent_output_index);
   GET_FROM_JSON_OBJECT(val, txin.real_output_key, real_output_key);
   GET_FROM_JSON_OBJECT(val, txin.mask, mask);
-  const auto dsa_it = val.FindMember("dsa");
-  if (dsa_it == val.MemberEnd())
-    throw MISSING_KEY("dsa");
-  json::read_hex(dsa_it->value, epee::as_mut_byte_span(txin.dsa));
+  GET_FROM_JSON_OBJECT(val, txin.owner_sig, owner_sig);
+  GET_FROM_JSON_OBJECT(val, txin.auth_type, auth_type);
+  GET_FROM_JSON_OBJECT(val, txin.auth_blind, auth_blind);
+  const auto auth_it = val.FindMember("auth");
+  if (auth_it == val.MemberEnd())
+    throw MISSING_KEY("auth");
+  json::read_hex(auth_it->value, epee::as_mut_byte_span(txin.auth));
 }
 
 

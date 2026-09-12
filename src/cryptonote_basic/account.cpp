@@ -360,6 +360,15 @@ DISABLE_VS_WARNINGS(4244 4345)
     memcpy(kpk.data(), pq_pk.kyber768_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     keys.m_account_address.pq_kyber_pk = kpk;
 
+    // Spec 2e: publish the commitment to the account's ML-DSA-65 identity key. The address is
+    // the ONLY place it appears; the chain never sees it until a spend reveals the key itself.
+    std::array<uint8_t, 32> commit{};
+    crypto::pqc::pqc_compute_auth_commit(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER,
+                                         pq_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                         commit.data());
+    keys.m_account_address.pq_auth_commit = commit;
+    keys.m_account_address.pq_auth_ver = ::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER;
+
     // audit M4: the secret material now lives in the mlocked keys.pq_keys / keys.pq_dilithium
     // members (pinned against swap). Scrub the plaintext keygen output and the transient
     // un-mlocked stack copies (pq_sk, sk, dk) so no unprotected residue is left on the stack.
@@ -400,6 +409,40 @@ DISABLE_VS_WARNINGS(4244 4345)
                                                   index.major, index.minor, out);
   }
   //-----------------------------------------------------------------
+  bool generate_pq_identity_keys(const account_keys& keys, const subaddress_index& index,
+                                 crypto::pqc::pq_dilithium_keys& out)
+  {
+    if (!keys.pq_dilithium)
+      return false;
+    if (index.is_zero())
+    {
+      out = *keys.pq_dilithium;
+      return true;
+    }
+    const crypto::secret_key* root = get_pq_root_secret(keys);
+    if (root == nullptr)
+    {
+      // audit CRIT-4: no root, no derivation. Never fall back to the spend key.
+      MERROR("generate_pq_identity_keys: account has no post-quantum root secret");
+      return false;
+    }
+    return crypto::pqc::pqc_dsa_keygen_subaddress(reinterpret_cast<const uint8_t*>(root), sizeof(*root),
+                                                  index.major, index.minor, out);
+  }
+  //-----------------------------------------------------------------
+  bool get_pq_auth_commit(const account_keys& keys, const subaddress_index& index,
+                          std::array<uint8_t, 32>& out)
+  {
+    crypto::pqc::pq_dilithium_keys id;
+    if (!generate_pq_identity_keys(keys, index, id))
+      return false;
+    crypto::pqc::pqc_compute_auth_commit(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER,
+                                         id.dilithium_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                         out.data());
+    memwipe(&id, sizeof(id));
+    return true;
+  }
+  //-----------------------------------------------------------------
   bool get_pq_subaddress(const account_keys& keys, const subaddress_index& index,
                          account_public_address& out)
   {
@@ -413,10 +456,18 @@ DISABLE_VS_WARNINGS(4244 4345)
     crypto::pqc::pq_stealth_keys sk;
     if (!generate_pq_subaddress_keys(keys, index, sk))
       return false;
+    std::array<uint8_t, 32> commit{};
+    if (!get_pq_auth_commit(keys, index, commit))
+    {
+      memwipe(&sk, sizeof(sk));
+      return false;
+    }
     out = keys.get_device().get_subaddress(keys, index);
     std::array<uint8_t, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES> kpk{};
     memcpy(kpk.data(), sk.kyber_pk, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     out.pq_kyber_pk = kpk;
+    out.pq_auth_commit = commit;
+    out.pq_auth_ver = ::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER;
     memwipe(&sk, sizeof(sk));
     return true;
   }

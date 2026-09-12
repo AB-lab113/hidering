@@ -389,6 +389,100 @@ namespace pqc
     return r;
   }
 
+  // ---------------------------------------------------------------------------------------
+  // Spec 2e — recipient-held post-quantum authorisation factor.
+  // ---------------------------------------------------------------------------------------
+  void pqc_compute_auth_commit(uint8_t auth_type, const uint8_t *auth_pk, size_t pk_len,
+                               uint8_t out_commit[32])
+  {
+    static const char domain[] = "HRG_BQ_ADDR_AUTH_v1";
+    std::string buf;
+    buf.reserve((sizeof(domain) - 1) + 1 + pk_len);
+    buf.append(domain, sizeof(domain) - 1);
+    buf.push_back(static_cast<char>(auth_type));   // typed domain separation (spec 2e §1.3)
+    buf.append(reinterpret_cast<const char*>(auth_pk), pk_len);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf.data(), buf.size(), h);
+    std::memcpy(out_commit, &h, 32);
+  }
+
+  bool pqc_compute_auth_blind(const kyber_shared_secret &ss, uint64_t output_index,
+                              uint8_t out_blind[32])
+  {
+    static const char domain[] = "HRG_BQ_BINDBLIND_v1";
+    uint8_t buf[(sizeof(domain) - 1) + sizeof(ss.ss) + 8];
+    size_t off = 0;
+    std::memcpy(buf + off, domain, sizeof(domain) - 1); off += sizeof(domain) - 1;
+    std::memcpy(buf + off, ss.ss, sizeof(ss.ss));       off += sizeof(ss.ss);
+    for (int n = 0; n < 8; ++n) buf[off++] = static_cast<uint8_t>((output_index >> (8 * n)) & 0xff);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf, off, h);
+    std::memcpy(out_blind, &h, 32);
+    // the shared secret went through this buffer: scrub it, as pqc_sel_pad does
+    OQS_MEM_cleanse(buf, sizeof(buf));
+    OQS_MEM_cleanse(&h, sizeof(h));
+    return true;
+  }
+
+  void pqc_compute_bind_tag_v2(uint8_t auth_type, const uint8_t *real_output_key, size_t rk_len,
+                               const uint8_t auth_commit[32], const uint8_t auth_blind[32],
+                               uint8_t out_tag[32])
+  {
+    static const char domain[] = "HRG_PQ_BIND_v2";
+    std::string buf;
+    buf.reserve((sizeof(domain) - 1) + 1 + rk_len + 32 + 32);
+    buf.append(domain, sizeof(domain) - 1);
+    buf.push_back(static_cast<char>(auth_type));
+    buf.append(reinterpret_cast<const char*>(real_output_key), rk_len);
+    buf.append(reinterpret_cast<const char*>(auth_commit), 32);
+    buf.append(reinterpret_cast<const char*>(auth_blind), 32);
+    crypto::hash h;
+    crypto::cn_fast_hash(buf.data(), buf.size(), h);
+    std::memcpy(out_tag, &h, 32);
+  }
+
+  bool pqc_dsa_keygen_subaddress(const uint8_t *root, size_t root_len,
+                                 uint32_t major, uint32_t minor, pq_dilithium_keys &out)
+  {
+    if (root == nullptr || root_len == 0)
+      return false;
+
+    ensure_oqs_rng_installed();
+
+    // root || major_le4 || minor_le4, expanded under its own domain into the keygen seed.
+    std::string buf;
+    buf.reserve(root_len + 8);
+    buf.append(reinterpret_cast<const char*>(root), root_len);
+    for (int n = 0; n < 4; ++n) buf.push_back(static_cast<char>((major >> (8 * n)) & 0xff));
+    for (int n = 0; n < 4; ++n) buf.push_back(static_cast<char>((minor >> (8 * n)) & 0xff));
+    uint8_t dsa_seed[ML_DSA_65_KEYGEN_SEED_BYTES];
+    derive_subseed("HRG_BQ_SUBADDR_DSA_v1", reinterpret_cast<const uint8_t*>(buf.data()), buf.size(),
+                   dsa_seed, sizeof(dsa_seed));
+    OQS_MEM_cleanse(&buf[0], buf.size());
+
+    bool ok = false;
+    OQS_SIG *sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
+    if (sig != nullptr
+        && sig->length_public_key == ML_DSA_65_PUBLIC_KEY_BYTES
+        && sig->length_secret_key == ML_DSA_65_SECRET_KEY_BYTES)
+    {
+      // Same mechanism as pqc_keygen_from_seed: no derandomised SIG keygen in liboqs, so the
+      // deterministic SHAKE256 stream is bound to THIS THREAD ONLY (audit MOYEN-4).
+      OQS_SHA3_shake256_inc_ctx stream;
+      OQS_SHA3_shake256_inc_init(&stream);
+      OQS_SHA3_shake256_inc_absorb(&stream, dsa_seed, sizeof(dsa_seed));
+      OQS_SHA3_shake256_inc_finalize(&stream);
+      {
+        scoped_det_rng bind(&stream);
+        ok = OQS_SIG_keypair(sig, out.dilithium_pk, out.dilithium_sk) == OQS_SUCCESS;
+      }
+      OQS_SHA3_shake256_inc_ctx_release(&stream);
+    }
+    if (sig != nullptr) OQS_SIG_free(sig);
+    OQS_MEM_cleanse(dsa_seed, sizeof(dsa_seed));
+    return ok;
+  }
+
   bool pqc_kem_keygen_subaddress(const uint8_t *root, size_t root_len,
                                  uint32_t major, uint32_t minor, pq_stealth_keys &out)
   {

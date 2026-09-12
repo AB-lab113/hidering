@@ -150,15 +150,26 @@ namespace boost
     a & x.k_image;
   }
 
-  // HIDERING Phase 5 (HFv16): transparent post-quantum input. dsa (pk||sig) is a fixed-size
-  // POD, serialised as a raw byte array like the crypto::public_key / key_image above.
+  // HIDERING Phase 5 (HFv16): transparent post-quantum input. The fixed-size PODs are
+  // serialised as raw byte arrays, like the crypto::public_key / key_image above.
+  //
+  // Latent defect fixed while implementing spec 2e: this serialiser had never been extended
+  // when txin_to_key_pq gained `mask` (CRIT-2) and `owner_sig` (CRIT-3), so a BQ spend stored
+  // in a wallet cache (transfer_details::m_tx is a transaction_prefix, whose vin holds these)
+  // came back missing both. Inert so far — no BQ transaction has ever existed — but it would
+  // have silently corrupted the first one. All fields are listed now, and any future field
+  // must be added here too.
   template <class Archive>
   inline void serialize(Archive &a, cryptonote::txin_to_key_pq &x, const boost::serialization::version_type ver)
   {
     a & x.amount;
     a & x.spent_output_index;
     a & x.real_output_key;
-    a & reinterpret_cast<char (&)[sizeof(crypto::pqc::pq_tx_sig)]>(x.dsa);
+    a & x.mask;
+    a & x.owner_sig;
+    a & x.auth_type;
+    a & x.auth_blind;
+    a & reinterpret_cast<char (&)[sizeof(crypto::pqc::pq_tx_sig)]>(x.auth);
   }
 
   template <class Archive>

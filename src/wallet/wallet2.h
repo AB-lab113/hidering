@@ -347,6 +347,12 @@ private:
     {
       crypto::pqc::bq_sel_tag sel_tag;
       crypto::pqc::kyber_ciphertext ct;
+      // Spec 2e §3.4: the binding tag this tx published for the output. The consensus cannot
+      // check that the SENDER committed to the recipient's own authorisation key rather than
+      // to its own — it never sees the address. The recipient can, and must, before crediting
+      // anything: a mismatch means an output nobody but the sender could ever spend.
+      crypto::hash bind_tag;
+      bool has_bind = false;
     };
     typedef std::vector<boost::optional<pq_output_field>> pq_output_fields;
 
@@ -1268,6 +1274,21 @@ private:
     // `index` — its classic Ed25519 half plus its own ML-KEM-768 key. (0,0) is the primary BQ
     // address. Empty string for a wallet without BQ keys.
     std::string get_pq_subaddress_as_str(const cryptonote::subaddress_index& index) const;
+    // Spec 2e §4.2 R-c — opt-in to merging BQ subaddresses in one transaction. OFF by default:
+    // merging welds two linkage sets together for ever. Session-only and deliberately not
+    // persisted, so it cannot be left on by accident across runs.
+    void set_pq_allow_subaddress_merge(bool allow) { m_pq_allow_subaddress_merge = allow; }
+    bool pq_allow_subaddress_merge() const { return m_pq_allow_subaddress_merge; }
+
+    // Spec 2e / T2. True once a BQ subaddress has been committed to a spend.
+    bool is_pq_subaddress_spent(const cryptonote::subaddress_index& index) const
+      { return m_pq_spent_subaddresses.count(index) != 0; }
+    // Allocate a BQ subaddress never yet used in a spend, on `major`. Used for the change of a
+    // BQ spend (R-b) and available to callers that need a fresh payment-request address.
+    cryptonote::subaddress_index allocate_fresh_pq_subaddress(uint32_t major);
+    // Record that `index` is committed to a spend (R-a/R-c then refuse it).
+    void mark_pq_subaddress_spent(const cryptonote::subaddress_index& index)
+      { m_pq_spent_subaddresses.insert(index); }
     // HIDERING Phase 5 (HFv16, decision 4): bring m_pq_subaddresses up to the indices held in
     // m_subaddresses (only the missing ones are derived). No-op for a wallet without BQ keys.
     void update_pq_subaddresses();
@@ -1527,6 +1548,15 @@ private:
         return;
       }
       a & m_background_sync_data;
+      if(ver < 32)
+      {
+        m_pq_spent_subaddresses.clear();
+        return;
+      }
+      // Spec 2e / T2: the BQ subaddresses already committed to a spend. History, not key
+      // material, so it lives in the cache and not in .keys — same reasoning as
+      // m_pq_subaddress_indices.
+      a & m_pq_spent_subaddresses;
     }
 
     BEGIN_SERIALIZE_OBJECT()
@@ -2052,10 +2082,17 @@ private:
     // key and confirm that the un-tweaked output key really belongs to that subaddress.
     bool confirm_pq_output(const crypto::public_key &output_public_key, const crypto::key_derivation &derivation,
                            const std::vector<crypto::key_derivation> &additional_derivations, size_t i,
-                           const crypto::pqc::kyber_ciphertext &ct, const cryptonote::subaddress_index &claimed,
+                           const pq_output_field &field, const cryptonote::subaddress_index &claimed,
                            const boost::optional<crypto::view_tag> &view_tag_opt, hw::device &hwdev,
                            boost::optional<cryptonote::subaddress_receive_info> &received,
-                           crypto::pqc::kyber_shared_secret &ss) const;
+                           crypto::pqc::kyber_shared_secret &ss,
+                           // Spec 2e §3.4: verify that the output's binding tag commits to OUR
+                           // authorisation commitment. Mandatory on every path that decides
+                           // whether an output is ours. The one documented exception is the
+                           // offline signer, which is handed a ciphertext without the creating
+                           // transaction — it is re-deriving a secret for an output the scanning
+                           // wallet already accepted under this very check.
+                           bool require_binding = true) const;
     // HIDERING Phase 5 (HFv16, A3): recover the ML-KEM-768 shared secret that encapsulated to the
     // BQ... output held in `td` (re-decapsulating that output's ciphertext and confirming the
     // un-tweak match), so the spend path can re-derive the per-output ML-DSA-65 key. Returns false
@@ -2184,6 +2221,16 @@ private:
     // (≈17 µs per subaddress), which is what keeps per-subaddress key material out of the files.
     std::unordered_multimap<uint64_t, cryptonote::subaddress_index> m_pq_subaddresses;
     std::unordered_set<cryptonote::subaddress_index> m_pq_subaddress_indices;
+    // Spec 2e §4.1 (T2) — BQ subaddresses whose authorisation key has been, or is about to be,
+    // revealed by a spend. Because that key is constant per subaddress, everything sharing a
+    // subaddress shares a linkage set; these must never be handed out again, never be reused as
+    // change, and never be merged with another one in a single transaction.
+    //
+    // Marked at CONSTRUCTION, not at confirmation: an abandoned transaction burns a subaddress
+    // for nothing, which is the price of never re-opening a linkage set after a crash or a
+    // double send.
+    std::unordered_set<cryptonote::subaddress_index> m_pq_spent_subaddresses;
+    bool m_pq_allow_subaddress_merge = false;   // spec 2e §4.2 R-c, session-only opt-in
     std::vector<std::vector<std::string>> m_subaddress_labels;
     std::unordered_map<crypto::hash, std::string> m_tx_notes;
     std::unordered_map<std::string, std::string> m_attributes;
@@ -2303,7 +2350,7 @@ private:
     background_sync_data_t m_background_sync_data;
   };
 }
-BOOST_CLASS_VERSION(tools::wallet2, 31)
+BOOST_CLASS_VERSION(tools::wallet2, 32)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 12)
 BOOST_CLASS_VERSION(tools::wallet2::multisig_info, 1)
 BOOST_CLASS_VERSION(tools::wallet2::multisig_info::LR, 0)

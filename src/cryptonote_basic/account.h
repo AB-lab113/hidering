@@ -38,6 +38,7 @@
 #include <array>
 #include <cstring>
 #include <boost/optional/optional.hpp>
+#include "cryptonote_config.h"
 
 namespace cryptonote
 {
@@ -158,6 +159,16 @@ namespace cryptonote
         if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(d_blob, stg, hparent_section, "pq_dilithium"))
         {
           this_ref.pq_dilithium = d_blob;
+          // Spec 2e: rehydrate the address' authorisation commitment from the (plaintext)
+          // identity public key, exactly as pq_kyber_pk is rehydrated above. Without this a
+          // reloaded BQ wallet would render an address missing its commitment — i.e. a
+          // different address from the one it handed out before being closed.
+          std::array<uint8_t, 32> commit{};
+          crypto::pqc::pqc_compute_auth_commit(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER,
+                                               d_blob.dilithium_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                               commit.data());
+          this_ref.m_account_address.pq_auth_commit = commit;
+          this_ref.m_account_address.pq_auth_ver = ::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER;
           memwipe(&d_blob, sizeof(d_blob)); // audit M4: scrub the transient un-mlocked copy
         }
         else
@@ -312,8 +323,22 @@ namespace cryptonote
   bool generate_pq_subaddress_keys(const account_keys& keys, const subaddress_index& index,
                                    crypto::pqc::pq_stealth_keys& out);
 
+  // Spec 2e — the ML-DSA-65 IDENTITY keypair of BQ (sub)address `index`: the recipient-held
+  // post-quantum factor that authorises a BQ spend. (0,0) returns keys.pq_dilithium as is;
+  // any other index is derived from get_pq_root_secret with pqc_dsa_keygen_subaddress.
+  // Nothing is stored — like the ML-KEM subaddress keys, it is recomputed on demand.
+  // Returns false for an account without pq_dilithium/pq_root, or on a liboqs failure.
+  bool generate_pq_identity_keys(const account_keys& keys, const subaddress_index& index,
+                                 crypto::pqc::pq_dilithium_keys& out);
+
+  // The 32-byte commitment published in the BQ address of `index`, i.e.
+  // Keccak("HRG_BQ_ADDR_AUTH_v1" || auth_ver || identity_pk). Returns false as above.
+  bool get_pq_auth_commit(const account_keys& keys, const subaddress_index& index,
+                          std::array<uint8_t, 32>& out);
+
   // The public BQ address of subaddress `index`: the Ed25519 half of the classic subaddress
-  // (D, C) plus that subaddress' own ML-KEM-768 key. For (0,0) it is the primary BQ address.
+  // (D, C) plus that subaddress' own ML-KEM-768 key and authorisation commitment. For (0,0)
+  // it is the primary BQ address.
   bool get_pq_subaddress(const account_keys& keys, const subaddress_index& index,
                          account_public_address& out);
 }

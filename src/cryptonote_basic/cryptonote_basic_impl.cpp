@@ -49,6 +49,12 @@ using namespace epee;
 
 namespace cryptonote {
 
+  // Spec 2e: marker | auth_ver | spend | view | kem_pk | auth_commit.
+  static constexpr size_t PQ_ADDRESS_PAYLOAD_SIZE =
+      1 /*marker*/ + 1 /*auth_ver*/ + 2 * sizeof(crypto::public_key)
+      + crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES + 32 /*auth_commit*/;
+
+
   struct integrated_address {
     account_public_address adr;
     crypto::hash8 payment_id;
@@ -247,11 +253,11 @@ namespace cryptonote {
       else if (subaddress_prefix == prefix)
       {
         // HIDERING Phase 5: prefix 62 is shared with the post-quantum BQ... address.
-        // Disambiguate by decoded payload size (subaddress = 64 bytes; BQ = 1249 bytes,
-        // see get_account_address_from_str_pq). parse_binary does not reject trailing
-        // bytes, so without this guard a BQ blob would silently parse as a subaddress.
-        const size_t pq_payload_size = 1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES;
-        if (data.size() == pq_payload_size)
+        // Disambiguate by decoded payload size (subaddress = 64 bytes; BQ = PQ_ADDRESS_PAYLOAD_SIZE,
+        // 1282 since spec 2e). parse_binary does not reject trailing bytes, so without this guard
+        // a BQ blob would silently parse as a subaddress. The size is taken from the one
+        // definition so the two cannot drift apart again.
+        if (data.size() == PQ_ADDRESS_PAYLOAD_SIZE)
         {
           // BQ... post-quantum address: parse the ML-KEM-768 key into info.address (is_pq()==true)
           // so a sender can encapsulate to it. The dedicated parser also checks the marker byte.
@@ -355,8 +361,6 @@ namespace cryptonote {
   // covers the two Ed25519 keys), so classic B... addresses are entirely unaffected. The
   // 1249-byte payload size is also what disambiguates a BQ... address from a subaddress
   // (64 bytes), which shares the numeric prefix 62.
-  static constexpr size_t PQ_ADDRESS_PAYLOAD_SIZE =
-      1 /*marker*/ + 2 * sizeof(crypto::public_key) + crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES;
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str_pq(
       network_type /*nettype*/
@@ -367,14 +371,21 @@ namespace cryptonote {
     // BQ... addresses are mainnet-only for now (single ::config prefix).
     CHECK_AND_ASSERT_MES(adr.is_pq(), std::string(), "get_account_address_as_str_pq: address carries no ML-KEM-768 key");
 
+    // Spec 2e: a BQ address without its authorisation commitment is unspendable-by-design —
+    // money sent to it could never be authorised post-quantum. Refuse to render one.
+    CHECK_AND_ASSERT_MES(adr.pq_auth_commit, std::string(),
+        "get_account_address_as_str_pq: address carries no post-quantum authorisation commitment");
     std::string blob;
     blob.reserve(PQ_ADDRESS_PAYLOAD_SIZE);
     // pins the "BQ" prefix, and says whether this is a subaddress (see the header)
     blob.push_back(static_cast<char>(subaddress ? ::config::CRYPTONOTE_PQ_SUBADDRESS_MARKER
                                                 : ::config::CRYPTONOTE_PQ_ADDRESS_MARKER));
+    // Spec 2e (T4): the version byte comes BEFORE any interpretable field.
+    blob.push_back(static_cast<char>(adr.pq_auth_ver));
     blob.append(reinterpret_cast<const char*>(&adr.m_spend_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(&adr.m_view_public_key), sizeof(crypto::public_key));
     blob.append(reinterpret_cast<const char*>(adr.pq_kyber_pk->data()), crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
+    blob.append(reinterpret_cast<const char*>(adr.pq_auth_commit->data()), 32);
     return tools::base58::encode_addr(::config::CRYPTONOTE_PQ_ADDRESS_PREFIX, blob);
   }
   //-----------------------------------------------------------------------
@@ -419,6 +430,17 @@ namespace cryptonote {
       return false;
     }
     p += 1;
+    // Spec 2e (T4): read the version BEFORE interpreting anything else, and refuse a version
+    // we do not know instead of parsing fields under unverified assumptions.
+    const uint8_t auth_ver = static_cast<uint8_t>(*p);
+    if (auth_ver != ::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER)
+    {
+      LOG_PRINT_L1("Unknown BQ... address authorisation version: " << (int)auth_ver
+        << ", this build understands " << (int)::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER);
+      return false;
+    }
+    out.pq_auth_ver = auth_ver;
+    p += 1;
     memcpy(&out.m_spend_public_key, p, sizeof(crypto::public_key));
     p += sizeof(crypto::public_key);
     memcpy(&out.m_view_public_key, p, sizeof(crypto::public_key));
@@ -426,6 +448,10 @@ namespace cryptonote {
     std::array<uint8_t, 1184> kpk;
     memcpy(kpk.data(), p, crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES);
     out.pq_kyber_pk = kpk;
+    p += crypto::pqc::ML_KEM_768_PUBLIC_KEY_BYTES;
+    std::array<uint8_t, 32> commit;
+    memcpy(commit.data(), p, 32);
+    out.pq_auth_commit = commit;
 
     if (!crypto::check_key(out.m_spend_public_key) || !crypto::check_key(out.m_view_public_key))
     {

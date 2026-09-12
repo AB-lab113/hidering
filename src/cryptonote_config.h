@@ -325,6 +325,15 @@ namespace config
   // value in the [0x29,0x41] window so it still renders "BQ"; a sender needs to tell the two
   // apart for the same reason the classic 60/62 prefixes exist (r*D tx key, additional keys).
   uint8_t const CRYPTONOTE_PQ_SUBADDRESS_MARKER = 0x35;
+  // Spec 2e (T4): the version/capacity byte of the BQ address payload, sitting immediately
+  // after the marker — i.e. BEFORE any interpretable field, so a parser can reject a version
+  // it does not know without having parsed anything. It selects how the trailing 32-byte
+  // auth_commit is opened; 0x01 = ML-DSA-65 identity key per (sub)address.
+  //
+  // It lands in the FIRST 8-byte base58 block (varint(62) | marker | auth_ver | B[0..4]), so
+  // like the marker it has to be checked empirically against the rendered "BQ" prefix before
+  // any new value is allocated (see pq_address_test, which does exactly that).
+  uint8_t const CRYPTONOTE_PQ_ADDRESS_AUTH_VER = 0x01;
   uint16_t const P2P_DEFAULT_PORT = 19740;
   uint16_t const RPC_DEFAULT_PORT = 19741;
   uint16_t const ZMQ_RPC_DEFAULT_PORT = 19742;

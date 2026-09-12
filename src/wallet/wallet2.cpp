@@ -1709,6 +1709,13 @@ std::string wallet2::get_pq_subaddress_as_str(const cryptonote::subaddress_index
   // can ever decapsulate for — money sent to it would be lost. Refuse instead.
   THROW_WALLET_EXCEPTION_IF(!index.is_zero() && !pq_secrets_usable(), error::password_needed,
       tr("The wallet keys must be unlocked to derive a post-quantum (BQ) subaddress"));
+  // Spec 2e §4.2 R-a — a BQ subaddress whose authorisation key has already been revealed by a
+  // spend must never be handed out again: a later payment to it would join the linkage set of
+  // every earlier spend. Refuse LOUDLY, so a third-party integration (wallet-rpc, GUI, a bot)
+  // gets an error rather than silently weaker privacy.
+  THROW_WALLET_EXCEPTION_IF(is_pq_subaddress_spent(index), error::wallet_internal_error,
+      tr("This BQ subaddress has already been used in a spend and must not be handed out again "
+         "(spec 2e / T2). Ask for a fresh one."));
   cryptonote::account_public_address addr;
   if (!cryptonote::get_pq_subaddress(m_account.get_keys(), index, addr))
     return std::string();
@@ -2434,28 +2441,20 @@ void wallet2::verify_pq_tx_well_formed(const cryptonote::transaction &tx, const 
     return; // no BQ... destinations in this tx
   std::vector<cryptonote::tx_extra_field> fields;
   THROW_WALLET_EXCEPTION_IF(!cryptonote::parse_tx_extra(tx.extra, fields), error::wallet_internal_error, "BQ tx integrity: tx_extra failed to parse");
-  size_t n_ct = 0, n_sig = 0;
+  size_t n_ct = 0, n_bind = 0, n_sig = 0;
   for (const auto &f : fields)
   {
     if (f.type() == typeid(cryptonote::tx_extra_kyber_ct)) ++n_ct;
+    else if (f.type() == typeid(cryptonote::tx_extra_pq_bind)) ++n_bind;
     else if (f.type() == typeid(cryptonote::tx_extra_pq_sig)) ++n_sig;
   }
   THROW_WALLET_EXCEPTION_IF(n_ct != n_bq, error::wallet_internal_error, "BQ tx integrity: ML-KEM-768 ciphertext count does not match BQ destination count");
-  // HIDERING Phase 5 (HFv16, A4): the external account-level ML-DSA-65 signature is emitted ONLY
-  // when the tx SPENDS a transparent BQ (txin_to_key_pq) input — NOT merely when it CREATES a BQ
-  // output. A B...→BQ tx (classic ring inputs paying a BQ output) carries the ML-KEM-768
-  // ciphertext(s) but no ML-DSA-65 signature, matching what the consensus validator now requires.
-  bool has_pq_input = false;
-  for (const auto &in : tx.vin)
-    if (in.type() == typeid(cryptonote::txin_to_key_pq)) { has_pq_input = true; break; }
-  if (has_pq_input)
-  {
-    THROW_WALLET_EXCEPTION_IF(n_sig != 1, error::wallet_internal_error, "BQ spend integrity: expected exactly one ML-DSA-65 signature");
-  }
-  else
-  {
-    THROW_WALLET_EXCEPTION_IF(n_sig != 0, error::wallet_internal_error, "BQ tx integrity: unexpected ML-DSA-65 signature on a tx with no post-quantum input");
-  }
+  // Spec 2e §3.4: one binding tag per BQ output. Without it the recipient cannot verify what
+  // the output is bound to, and the spend could never pass check (c).
+  THROW_WALLET_EXCEPTION_IF(n_bind != n_bq, error::wallet_internal_error, "BQ tx integrity: binding tag count does not match BQ destination count");
+  // Spec 2e §2.1: the account-level ML-DSA-65 signature (tx_extra 0x06) is gone for good.
+  // Emitting one now would be rejected by the validator; catch it here, before broadcast.
+  THROW_WALLET_EXCEPTION_IF(n_sig != 0, error::wallet_internal_error, "BQ tx integrity: removed account-level ML-DSA-65 signature field (0x06) present");
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_pq_output_fields(const cryptonote::transaction_prefix &tx, pq_output_fields &out) const
@@ -2487,8 +2486,22 @@ bool wallet2::get_pq_output_fields(const cryptonote::transaction_prefix &tx, pq_
       out.resize(tx.vout.size());
     if (out[kct.output_index])
       continue;
-    out[kct.output_index] = pq_output_field{kct.sel_tag, kct.ct};
+    pq_output_field pf;
+    pf.sel_tag = kct.sel_tag;
+    pf.ct = kct.ct;
+    out[kct.output_index] = pf;
     any = true;
+  }
+  // Spec 2e: pick up the binding tags alongside, so the scan can verify them (§3.4).
+  for (const cryptonote::tx_extra_field &f : fields)
+  {
+    if (f.type() != typeid(cryptonote::tx_extra_pq_bind))
+      continue;
+    const cryptonote::tx_extra_pq_bind &b = boost::get<cryptonote::tx_extra_pq_bind>(f);
+    if (b.output_index >= out.size() || !out[b.output_index] || out[b.output_index]->has_bind)
+      continue;
+    out[b.output_index]->bind_tag = b.bind_tag;
+    out[b.output_index]->has_bind = true;
   }
   if (!any)
     out.clear();
@@ -2497,16 +2510,16 @@ bool wallet2::get_pq_output_fields(const cryptonote::transaction_prefix &tx, pq_
 //----------------------------------------------------------------------------------------------------
 bool wallet2::confirm_pq_output(const crypto::public_key &output_public_key, const crypto::key_derivation &derivation,
                                 const std::vector<crypto::key_derivation> &additional_derivations, size_t i,
-                                const crypto::pqc::kyber_ciphertext &ct, const cryptonote::subaddress_index &claimed,
+                                const pq_output_field &field, const cryptonote::subaddress_index &claimed,
                                 const boost::optional<crypto::view_tag> &view_tag_opt, hw::device &hwdev,
                                 boost::optional<cryptonote::subaddress_receive_info> &received,
-                                crypto::pqc::kyber_shared_secret &ss) const
+                                crypto::pqc::kyber_shared_secret &ss, bool require_binding) const
 {
   crypto::pqc::pq_stealth_keys sk;
   if (!cryptonote::generate_pq_subaddress_keys(m_account.get_keys(), claimed, sk))
     return false;
   crypto::pqc::kyber_shared_secret cand;
-  const bool decaps_ok = crypto::pqc::pqc_stealth_decaps(sk, ct, cand);
+  const bool decaps_ok = crypto::pqc::pqc_stealth_decaps(sk, field.ct, cand);
   memwipe(&sk, sizeof(sk));
   if (!decaps_ok)
   {
@@ -2530,9 +2543,48 @@ bool wallet2::confirm_pq_output(const crypto::public_key &output_public_key, con
       cryptonote::is_out_to_acc_precomp(m_subaddresses, rct::rct2pk(untweaked), derivation, additional_derivations, i, hwdev, view_tag_opt);
     if (r && r->index == claimed)
     {
-      received = r;
-      ss = cand;
-      ok = true;
+      // Spec 2e §3.4 — MANDATORY, and it has no consensus equivalent. The sender chooses what
+      // the binding tag commits to; nothing on chain forces it to be OUR authorisation
+      // commitment rather than one of its own. If it committed to its own, the output is
+      // unspendable by us for ever (and reclaimable by the sender should Ed25519 fall), so it
+      // must never be credited or displayed as received. Verify before accepting.
+      if (!require_binding)
+      {
+        received = r;
+        ss = cand;
+        ok = true;
+      }
+      else
+      {
+      std::array<uint8_t, 32> our_commit{};
+      uint8_t blind[32];
+      uint8_t expect[32];
+      if (field.has_bind
+          && cryptonote::get_pq_auth_commit(m_account.get_keys(), claimed, our_commit)
+          && crypto::pqc::pqc_compute_auth_blind(cand, i, blind))
+      {
+        crypto::pqc::pqc_compute_bind_tag_v2(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER,
+                                             reinterpret_cast<const uint8_t*>(&output_public_key), sizeof(output_public_key),
+                                             our_commit.data(), blind, expect);
+        if (memcmp(expect, &field.bind_tag, 32) == 0)
+        {
+          received = r;
+          ss = cand;
+          ok = true;
+        }
+        else
+        {
+          MWARNING("BQ output " << i << " on subaddress (" << claimed.major << "," << claimed.minor
+                   << ") is bound to an authorisation commitment that is not ours: it can never be spent "
+                   "by this wallet. Ignoring it (spec 2e §3.4).");
+        }
+        memwipe(blind, sizeof(blind));
+      }
+      else if (!field.has_bind)
+      {
+        MWARNING("BQ output " << i << " carries no binding tag; ignoring it (spec 2e §3.4).");
+      }
+      }
     }
   }
   memwipe(&t, sizeof(t));
@@ -2563,10 +2615,44 @@ bool wallet2::detect_pq_output(const crypto::public_key &output_public_key, cons
     memcpy(&key, fp.data, sizeof(key));
     const auto range = m_pq_subaddresses.equal_range(key);
     for (auto it = range.first; it != range.second; ++it)
-      if (confirm_pq_output(output_public_key, derivation, additional_derivations, i, field.ct, it->second, view_tag_opt, hwdev, received, ss))
+      if (confirm_pq_output(output_public_key, derivation, additional_derivations, i, field, it->second, view_tag_opt, hwdev, received, ss))
         return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+// Spec 2e §4.2 R-c: render the subaddresses a refused merge would have welded together, so the
+// error names what the caller has to split rather than just saying "no".
+static std::string pq_subaddr_list(const std::set<std::pair<uint32_t, uint32_t>> &s)
+{
+  std::string out;
+  for (const auto &i : s)
+  {
+    if (!out.empty()) out += ", ";
+    out += std::to_string(i.first) + "/" + std::to_string(i.second);
+  }
+  return out;
+}
+//----------------------------------------------------------------------------------------------------
+cryptonote::subaddress_index wallet2::allocate_fresh_pq_subaddress(uint32_t major)
+{
+  // Spec 2e §4.2 — a BQ subaddress that has never been committed to a spend. Walks up from the
+  // first unused minor index of `major`, expanding the table as needed, and skipping anything
+  // already burnt. Never returns (major, 0): the primary/account index is where the previous
+  // design silently parked every change output, which is the worst case for T1 linkability.
+  const uint32_t n = (uint32_t)get_num_subaddresses(major);
+  uint32_t minor = n == 0 ? 1 : n;
+  if (minor == 0)
+    minor = 1;
+  while (is_pq_subaddress_spent({major, minor}))
+  {
+    THROW_WALLET_EXCEPTION_IF(minor == std::numeric_limits<uint32_t>::max(), error::wallet_internal_error,
+        tr("no fresh BQ subaddress left on this account"));
+    ++minor;
+  }
+  const cryptonote::subaddress_index index{major, minor};
+  expand_subaddresses(index);
+  return index;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::pq_secrets_usable() const
@@ -2730,7 +2816,7 @@ bool wallet2::recover_pq_spend_secret(const transfer_details &td, crypto::pqc::k
 
   boost::optional<cryptonote::subaddress_receive_info> r;
   crypto::pqc::kyber_shared_secret cand;
-  const bool ok = confirm_pq_output(output_public_key, derivation, additional_derivations, out_index, fields[out_index]->ct,
+  const bool ok = confirm_pq_output(output_public_key, derivation, additional_derivations, out_index, *fields[out_index],
                                     td.m_subaddr_index, cryptonote::get_output_view_tag(txp.vout[out_index]), hwdev, r, cand);
   if (ok)
   {
@@ -8542,8 +8628,15 @@ void wallet2::restore_pq_construction_data(unsigned_tx_set &exported_txs) const
       }
       boost::optional<cryptonote::subaddress_receive_info> r;
       crypto::pqc::kyber_shared_secret ss;
+      // The offline signer only receives the ciphertext, not the creating transaction, so it
+      // cannot re-run the spec 2e §3.4 binding check here. It does not need to: the output was
+      // already accepted by the scanning wallet, where that check is mandatory, and if the
+      // binding were wrong the spend would simply fail validation at check (c).
+      pq_output_field cs_field;
+      cs_field.ct = e.ct;
+      cs_field.has_bind = false;
       const bool ok = confirm_pq_output(out_key, derivation, additional_derivations, src.real_output_in_tx_index,
-                                        e.ct, claimed, boost::none, hwdev, r, ss);
+                                        cs_field, claimed, boost::none, hwdev, r, ss, false /*require_binding*/);
       THROW_WALLET_EXCEPTION_IF(!ok, error::wallet_internal_error,
           "the ML-KEM-768 ciphertext of a BQ source does not decapsulate to an output of the named subaddress");
       src.is_pq = true;
@@ -10771,6 +10864,9 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   LOG_PRINT_L2("preparing outputs");
   size_t i = 0, out_index = 0;
   std::vector<cryptonote::tx_source_entry> sources;
+  // Spec 2e §4.2 (T2): the BQ subaddresses this transaction would spend from. Collected while
+  // the sources are built, then checked before construction (R-c) and recorded (R-a/R-b).
+  std::set<std::pair<uint32_t, uint32_t>> pq_spend_subaddrs;
   for(size_t idx: selected_transfers)
   {
     sources.resize(sources.size()+1);
@@ -10829,6 +10925,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
         // tells that machine which of its BQ keys to decapsulate with (decision 4).
         src.pq_ct = pq_ct;
         src.pq_subaddr = td.m_subaddr_index;
+        pq_spend_subaddrs.insert({td.m_subaddr_index.major, td.m_subaddr_index.minor}); // spec 2e / T2
       }
       memwipe(&pq_ss, sizeof(pq_ss));
     }
@@ -10864,10 +10961,47 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   }
   else
   {
-    change_dts.addr = get_subaddress({subaddr_account, 0});
-    change_dts.is_subaddress = subaddr_account != 0;
+    // Spec 2e §4.2 R-b — the change of a BQ spend goes to a FRESH BQ subaddress.
+    //
+    // What it used to do, and why both cases were wrong: get_subaddress({major, 0}) returns
+    // m_account_address for major == 0, i.e. the PRIMARY BQ address — so every BQ spend's
+    // change landed on one index, and under T1 the first spend of any such change reveals the
+    // primary authorisation key and merges nearly the whole wallet into one linkage set. For
+    // major > 0 it returns a plain (C, D) pair with no ML-KEM key at all, so the change of a BQ
+    // spend was a classic B... output: spending BQ funds silently converted the remainder back
+    // into quantum-vulnerable money.
+    if (!pq_spend_subaddrs.empty())
+    {
+      const cryptonote::subaddress_index fresh = allocate_fresh_pq_subaddress(subaddr_account);
+      cryptonote::account_public_address bq_change;
+      THROW_WALLET_EXCEPTION_IF(!cryptonote::get_pq_subaddress(m_account.get_keys(), fresh, bq_change),
+          error::wallet_internal_error, tr("cannot derive a fresh BQ change subaddress"));
+      change_dts.addr = bq_change;
+      change_dts.is_subaddress = true;
+      change_dts.is_pq = true;
+      mark_pq_subaddress_spent(fresh); // never hand this one out as a payment address
+    }
+    else
+    {
+      change_dts.addr = get_subaddress({subaddr_account, 0});
+      change_dts.is_subaddress = subaddr_account != 0;
+    }
     splitted_dsts.push_back(change_dts);
   }
+
+  // Spec 2e §4.2 R-c — refuse to merge two BQ subaddresses into one transaction unless the
+  // caller asked for it explicitly. Both authorisation keys would be revealed in the same
+  // transaction, welding their linkage sets together and destroying the "one payment request,
+  // one linkage set" property that T2 exists to provide. Refused by default; the message names
+  // what would be merged so the caller can split the spend instead.
+  THROW_WALLET_EXCEPTION_IF(pq_spend_subaddrs.size() > 1 && !m_pq_allow_subaddress_merge,
+      error::wallet_internal_error,
+      tr("this transaction would spend BQ outputs received on ") + std::to_string(pq_spend_subaddrs.size())
+        + tr(" different subaddresses (") + pq_subaddr_list(pq_spend_subaddrs)
+        + tr("), which would link them together for ever (spec 2e / T2). Split the spend, or "
+             "enable BQ subaddress merging explicitly."));
+  for (const auto &idx : pq_spend_subaddrs)
+    mark_pq_subaddress_spent({idx.first, idx.second});
 
   crypto::secret_key tx_key;
   std::vector<crypto::secret_key> additional_tx_keys;

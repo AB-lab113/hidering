@@ -52,18 +52,6 @@ using namespace crypto;
 namespace cryptonote
 {
   //---------------------------------------------------------------
-  // HIDERING Phase 5 (HFv16): serialise an external ML-DSA-65 signature into
-  // tx.extra as [ TX_EXTRA_TAG_PQ_SIG | pk(1952) | sig(3309) ]. Both fields are
-  // fixed length so no length prefix is needed; the parser in blockchain.cpp
-  // reads exactly that many bytes after the tag. Only emitted once the chain
-  // reaches HF_VERSION_PQ (inactive on the live chain).
-  void add_pq_sig_to_extra(std::vector<uint8_t>& extra, const crypto::pqc::pq_tx_sig& sig)
-  {
-    extra.push_back(TX_EXTRA_TAG_PQ_SIG);
-    extra.insert(extra.end(), sig.pk, sig.pk + crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
-    extra.insert(extra.end(), sig.sig, sig.sig + crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
-  }
-  //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16): serialise a BQ... output's ML-KEM-768 ciphertext into tx.extra as
   // [ TX_EXTRA_TAG_KYBER_CT | output_index:varint | sel_tag:8 | ct:1088 ] through the canonical
   // tx_extra_kyber_ct variant, so parse_tx_extra round-trips it. Appended after the classic
@@ -339,6 +327,18 @@ namespace cryptonote
       return false;
     }
 
+    // Spec 2e §4.3 — last-resort stop, on the one piece of information construct_tx actually
+    // has: the change address it was handed. A transaction that spends a BQ output and sends
+    // its change to a non-BQ address would leave the remainder outside post-quantum protection
+    // (and, when the change went to the primary index, weld the whole wallet into one linkage
+    // set). The wallet enforces the policy (R-b); this refuses the manifest inconsistency, so
+    // an integration building its own transactions cannot bypass it silently.
+    if (any_pq && change_addr && change_addr->m_spend_public_key != crypto::null_pkey && !change_addr->is_pq())
+    {
+      LOG_ERROR("HIDERING: a BQ spend must not send its change to a non-BQ address (spec 2e §4.3)");
+      return false;
+    }
+
     std::vector<rct::key> amount_keys;
     tx.set_null();
     amount_keys.clear();
@@ -513,11 +513,23 @@ namespace cryptonote
           return false;
         }
 
-        crypto::pqc::pq_public_key out_dsa_pk;
-        crypto::pqc::pq_secret_key out_dsa_sk;
-        if (!crypto::pqc::pqc_keygen_output_dsa(*src_entr.pq_ss, src_entr.real_output_in_tx_index, out_dsa_pk, out_dsa_sk))
+        // Spec 2e: authorise with the ML-DSA-65 IDENTITY key of the (sub)address the output was
+        // received on — the recipient-held factor. It is derived from the account's PQ root
+        // (CRIT-4), so no shared secret can produce it and a quantum sender cannot forge it.
+        CHECK_AND_ASSERT_MES((bool)src_entr.pq_subaddr, false,
+            "is_pq source carries no subaddress index; its identity key cannot be derived (spec 2e)");
+        crypto::pqc::pq_dilithium_keys identity;
+        if (!generate_pq_identity_keys(sender_account_keys, *src_entr.pq_subaddr, identity))
         {
-          LOG_ERROR("Failed to re-derive per-output ML-DSA-65 key for BQ spend");
+          LOG_ERROR("Failed to derive the BQ (sub)address ML-DSA-65 identity key for the spend");
+          memwipe(&owner_sk, sizeof(owner_sk));
+          return false;
+        }
+        uint8_t in_auth_blind[32];
+        if (!crypto::pqc::pqc_compute_auth_blind(*src_entr.pq_ss, src_entr.real_output_in_tx_index, in_auth_blind))
+        {
+          LOG_ERROR("Failed to re-derive the BQ binding blind for the spend");
+          memwipe(&identity, sizeof(identity));
           memwipe(&owner_sk, sizeof(owner_sk));
           return false;
         }
@@ -530,12 +542,18 @@ namespace cryptonote
         // the ECDH-derived mask for a BQ output made by a classic RingCT tx, or the identity
         // mask for one made by a transparent BQ spend.
         in_pq.mask = src_entr.mask;
-        memcpy(in_pq.dsa.pk, out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
-        memset(in_pq.dsa.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES); // signed below, once prefix hash is known
+        in_pq.auth_type = crypto::pqc::PQ_AUTH_TYPE_MLDSA65;
+        memcpy(&in_pq.auth_blind, in_auth_blind, sizeof(in_pq.auth_blind));
+        memcpy(in_pq.auth.pk, identity.dilithium_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES);
+        memset(in_pq.auth.sig, 0, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES); // signed below, once prefix hash is known
         memset(&in_pq.owner_sig, 0, sizeof(in_pq.owner_sig));               // likewise (CRIT-3)
         // stash the signing material for the post-prefix-hash signing pass, keyed by output key
-        pq_input_signing_keys.push_back({real_out_key, out_dsa_sk, owner_sk});
-        memwipe(&out_dsa_sk, sizeof(out_dsa_sk));
+        crypto::pqc::pq_secret_key identity_sk{};
+        memcpy(identity_sk.dilithium3_sk, identity.dilithium_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES);
+        pq_input_signing_keys.push_back({real_out_key, identity_sk, owner_sk});
+        memwipe(&identity_sk, sizeof(identity_sk));
+        memwipe(&identity, sizeof(identity));
+        memwipe(in_auth_blind, sizeof(in_auth_blind));
         memwipe(&owner_sk, sizeof(owner_sk));
         tx.vin.push_back(in_pq);
         continue;
@@ -748,26 +766,33 @@ namespace cryptonote
         CHECK_AND_ASSERT_MES(tag_ok, false, "Failed to compute the BQ selection tag");
         kyber_cts.push_back(ct_field);
 
-        // Phase 5 (A1): derive the per-output ML-DSA-65 keypair from the SAME KEM shared
-        // secret (and this output's index) and publish the binding tag committing the final
-        // on-chain output key P'_i (already tweaked above) to dsa_pk_i. At spend time the BQ
-        // owner re-derives the same keypair (it decapsulates to the same ss) and signs; the
-        // validator recomputes this tag from the revealed P'_i + dsa_pk to authorise the spend.
-        crypto::pqc::pq_public_key out_dsa_pk;
-        crypto::pqc::pq_secret_key out_dsa_sk;
-        if (!crypto::pqc::pqc_keygen_output_dsa(kss, output_index, out_dsa_pk, out_dsa_sk))
+        // Spec 2e §3.1: publish the binding tag committing the final on-chain output key P'_i
+        // (already tweaked above) to the AUTHORISATION COMMITMENT read from the recipient's
+        // address, blinded per output.
+        //
+        //   bind_tag = Keccak("HRG_PQ_BIND_v2" || auth_ver || P'_i || auth_commit || auth_blind)
+        //
+        // Everything here is computable by the sender and none of it yields the identity
+        // secret: auth_commit is a hash, and auth_blind is a one-way image of the KEM shared
+        // secret. That asymmetry is what closes the residual of CRIT-3 — the former per-output
+        // key was derived from ss alone, which the sender also holds.
+        CHECK_AND_ASSERT_MES(dst_entr.addr.pq_auth_commit, false,
+            "BQ... destination carries no post-quantum authorisation commitment (spec 2e)");
+        uint8_t out_auth_blind[32];
+        if (!crypto::pqc::pqc_compute_auth_blind(kss, output_index, out_auth_blind))
         {
-          LOG_ERROR("Failed to derive per-output ML-DSA-65 key for BQ output");
+          LOG_ERROR("Failed to derive the BQ binding blind");
           memwipe(&kss, sizeof(kss));
           memwipe(&kyber_tweak, sizeof(kyber_tweak));
           return false;
         }
         crypto::hash bind_tag;
-        crypto::pqc::pqc_compute_bind_tag(reinterpret_cast<const uint8_t*>(&out_eph_public_key), sizeof(out_eph_public_key),
-                                          out_dsa_pk.dilithium3_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
-                                          reinterpret_cast<uint8_t*>(&bind_tag));
+        crypto::pqc::pqc_compute_bind_tag_v2(dst_entr.addr.pq_auth_ver,
+                                             reinterpret_cast<const uint8_t*>(&out_eph_public_key), sizeof(out_eph_public_key),
+                                             dst_entr.addr.pq_auth_commit->data(), out_auth_blind,
+                                             reinterpret_cast<uint8_t*>(&bind_tag));
         pq_binds.emplace_back(static_cast<uint64_t>(output_index), bind_tag);
-        memwipe(&out_dsa_sk, sizeof(out_dsa_sk)); // the per-output signing key is re-derived at spend, never stored here
+        memwipe(out_auth_blind, sizeof(out_auth_blind));
 
         // audit M-3: wipe the ML-KEM shared secret and the derived tweak scalar.
         memwipe(&kss, sizeof(kss));
@@ -899,14 +924,14 @@ namespace cryptonote
         crypto::pqc::pq_tx_sig in_sig;
         if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_in_prefix_hash), sizeof(pq_in_prefix_hash),
                                       mat->dsa_sk.dilithium3_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
-                                      in.dsa.pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
+                                      in.auth.pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
                                       in_sig))
         {
           LOG_ERROR("Failed to sign transparent post-quantum (BQ...) input");
           for (auto &m : pq_input_signing_keys) memwipe(&m, sizeof(m));
           return false;
         }
-        memcpy(in.dsa.sig, in_sig.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
+        memcpy(in.auth.sig, in_sig.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES);
         crypto::generate_signature(pq_in_prefix_hash, in.real_output_key, mat->owner_sk, in.owner_sig);
         ++signed_inputs;
       }
@@ -915,42 +940,16 @@ namespace cryptonote
       pq_input_signing_keys.clear();
     }
 
-    // HIDERING Phase 5 (HFv16, A4): attach an external account-level ML-DSA-65 signature over
-    // the tx prefix as the LAST field of tx.extra — but ONLY for a transparent BQ spend (a tx
-    // that spends is_pq sources). Post-quantum spend authority is OPT-IN: it is the BQ address
-    // owner who carries an ML-DSA-65 key. A classic B... transaction (ring inputs) — including
-    // one that merely CREATES a BQ output (B...→BQ) — is authorised entirely by its Ed25519
-    // ring/CLSAG signature and must NOT require the sender to hold an ML-DSA-65 key. This keeps
-    // B... usable at HFv16 with no PQ key (VERROU 1). The signature covers the prefix hash with
-    // the ML-KEM-768 ciphertexts already appended but BEFORE the PQ field itself, and (audit H2)
-    // with NO trailing 0x00 padding (omitted on the PQ path). The validator recovers the signed
-    // message by stripping the trailing PQ field; the ring/rct signatures below still commit to
-    // the full extra (PQ field included). Gated on hf_version (0 on the live chain) AND on the
-    // presence of a transparent PQ input, so it is doubly inert pre-fork and for classic txs.
-    if (hf_version >= HF_VERSION_PQ && any_pq)
-    {
-      const crypto::hash pq_prefix_hash = broadcast_prefix_hash();
-      // audit C-1: sign with the sender's PERSISTENT ML-DSA-65 key (account_keys
-      // .pq_dilithium), NOT a per-tx throwaway. A stable per-account key is what gives the
-      // signature real authority — one that still holds when the Ed25519 ring signature is
-      // quantum-broken (the whole point of Phase 5). The ring/rct signatures generated
-      // below commit to the full extra (this PQ field included), so the ML-DSA public
-      // key cannot be stripped/replaced without invalidating the spend. A BQ wallet always
-      // holds pq_dilithium (generate_pq_keys), so this assert only fires on a misconstructed
-      // BQ spend, never on a classic B... transaction.
-      CHECK_AND_ASSERT_MES(sender_account_keys.pq_dilithium, false,
-          "Transparent BQ spend requires the sender's persistent ML-DSA-65 key (account has no pq_dilithium)");
-      crypto::pqc::pq_tx_sig pq_sig;
-      if (!crypto::pqc::pqc_tx_sign(reinterpret_cast<const uint8_t*>(&pq_prefix_hash), sizeof(pq_prefix_hash),
-                                    sender_account_keys.pq_dilithium->dilithium_sk, crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES,
-                                    sender_account_keys.pq_dilithium->dilithium_pk, crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES,
-                                    pq_sig))
-      {
-        LOG_ERROR("Failed to build post-quantum (ML-DSA-65) tx signature");
-        return false;
-      }
-      add_pq_sig_to_extra(tx.extra, pq_sig);
-    }
+    // Spec 2e §2.1: the account-level ML-DSA-65 signature (tx_extra tag 0x06) is GONE.
+    // It authorised nothing — the validator could not bind it to the sender on a privacy
+    // chain (audit C-1's own residual), so any key passed — while publishing, in the clear on
+    // every BQ spend, a key stable for the life of the wallet: it linked together every BQ
+    // spend of an account, for 5262 bytes a transaction. The authorisation it was supposed to
+    // provide now lives per-input, bound to the (sub)address the output was paid to.
+    //
+    // Its removal also deletes the "strip the trailing fixed-size field to recover the signed
+    // message" dance on both sides: nothing about the signed prefix now depends on a field's
+    // position or length inside tx_extra.
 
     // HIDERING (audit E-5 / finding #4): enforce the tx_extra size ceiling ONCE, here,
     // after EVERY field is in place — padding, ML-KEM-768 ciphertexts, AND the trailing

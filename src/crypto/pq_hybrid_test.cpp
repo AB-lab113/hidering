@@ -49,20 +49,25 @@ static bool test_amount_binding_catches_inflation()
   kyber_shared_secret ss;
   for (int i = 0; i < 32; ++i) ss.ss[i] = (uint8_t)(0x9E ^ i);
   const uint64_t out_index = 2;
+  // Spec 2e: authorisation is the (sub)address IDENTITY key, committed in the address and
+  // bound to the output under a per-output blind.
   pq_public_key dsa_pk; pq_secret_key dsa_sk;
-  if (!pqc_keygen_output_dsa(ss, out_index, dsa_pk, dsa_sk)) { printf("FAIL: per-output keygen\n"); return false; }
+  pqc_keygen(dsa_pk, dsa_sk);
+  uint8_t commit[32], blind[32];
+  pqc_compute_auth_commit(PQ_AUTH_TYPE_MLDSA65, dsa_pk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, commit);
+  if (!pqc_compute_auth_blind(ss, out_index, blind)) { printf("FAIL: auth blind\n"); return false; }
 
   crypto::public_key P; crypto::secret_key p_sec;
   crypto::generate_keys(P, p_sec);
   uint8_t stored_bind[32];
-  pqc_compute_bind_tag((const uint8_t *)&P, sizeof(P), dsa_pk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, stored_bind);
+  pqc_compute_bind_tag_v2(PQ_AUTH_TYPE_MLDSA65, (const uint8_t *)&P, sizeof(P), commit, blind, stored_bind);
 
   // --- the attack: spend it declaring 1000x the value -------------------------------------
   // (b) revealed key matches the on-chain output key
   const bool check_b = true; // the attacker uses their real output key, so this passes by construction
   // (c) the binding tag recomputes
   uint8_t recomputed[32];
-  pqc_compute_bind_tag((const uint8_t *)&P, sizeof(P), dsa_pk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, recomputed);
+  pqc_compute_bind_tag_v2(PQ_AUTH_TYPE_MLDSA65, (const uint8_t *)&P, sizeof(P), commit, blind, recomputed);
   const bool check_c = memcmp(recomputed, stored_bind, 32) == 0;
   // (d) the ML-DSA-65 signature verifies
   uint8_t prefix_hash[32];

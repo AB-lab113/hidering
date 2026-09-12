@@ -192,7 +192,22 @@ namespace cryptonote
     // own it let the sender spend what it paid. x' needs the recipient's spend key. Validator
     // check (d2). Not quantum-resistant by itself; see the CRIT-3 audit note.
     crypto::signature owner_sig;
-    crypto::pqc::pq_tx_sig dsa;         // ML-DSA-65 pk(1952) || sig(3309), per-output
+
+    // Spec 2e — the TYPED post-quantum authorisation. It replaces the former per-output
+    // ML-DSA-65 key (derived from the KEM shared secret, hence known to the sender: CRIT-3)
+    // by the identity key of the (sub)address the output was paid to, which only the
+    // recipient can derive. The type selects a body of FIXED size; an unknown type is
+    // rejected at parse, never skipped — a skippable field would be a malleable field.
+    //
+    //   auth_type = PQ_AUTH_TYPE_MLDSA65 (0x01):
+    //     auth_blind(32) || auth.pk(1952) || auth.sig(3309)
+    //
+    // auth_blind is the one-way blinding factor of the binding tag (pqc_compute_auth_blind).
+    // Without it, revealing auth.pk once would let anyone recompute the address commitment and
+    // sweep the chain for every output ever sent to that subaddress — see spec 2e §2.4.
+    uint8_t auth_type = crypto::pqc::PQ_AUTH_TYPE_MLDSA65;
+    crypto::hash auth_blind;
+    crypto::pqc::pq_tx_sig auth;        // ML-DSA-65 pk(1952) || sig(3309), per (sub)address
 
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(amount)
@@ -200,7 +215,12 @@ namespace cryptonote
       FIELD(real_output_key)
       FIELD(mask)
       FIELD(owner_sig)
-      // dsa is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
+      VARINT_FIELD(auth_type)
+      // Spec 2e §2.2: the body size is a pure function of the type. Refuse anything else here,
+      // at the parse boundary, so no later code can be handed a half-understood field.
+      if (auth_type != crypto::pqc::PQ_AUTH_TYPE_MLDSA65) return false;
+      FIELD(auth_blind)
+      // auth is a fixed-size (5261-byte) trivially-copyable POD; serialise as a raw blob
       // (no BLOB_SERIALIZER registration needed in this TU — that lives in tx_extra.h).
       // The tag() is REQUIRED even for a blob: without it the JSON archive emits the blob
       // as a bare value with no key and no separator, producing invalid JSON
@@ -209,8 +229,8 @@ namespace cryptonote
       // binary_archive::tag() is a no-op (binary_archive.h), so the consensus encoding is
       // unchanged — pinned by pq_consensus.txin_to_key_pq_json_valid_and_wire_unchanged.
       // Same idiom as MAGIC_FIELD (serialization.h): tag() then serialize_blob().
-      ar.tag("dsa");
-      ar.serialize_blob(&dsa, sizeof(dsa));
+      ar.tag("auth");
+      ar.serialize_blob(&auth, sizeof(auth));
       if (!ar.good()) return false;
     END_SERIALIZE()
   };
@@ -660,6 +680,18 @@ namespace cryptonote
     // wallet-file encoding of classic B... addresses is byte-for-byte unchanged; the
     // BQ... key is (de)serialized out-of-band by get_account_address_{as,from}_str_pq().
     boost::optional<std::array<uint8_t, 1184>> pq_kyber_pk;
+
+    // Spec 2e — the recipient-held authorisation factor of a BQ... address, carried the same
+    // out-of-band way as pq_kyber_pk (absent from BOTH serialization maps below, so classic
+    // B... addresses stay byte-for-byte identical everywhere).
+    //
+    //  * pq_auth_commit: a 32-byte OPAQUE commitment to that factor. The sender copies it into
+    //    the output's binding tag; the spender later reveals the factor and the validator
+    //    checks it opens this commitment. That check IS the C-1 binding.
+    //  * pq_auth_ver: which factor the commitment is for (::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER
+    //    today). Kept beside the commitment because it is part of its preimage.
+    boost::optional<std::array<uint8_t, 32>> pq_auth_commit;
+    uint8_t pq_auth_ver = 0;
 
     // True iff this is a post-quantum BQ... address (carries a ML-KEM-768 key).
     bool is_pq() const { return pq_kyber_pk.is_initialized(); }

@@ -248,6 +248,62 @@ namespace pqc
     uint8_t data[BQ_SEL_TAG_BYTES];
   };
 
+  // ---------------------------------------------------------------------------------------
+  // Spec 2e (docs/audit/spec_2e_bq_address_auth_binding.md) — the recipient-held POST-QUANTUM
+  // AUTHORISATION FACTOR. This is what closes the residual of CRIT-3: a sender that can also
+  // run Shor recovers the output's one-time key x' (check d2 is Ed25519), but it can never
+  // produce the identity secret behind the commitment published in the recipient's address.
+  //
+  // The authorisation is TYPED so a future, unlinkable scheme (design_2d option T3) can be
+  // added as a new type without touching the address format — the consensus treats the
+  // commitment as opaque and only knows "open it the way this type says".
+  enum : uint8_t
+  {
+    PQ_AUTH_TYPE_MLDSA65 = 0x01,   // auth_pk = ML-DSA-65 public key of the (sub)address
+  };
+  // Body size of a typed authorisation, a pure function of the type (the consensus rejects
+  // an unknown type at parse rather than skipping it — see the spec, §2.2).
+  constexpr size_t PQ_AUTH_BLIND_BYTES = 32;
+
+  // The address-level commitment to the authorisation key:
+  //   auth_commit = Keccak("HRG_BQ_ADDR_AUTH_v1" || auth_type || auth_pk)
+  // auth_type is IN the preimage on purpose: without it a future type could produce the same
+  // commitment from different material, and the consensus would accept a key of one type
+  // against a commitment written for another.
+  void pqc_compute_auth_commit(uint8_t auth_type, const uint8_t *auth_pk, size_t pk_len,
+                               uint8_t out_commit[32]);
+
+  // The per-output blinding factor of the binding tag:
+  //   auth_blind = Keccak("HRG_BQ_BINDBLIND_v1" || ss || output_index_le8)
+  // Revealed at spend so the validator can recompute the tag. It is a ONE-WAY image of the
+  // KEM shared secret, never ss itself: ss also drives derive_bq_output_tweak, and revealing
+  // it would widen the disclosure for nothing. Without a blinding factor, revealing auth_pk
+  // once would let anyone recompute auth_commit and then sweep the whole chain for every
+  // output ever sent to that subaddress, spent or not — a retroactive break of B3.
+  bool pqc_compute_auth_blind(const kyber_shared_secret &ss, uint64_t output_index,
+                              uint8_t out_blind[32]);
+
+  // The binding tag published when a BQ output is CREATED (version 2, spec 2e §3.1):
+  //   bind_tag = Keccak("HRG_PQ_BIND_v2" || auth_type || P' || auth_commit || auth_blind)
+  // The sender can compute all four terms (it reads auth_type/auth_commit from the address and
+  // gets auth_blind from its own encapsulation) and none of them yields the identity secret.
+  void pqc_compute_bind_tag_v2(uint8_t auth_type, const uint8_t *real_output_key, size_t rk_len,
+                               const uint8_t auth_commit[32], const uint8_t auth_blind[32],
+                               uint8_t out_tag[32]);
+
+  // The ML-DSA-65 identity keypair of a BQ subaddress:
+  //   dsa_seed = SHAKE256("HRG_BQ_SUBADDR_DSA_v1" || root || major_le4 || minor_le4)
+  // `root` is cryptonote::get_pq_root_secret — never the view key (it would hand spend
+  // authority to every view-key holder) and, since CRIT-4, never the spend key either (Shor
+  // on the published spend public key would have handed an adversary every identity key).
+  // (0,0) is the primary address and keeps account_keys::pq_dilithium — callers route it there.
+  //
+  // NB: liboqs still exposes no derandomised keygen for SIG, so this rides the per-thread
+  // randombytes hook (audit MOYEN-4) and is therefore sensitive to how many bytes the backend
+  // reads. It is a HOT PATH for BQ spends and is pinned in pq_vector_test for that reason.
+  bool pqc_dsa_keygen_subaddress(const uint8_t *root, size_t root_len,
+                                 uint32_t major, uint32_t minor, pq_dilithium_keys &out);
+
   void pqc_kem_pk_fingerprint(const uint8_t *kem_pk, size_t pk_len, bq_sel_tag &out);
   // derivation_len must be 32 (a crypto::key_derivation); false otherwise.
   bool pqc_sel_pad(const uint8_t *derivation, size_t derivation_len, uint64_t output_index, bq_sel_tag &out);

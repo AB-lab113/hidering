@@ -321,12 +321,19 @@ static bool test_restored_wallet_scans_and_spends()
     if (!wallet_accessor_test::recover(rest, td, ss))
     { printf("FAIL: the restored wallet cannot recover the spend secret on (%u,%u)\n",
              td.m_subaddr_index.major, td.m_subaddr_index.minor); return false; }
-    pq_public_key dpk; pq_secret_key dsk;
-    pqc_keygen_output_dsa(ss, td.m_internal_output_index, dpk, dsk);
+    // Spec 2e: the binding is to the (sub)address IDENTITY key, blinded per output — not to a
+    // key derived from the shared secret, which the sender also knows (CRIT-3).
+    std::array<uint8_t, 32> commit{};
+    if (!get_pq_auth_commit(rest.get_account().get_keys(), td.m_subaddr_index, commit))
+    { printf("FAIL: cannot derive the authorisation commitment\n"); return false; }
+    uint8_t blind[32];
+    if (!pqc_compute_auth_blind(ss, td.m_internal_output_index, blind))
+    { printf("FAIL: cannot derive the binding blind\n"); return false; }
     crypto::public_key P;
     get_output_public_key(tx.vout[td.m_internal_output_index], P);
     uint8_t expect[32];
-    pqc_compute_bind_tag((const uint8_t *)&P, 32, dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, expect);
+    pqc_compute_bind_tag_v2(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER, (const uint8_t *)&P, 32,
+                            commit.data(), blind, expect);
     bool found = false;
     for (const auto &f : fields)
       if (f.type() == typeid(tx_extra_pq_bind) && boost::get<tx_extra_pq_bind>(f).output_index == td.m_internal_output_index)

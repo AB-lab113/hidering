@@ -216,6 +216,13 @@ static bool test_derivation_and_format()
     std::array<uint8_t, ML_KEM_768_PUBLIC_KEY_BYTES> k;
     for (auto &b : k) b = (uint8_t)crypto::rand<uint8_t>();
     a.pq_kyber_pk = k;
+    // Spec 2e: a BQ address also carries an authorisation commitment and a version byte, and
+    // get_account_address_as_str_pq refuses to render one without them. pq_address_test runs the
+    // exhaustive (marker, auth_ver) prefix proof; this keeps the subaddress-marker check honest.
+    std::array<uint8_t, 32> c;
+    for (auto &b : c) b = (uint8_t)crypto::rand<uint8_t>();
+    a.pq_auth_commit = c;
+    a.pq_auth_ver = ::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER;
     if (get_account_address_as_str_pq(MAINNET, a, true).compare(0, 2, "BQ") != 0)
     { printf("FAIL: the BQ subaddress marker does not always render \"BQ\"\n"); return false; }
   }
@@ -322,12 +329,19 @@ static bool test_end_to_end_scan()
     kyber_shared_secret ss;
     if (!wallet_accessor_test::recover(recv, td, ss))
     { printf("FAIL: cannot recover the spend secret of the output on (%u,%u)\n", td.m_subaddr_index.major, td.m_subaddr_index.minor); return false; }
-    pq_public_key dpk; pq_secret_key dsk;
-    pqc_keygen_output_dsa(ss, td.m_internal_output_index, dpk, dsk);
+    // Spec 2e: the binding is to the (sub)address IDENTITY key, blinded per output — not to a
+    // key derived from the shared secret, which the sender also knows (CRIT-3).
+    std::array<uint8_t, 32> commit{};
+    if (!get_pq_auth_commit(recv.get_account().get_keys(), td.m_subaddr_index, commit))
+    { printf("FAIL: cannot derive the authorisation commitment\n"); return false; }
+    uint8_t blind[32];
+    if (!pqc_compute_auth_blind(ss, td.m_internal_output_index, blind))
+    { printf("FAIL: cannot derive the binding blind\n"); return false; }
     crypto::public_key P;
     get_output_public_key(tx.vout[td.m_internal_output_index], P);
     uint8_t expect[32];
-    pqc_compute_bind_tag((const uint8_t *)&P, 32, dpk.dilithium3_pk, ML_DSA_65_PUBLIC_KEY_BYTES, expect);
+    pqc_compute_bind_tag_v2(::config::CRYPTONOTE_PQ_ADDRESS_AUTH_VER, (const uint8_t *)&P, 32,
+                            commit.data(), blind, expect);
     bool found = false;
     for (const auto &f : fields)
       if (f.type() == typeid(tx_extra_pq_bind) && boost::get<tx_extra_pq_bind>(f).output_index == td.m_internal_output_index)
@@ -380,7 +394,7 @@ static bool test_extra_budget()
   account_base bqs; bqs.generate();
   if (!generate_pq_keys(bqs.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: BQ sender keygen\n"); return false; }
   size_t max_spend = 0, spend_extra_at_max = 0;
-  for (size_t n = 1; n <= 3; ++n)
+  for (size_t n = 1; n <= 12; ++n)
   {
     // A genuine BQ output of the spender (CRIT-3: construct_tx must be able to derive its
     // one-time secret): P' = H_s(r*A, 0)*G + B + t*G, t from the output's ML-KEM secret.
@@ -404,6 +418,7 @@ static bool test_extra_budget()
     src.outputs.push_back(oe);
     src.is_pq = true;
     src.pq_ss = ss;
+    src.pq_subaddr = cryptonote::subaddress_index{0, 0};  // spec 2e: identity key of (0,0)
     std::vector<tx_destination_entry> dests(n, tx_destination_entry(1 * HRG, bq, false));
     transaction tx;
     if (build(bqs.get_keys(), {src}, dests, tx))
@@ -415,10 +430,14 @@ static bool test_extra_budget()
          (unsigned)MAX_TX_EXTRA_SIZE_PQ, 1098u + 34u);
   printf("INFO: B...->BQ payment: at most %zu BQ outputs (tx_extra %zu bytes at the maximum)\n", max_b_to_bq, extra_at_max);
   printf("INFO: transparent BQ spend: at most %zu BQ outputs (tx_extra %zu bytes at the maximum)\n", max_spend, spend_extra_at_max);
-  if (max_b_to_bq != 7 || max_spend != 2)
-  { printf("FAIL: budget differs from the analysis (expected 7 and 2)\n"); return false; }
-  printf("PASS: tx_extra budget measured on real transactions matches the analysis: 7 BQ outputs\n"
-         "      for a B...->BQ payment, 2 for a transparent BQ spend (payment + BQ change)\n");
+  // Spec 2e removed the 5262-byte account-level signature (tx_extra 0x06) that a BQ spend used
+  // to carry, so the spend ceiling rises from 2. design_2d §5 ESTIMATED 6 to 7 and insisted the
+  // figure be measured; these are the measured values.
+  if (max_b_to_bq != 7 || max_spend != 7)
+  { printf("FAIL: budget differs from the measured expectation (7 and 7)\n"); return false; }
+  printf("PASS: tx_extra budget measured on real transactions: 7 BQ outputs for a B...->BQ\n"
+         "      payment, and 7 for a transparent BQ spend — up from 2 before spec 2e removed\n"
+         "      the account-level ML-DSA signature (design_2d §5 estimated 6 to 7)\n");
   return true;
 }
 

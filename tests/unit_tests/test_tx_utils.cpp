@@ -415,9 +415,9 @@ TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
   for (size_t i = 0; i < sizeof(in.real_output_key); ++i)
     ((uint8_t*)&in.real_output_key)[i] = (uint8_t)(0x40 + i);
   for (size_t i = 0; i < crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES; ++i)
-    in.dsa.pk[i] = (uint8_t)(i & 0xFF);
+    in.auth.pk[i] = (uint8_t)(i & 0xFF);
   for (size_t i = 0; i < crypto::pqc::ML_DSA_65_SIGNATURE_BYTES; ++i)
-    in.dsa.sig[i] = (uint8_t)((i * 7 + 13) & 0xFF);
+    in.auth.sig[i] = (uint8_t)((i * 7 + 13) & 0xFF);
   tx.vin.push_back(in);
 
   cryptonote::tx_out o{};
@@ -432,20 +432,33 @@ TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
   tx.extra.push_back(TX_EXTRA_TAG_PUBKEY);
   tx.extra.insert(tx.extra.end(), 32, 0x11);
 
-  // mask and owner_sig are left zero (value-initialised): the pin below was taken that way.
+  // mask, owner_sig and auth_blind are left zero (value-initialised): the pin below was taken
+  // that way. auth_type is the struct's default, PQ_AUTH_TYPE_MLDSA65.
 
-  // (1) WIRE FORMAT PIN. binary_archive::tag() is a no-op, so the tag("dsa") JSON fix must not
+  // (1) WIRE FORMAT PIN. binary_archive::tag() is a no-op, so the tag("auth") JSON fix must not
   // move these. They move ONLY when txin_to_key_pq deliberately gains a field — legitimate while
   // HFv16 has never been active, and each move must be explained here:
   //   5383  original pin (JSON fix, 7 Sep 2026)
   //   5415  + mask, 32 bytes (CRIT-2, 8 Sep: bind the amount to the commitment) — the pin was
   //         not updated then; unit_tests had not been rebuilt
   //   5479  + owner_sig, 64 bytes (CRIT-3, 11 Sep: the output's one-time key must sign)
+  //   5512  spec 2e (12 Sep): dsa -> a TYPED authorisation. +1 varint auth_type, +32 auth_blind;
+  //         the 5261-byte ML-DSA blob is unchanged, it now carries the (sub)address identity key
+  //         instead of a key derived from the shared secret. Measured, not predicted.
   const cryptonote::blobdata blob = cryptonote::tx_to_blob(tx);
-  EXPECT_EQ(5479u, blob.size());
+  EXPECT_EQ(5512u, blob.size());
   crypto::hash blob_hash;
   crypto::cn_fast_hash(blob.data(), blob.size(), blob_hash);
-  EXPECT_EQ(std::string("e05cafde0b5804188bbd6a87e35607e5f9f0cda3d977dd33e72a4e796010a9e3"), epee::string_tools::pod_to_hex(blob_hash));
+  EXPECT_EQ(std::string("229cbeb9357c418ae2d7e262c36d1702ce1d2bf049a65086dc265c30a4cfc111"), epee::string_tools::pod_to_hex(blob_hash));
+
+  // (2a) spec 2e §2.2: an unknown authorisation type is rejected AT PARSE, never skipped.
+  {
+    cryptonote::transaction bad = tx;
+    boost::get<cryptonote::txin_to_key_pq>(bad.vin[0]).auth_type = 0x7E;
+    const cryptonote::blobdata bad_blob = cryptonote::tx_to_blob(bad);
+    cryptonote::transaction parsed{};
+    EXPECT_FALSE(cryptonote::parse_and_validate_tx_from_blob(bad_blob, parsed));
+  }
 
   // (2) the blob still round-trips
   cryptonote::transaction tx2{};
@@ -456,15 +469,17 @@ TEST(pq_consensus, txin_to_key_pq_json_valid_and_wire_unchanged)
   EXPECT_EQ(in.amount, in2.amount);
   EXPECT_EQ(in.spent_output_index, in2.spent_output_index);
   EXPECT_EQ(in.real_output_key, in2.real_output_key);
-  EXPECT_EQ(0, memcmp(in.dsa.pk,  in2.dsa.pk,  crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES));
-  EXPECT_EQ(0, memcmp(in.dsa.sig, in2.dsa.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
+  EXPECT_EQ(in.auth_type, in2.auth_type);
+  EXPECT_EQ(in.auth_blind, in2.auth_blind);
+  EXPECT_EQ(0, memcmp(in.auth.pk,  in2.auth.pk,  crypto::pqc::ML_DSA_65_PUBLIC_KEY_BYTES));
+  EXPECT_EQ(0, memcmp(in.auth.sig, in2.auth.sig, crypto::pqc::ML_DSA_65_SIGNATURE_BYTES));
   EXPECT_EQ(0, memcmp(&in.mask, &in2.mask, sizeof(in.mask)));
   EXPECT_EQ(0, memcmp(&in.owner_sig, &in2.owner_sig, sizeof(in.owner_sig)));
 
   // (3) THE BUG: the JSON the daemon serves must name the dsa field and must PARSE.
   const std::string js = cryptonote::obj_to_json_str(tx);
-  EXPECT_NE(std::string::npos, js.find("\"dsa\""))
-      << "dsa blob emitted without its key -> invalid JSON";
+  EXPECT_NE(std::string::npos, js.find("\"auth\""))
+      << "auth blob emitted without its key -> invalid JSON";
   EXPECT_NE(std::string::npos, js.find("\"owner_sig\""));
   rapidjson::Document doc;
   doc.Parse(js.c_str());
