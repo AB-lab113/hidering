@@ -1459,6 +1459,33 @@ bool wallet2::get_seed(epee::wipeable_string& electrum_words, const epee::wipeab
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+// HIDERING Phase 5 (audit CRIT-4 / decision R2a) — the BQ (post-quantum) seed, i.e. the
+// 25-word backup of account_keys::pq_root. See wallet2.h for why it carries no seed offset.
+bool wallet2::get_pq_seed(epee::wipeable_string& electrum_words) const
+{
+  const crypto::secret_key *root = cryptonote::get_pq_root_secret(get_account().get_keys());
+  if (root == nullptr)
+    return false;
+  // Key encryption scrambles the root in memory (AskPasswordToDecrypt, the default). Rendering
+  // the scrambled bytes would hand the user 25 perfectly valid words that restore a DIFFERENT
+  // wallet — the worst possible failure for a backup. Same guard as get_pq_subaddress_as_str.
+  THROW_WALLET_EXCEPTION_IF(!pq_secrets_usable(), error::password_needed,
+      tr("The wallet keys must be unlocked to show the post-quantum (BQ) seed"));
+  if (seed_language.empty())
+  {
+    std::cout << "seed_language not set" << std::endl;
+    return false;
+  }
+  // bytes_to_words writes the 32 bytes verbatim (no sc_reduce32 on this path), which is
+  // what the root needs: it is entropy, not an Ed25519 scalar.
+  if (!crypto::ElectrumWords::bytes_to_words(*root, electrum_words, seed_language))
+  {
+    std::cout << "Failed to create the post-quantum seed for language: " << seed_language << std::endl;
+    return false;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::get_multisig_seed(epee::wipeable_string& seed, const epee::wipeable_string &passphrase) const
 {
   const multisig::multisig_account_status ms_status{get_multisig_status()};
@@ -5912,6 +5939,16 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     r = r && hwdev.verify_keys(keys.m_spend_secret_key, keys.m_account_address.m_spend_public_key);
   THROW_WALLET_EXCEPTION_IF(!r, error::wallet_files_doesnt_correspond, m_keys_file, m_wallet_file);
 
+  // HIDERING Phase 5 (audit CRIT-4 / decision R2a): a BQ wallet written before the root was
+  // split out has pq_keys but no pq_root, so every BQ key it holds hangs off the spend key —
+  // exactly the weakness CRIT-4 names. Refuse it loudly. Falling back to the spend key would
+  // keep the hole open, and deriving a fresh root would produce a different BQ address. No
+  // BQ output has ever existed on mainnet (HFv16 was never activated), so the only wallets
+  // this can reject are local test ones: recreate them with --bq-wallet.
+  THROW_WALLET_EXCEPTION_IF(keys.pq_keys && !keys.pq_root, error::wallet_internal_error,
+      "this BQ... wallet predates the post-quantum root split (audit CRIT-4) and cannot be "
+      "loaded; recreate it with --bq-wallet, which now issues a separate BQ seed");
+
   if (r)
   {
     if (!m_is_background_wallet)
@@ -6238,7 +6275,8 @@ void wallet2::generate(const std::string& wallet_, const epee::wipeable_string& 
  * \return                         The secret key of the generated wallet
  */
 crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wipeable_string& password,
-  const crypto::secret_key& recovery_param, bool recover, bool two_random, bool create_address_file, bool use_pq)
+  const crypto::secret_key& recovery_param, bool recover, bool two_random, bool create_address_file, bool use_pq,
+  const crypto::secret_key *pq_root_param)
 {
   clear();
   prepare_file_names(wallet_);
@@ -6255,9 +6293,18 @@ crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wip
   // HIDERING Phase 5 (HFv16): opt-in BQ... address. After the classic Ed25519 keygen,
   // attach a ML-KEM-768 keypair so m_account.get_keys().m_account_address.is_pq() == true.
   // Off by default → existing wallets are unaffected (pq_keys stays boost::none).
+  //
+  // audit CRIT-4 (decision R2a): the BQ keys hang off an independent root secret, not off
+  // the Ed25519 spend key. On a RESTORE the caller must hand us the user's BQ seed; we
+  // refuse rather than draw a fresh root, because a fresh root would produce a perfectly
+  // valid BQ address that simply is not the one holding the funds — M-4 all over again,
+  // and silent. On a CREATE we draw one and the caller shows the user its mnemonic.
   if (use_pq)
   {
-    THROW_WALLET_EXCEPTION_IF(!cryptonote::generate_pq_keys(m_account.get_keys_nonconst()),
+    THROW_WALLET_EXCEPTION_IF(recover && pq_root_param == nullptr, error::wallet_internal_error,
+        "restoring a BQ... wallet needs its post-quantum seed as well as the 25-word seed");
+    const crypto::secret_key pq_root = pq_root_param ? *pq_root_param : cryptonote::generate_pq_root_secret();
+    THROW_WALLET_EXCEPTION_IF(!cryptonote::generate_pq_keys(m_account.get_keys_nonconst(), pq_root),
         error::wallet_internal_error, "ML-KEM-768 BQ... key generation failed");
     LOG_PRINT_L0("Generated a post-quantum BQ... address: " << cryptonote::get_pq_address_str(m_account.get_keys(), m_nettype));
   }

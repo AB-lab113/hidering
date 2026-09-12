@@ -33,7 +33,7 @@ static bool test_bq_keygen_and_address()
   acc.generate();
 
   // Opt into a BQ... address.
-  if (!generate_pq_keys(acc.get_keys_nonconst())) { printf("FAIL: generate_pq_keys\n"); return false; }
+  if (!generate_pq_keys(acc.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: generate_pq_keys\n"); return false; }
   if (!acc.get_keys().m_account_address.is_pq()) { printf("FAIL: is_pq()=false after generate_pq_keys\n"); return false; }
   if (!acc.get_keys().pq_keys) { printf("FAIL: pq_keys (decaps key) not set\n"); return false; }
 
@@ -88,25 +88,36 @@ static bool test_bq_keygen_and_address()
   return true;
 }
 
-// audit M-4: the BQ keypair must be DETERMINISTIC in the spend key, so a wallet
-// restored from its 25-word seed regenerates the exact same BQ... address (and can
-// therefore spend BQ funds again). Two accounts created from the same recovery key
-// must yield identical BQ keys; a different recovery key must yield a different one.
+// audit M-4 (determinism), restated for audit CRIT-4 / decision R2a (12 Sep 2026).
+//
+// The BQ keypair must be DETERMINISTIC in its root, so a wallet restored from its seeds
+// regenerates the exact same BQ... address and can spend BQ funds again. What changed is
+// WHICH secret that root is: it used to be m_spend_secret_key — the discrete log of the
+// spend public key published in the BQ address, so Shor handed an adversary every BQ key.
+// It is now an INDEPENDENT 32-byte secret with its own mnemonic.
+//
+// So this test now pins two properties at once:
+//   (1) same root  -> same BQ keys, whatever the spend key (restore works);
+//   (2) same spend key + different root -> different BQ keys (the CRIT-4 property: the
+//       BQ material is not a function of the Ed25519 half any more).
 static bool test_bq_keygen_is_deterministic()
 {
-  // Account `a`: a fresh (random) spend key, then derive its BQ keypair.
+  // Account `a`: a fresh spend key, and a PQ root of its own.
   account_base a;
   const crypto::secret_key recovery = a.generate();
-  if (!generate_pq_keys(a.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (a)\n"); return false; }
+  const crypto::secret_key pq_root = generate_pq_root_secret();
+  if (!generate_pq_keys(a.get_keys_nonconst(), pq_root)) { printf("FAIL: generate_pq_keys (a)\n"); return false; }
   const std::string addr_a = get_pq_address_str(a.get_keys(), MAINNET);
+  if (!a.get_keys().pq_root) { printf("FAIL: pq_root not stored on the account\n"); return false; }
+  if (memcmp(&*a.get_keys().pq_root, &pq_root, sizeof(crypto::secret_key)) != 0)
+  { printf("FAIL: stored pq_root differs from the one supplied\n"); return false; }
 
-  // Account `b`: RESTORED from a's recovery key (the M-4 scenario). Its spend key
-  // is identical, so the seed-derived BQ keypair must be identical too.
+  // (1) Account `b`: RESTORED from BOTH of a's seeds (the R2a scenario).
   account_base b;
   b.generate(recovery, true /*recover*/);
   if (memcmp(&b.get_keys().m_spend_secret_key, &a.get_keys().m_spend_secret_key, sizeof(crypto::secret_key)) != 0)
   { printf("FAIL: restored account has a different spend key (test setup)\n"); return false; }
-  if (!generate_pq_keys(b.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (b)\n"); return false; }
+  if (!generate_pq_keys(b.get_keys_nonconst(), pq_root)) { printf("FAIL: generate_pq_keys (b)\n"); return false; }
 
   const std::string addr_b = get_pq_address_str(b.get_keys(), MAINNET);
   if (addr_a.empty() || addr_a != addr_b)
@@ -118,14 +129,41 @@ static bool test_bq_keygen_is_deterministic()
              crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES) != 0)
   { printf("FAIL: restore produced a different ML-DSA-65 secret key\n"); return false; }
 
-  // A different spend key must yield a different BQ address.
+  // (2) audit CRIT-4: the SAME spend key with a DIFFERENT root must give different BQ keys.
+  // Before the fix this was impossible to even express — the root WAS the spend key, so
+  // these two accounts would have collided on the same BQ address.
   account_base c;
-  c.generate();
-  if (!generate_pq_keys(c.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (c)\n"); return false; }
+  c.generate(recovery, true /*recover*/);
+  const crypto::secret_key other_root = generate_pq_root_secret();
+  if (memcmp(&other_root, &pq_root, sizeof(crypto::secret_key)) == 0)
+  { printf("FAIL: two fresh roots collided (RNG broken)\n"); return false; }
+  if (!generate_pq_keys(c.get_keys_nonconst(), other_root)) { printf("FAIL: generate_pq_keys (c)\n"); return false; }
+  if (memcmp(&c.get_keys().m_spend_secret_key, &a.get_keys().m_spend_secret_key, sizeof(crypto::secret_key)) != 0)
+  { printf("FAIL: account c has a different spend key (test setup)\n"); return false; }
   if (get_pq_address_str(c.get_keys(), MAINNET) == addr_a)
-  { printf("FAIL: a different spend key collided to the same BQ address\n"); return false; }
+  { printf("FAIL: BQ address unchanged by a different root — still derived from the spend key (CRIT-4)\n"); return false; }
+  if (memcmp(a.get_keys().pq_keys->kyber_sk, c.get_keys().pq_keys->kyber_sk,
+             crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES) == 0)
+  { printf("FAIL: ML-KEM secret key unchanged by a different root (CRIT-4)\n"); return false; }
 
-  printf("PASS: BQ keygen deterministic in spend key (restore reproduces BQ, distinct seed → distinct BQ)\n");
+  // (3) A different spend key with the SAME root still changes the BQ address: the address
+  // carries the Ed25519 spend/view keys alongside the ML-KEM key, so it must.
+  account_base d;
+  d.generate();
+  if (!generate_pq_keys(d.get_keys_nonconst(), pq_root)) { printf("FAIL: generate_pq_keys (d)\n"); return false; }
+  if (get_pq_address_str(d.get_keys(), MAINNET) == addr_a)
+  { printf("FAIL: a different spend key collided to the same BQ address\n"); return false; }
+  if (memcmp(d.get_keys().pq_keys->kyber_sk, a.get_keys().pq_keys->kyber_sk,
+             crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES) != 0)
+  { printf("FAIL: same root gave a different ML-KEM key across accounts\n"); return false; }
+
+  // (4) An account with no root must refuse to derive: never fall back to the spend key.
+  account_base e;
+  e.generate();
+  if (get_pq_root_secret(e.get_keys()) != nullptr)
+  { printf("FAIL: a classic account reports a PQ root\n"); return false; }
+
+  printf("PASS: BQ keygen deterministic in the PQ root, independent of the spend key (CRIT-4)\n");
   return true;
 }
 

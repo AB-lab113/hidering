@@ -190,6 +190,9 @@ namespace
   // derived deterministically from the spend key). Such a wallet additionally exposes a BQ...
   // address and can receive/spend transparent post-quantum (BQ) outputs once HFv16 is active.
   const command_line::arg_descriptor<bool> arg_bq_wallet = {"bq-wallet", sw::tr("Create a post-quantum BQ... wallet (ML-KEM-768 + ML-DSA-65), in addition to the classic B... address"), false};
+  // HIDERING Phase 5 (audit CRIT-4 / decision R2a): a BQ wallet has a SECOND, independent
+  // 25-word seed backing its post-quantum root. Restoring one needs both seeds.
+  const command_line::arg_descriptor<std::string> arg_bq_seed = {"bq-seed", sw::tr("Specify the post-quantum (BQ) seed when restoring a BQ... wallet, alongside --electrum-seed"), ""};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
@@ -914,6 +917,7 @@ bool simple_wallet::print_seed(bool encrypted)
   if (success) 
   {
     print_seed(seed);
+    print_pq_seed(); // HIDERING Phase 5 (CRIT-4 / R2a): the BQ wallet's second seed
   }
   else
   {
@@ -3945,6 +3949,36 @@ bool simple_wallet::ask_wallet_create_if_needed()
  * \brief Prints the seed with a nice message
  * \param seed seed to print
  */
+// HIDERING Phase 5 (audit CRIT-4 / decision R2a) — show the SECOND seed of a BQ wallet.
+// A BQ wallet is only restorable with both: the 25 words below the classic notice restore
+// the Ed25519 half, these restore the post-quantum half. They are independent by design —
+// that is what puts the post-quantum keys out of reach of a quantum attack on the published
+// spend public key (CRIT-4). Silently skipped for a classic wallet.
+void simple_wallet::print_pq_seed(const epee::wipeable_string *password)
+{
+  if (!m_wallet || !m_wallet->get_account().get_keys().pq_root)
+    return;
+  epee::wipeable_string pq_seed;
+  // The root is encrypted in memory by default, and get_pq_seed refuses to render it then
+  // (it would print 25 valid words restoring a DIFFERENT wallet). At wallet creation the
+  // password is at hand, so unlock here; the `seed` command is already inside SCOPED_WALLET_UNLOCK.
+  boost::optional<tools::wallet_keys_unlocker> unlocker;
+  if (password != nullptr)
+    unlocker.emplace(*m_wallet, password);
+  if (!m_wallet->get_pq_seed(pq_seed))
+  {
+    fail_msg_writer() << tr("Failed to retrieve the post-quantum (BQ) seed");
+    return;
+  }
+  success_msg_writer(true) << "\n" << tr("NOTE: this is the SECOND seed, the post-quantum (BQ) one. "
+    "It backs up the post-quantum keys, which are NOT derived from the 25 words above. "
+    "Restoring this wallet needs BOTH seeds: --electrum-seed and --bq-seed. Store it with "
+    "the same care, and separately from the other one.\n"
+    "(No seed offset passphrase applies to this seed.)\n");
+  print_seed(pq_seed);
+  pq_seed.wipe();
+}
+//----------------------------------------------------------------------------------------------------
 void simple_wallet::print_seed(const epee::wipeable_string &seed)
 {
   success_msg_writer(true) << "\n" << boost::format(tr("NOTE: the following %s can be used to recover access to your wallet. "
@@ -4004,6 +4038,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler([&](){
     m_electrum_seed.wipe();
+    m_bq_seed.wipe();                                  // HIDERING Phase 5 (CRIT-4 / R2a)
+    memwipe(&unwrap(unwrap(m_bq_root)), sizeof(m_bq_root));
+    m_bq_root_set = false;
   });
 
   const bool testnet = tools::wallet2::has_testnet_option(vm);
@@ -4127,6 +4164,45 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       seed_pass = pwd_container->password();
       if (!seed_pass.empty() && !m_restore_multisig_wallet)
         m_recovery_key = cryptonote::decrypt_key(m_recovery_key, seed_pass);
+
+      // HIDERING Phase 5 (audit CRIT-4 / decision R2a): a BQ... wallet has TWO seeds. The
+      // 25 words above restore the Ed25519 half; the post-quantum root has its own, because
+      // it is independent entropy — that independence is what puts it out of Shor's reach.
+      // Asked for here, on the same screen, because the root must exist before any key is
+      // derived. Empty is refused: minting a fresh root would hand the user a perfectly
+      // valid BQ address that is simply not the one holding the funds.
+      if (m_generate_bq && !m_restore_multisig_wallet)
+      {
+        if (m_bq_seed.empty())
+        {
+          m_bq_seed = "";
+          do
+          {
+            const char *prompt = m_bq_seed.empty()
+              ? "Specify the post-quantum (BQ) seed — the SECOND 25-word list issued with this BQ wallet"
+              : "BQ seed continued";
+            epee::wipeable_string bq_seed = input_secure_line(prompt);
+            if (std::cin.eof())
+              return false;
+            if (bq_seed.empty())
+            {
+              fail_msg_writer() << tr("restoring a BQ... wallet needs its post-quantum seed too; "
+                                      "pass it with --bq-seed=\"words list here\". To create a brand new "
+                                      "BQ wallet instead, drop --restore-deterministic-wallet.");
+              return false;
+            }
+            m_bq_seed += bq_seed;
+            m_bq_seed += ' ';
+          } while (might_be_partial_seed(m_bq_seed));
+        }
+        std::string bq_language;
+        if (!crypto::ElectrumWords::words_to_bytes(m_bq_seed, m_bq_root, bq_language))
+        {
+          fail_msg_writer() << tr("Post-quantum (BQ) seed failed verification");
+          return false;
+        }
+        m_bq_root_set = true;
+      }
     }
     if (!m_generate_from_view_key.empty())
     {
@@ -4650,6 +4726,7 @@ bool simple_wallet::handle_command_line(const boost::program_options::variables_
   m_restore_height                = command_line::get_arg(vm, arg_restore_height);
   m_restore_date                  = command_line::get_arg(vm, arg_restore_date);
   m_generate_bq                   = command_line::get_arg(vm, arg_bq_wallet); // HIDERING Phase 5
+  m_bq_seed                       = command_line::get_arg(vm, arg_bq_seed);  // HIDERING Phase 5 (CRIT-4 / R2a)
   m_do_not_relay                  = command_line::get_arg(vm, arg_do_not_relay);
   m_subaddress_lookahead          = command_line::get_arg(vm, arg_subaddress_lookahead);
   m_use_english_language_names    = command_line::get_arg(vm, arg_use_english_language_names);
@@ -4829,7 +4906,10 @@ boost::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::pr
   {
     // HIDERING Phase 5 (HFv16): --bq-wallet derives a post-quantum BQ... keypair in addition to
     // the classic Ed25519 keys (off by default → classic wallets byte-identical).
-    recovery_val = m_wallet->generate(m_wallet_file, std::move(rc.second).password(), recovery_key, recover, two_random, create_address_file, m_generate_bq);
+    // HIDERING Phase 5 (audit CRIT-4 / decision R2a): on a restore m_bq_root carries the
+    // user's BQ seed; on a fresh create we pass nullptr and wallet2 draws a new root.
+    recovery_val = m_wallet->generate(m_wallet_file, std::move(rc.second).password(), recovery_key, recover, two_random, create_address_file, m_generate_bq,
+                                      m_bq_root_set ? &m_bq_root : nullptr);
     message_writer(console_color_white, true) << tr("Generated new wallet: ")
       << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
     if (m_generate_bq && m_wallet->get_account().get_keys().m_account_address.is_pq())
@@ -4870,6 +4950,7 @@ boost::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::pr
   {
     print_seed(electrum_words);
   }
+  print_pq_seed(&password); // HIDERING Phase 5 (CRIT-4 / R2a): the BQ wallet's second seed
   success_msg_writer() << "**********************************************************************";
 
   return password;
@@ -10417,6 +10498,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_do_not_relay);
   command_line::add_arg(desc_params, arg_create_address_file);
   command_line::add_arg(desc_params, arg_bq_wallet); // HIDERING Phase 5
+  command_line::add_arg(desc_params, arg_bq_seed);   // HIDERING Phase 5 (CRIT-4 / R2a)
   command_line::add_arg(desc_params, arg_subaddress_lookahead);
   command_line::add_arg(desc_params, arg_use_english_language_names);
 

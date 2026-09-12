@@ -1037,11 +1037,19 @@ private:
      *                              keypair (post-quantum address). Defaults to false, so
      *                              every existing caller produces an identical classic
      *                              B... wallet (is_pq() == false).
+     * \param  pq_root_param        HIDERING Phase 5 (audit CRIT-4 / decision R2a): the
+     *                              post-quantum root secret, backed up by its OWN 25-word
+     *                              mnemonic and independent of recovery_param. Required
+     *                              when use_pq && recover (a BQ restore MUST be handed the
+     *                              BQ seed — minting a fresh root there would silently
+     *                              strand the funds); ignored when !use_pq. When creating
+     *                              (use_pq && !recover) pass nullptr to draw a fresh one.
      * \return                      The secret key of the generated wallet
      */
     crypto::secret_key generate(const std::string& wallet, const epee::wipeable_string& password,
       const crypto::secret_key& recovery_param = crypto::secret_key(), bool recover = false,
-      bool two_random = false, bool create_address_file = false, bool use_pq = false);
+      bool two_random = false, bool create_address_file = false, bool use_pq = false,
+      const crypto::secret_key *pq_root_param = nullptr);
     /*!
      * \brief Creates a wallet from a public address and a spend/view secret key pair.
      * \param  wallet_                 Name of wallet file
@@ -1220,6 +1228,25 @@ private:
      */
     bool is_deterministic() const;
     bool get_seed(epee::wipeable_string& electrum_words, const epee::wipeable_string &passphrase = epee::wipeable_string()) const;
+
+    /*!
+     * \brief HIDERING Phase 5 (audit CRIT-4 / decision R2a) — the BQ (post-quantum) seed.
+     *
+     * The 25-word backup of account_keys::pq_root, the secret every BQ key of this wallet
+     * hangs off. It is a SECOND, independent mnemonic: the classic seed restores the
+     * Ed25519 half, this one restores the post-quantum half, and a BQ wallet needs both.
+     *
+     * There is deliberately no seed-offset passphrase on this one, unlike get_seed(): the
+     * offset is scalar addition mod l (cryptonote::encrypt_key), and pq_root is raw entropy
+     * that is never reduced — running it through sc_add would not round-trip. See
+     * docs/audit/design_2c_pq_root_shor_resistance.md, open items.
+     *
+     * Throws error::password_needed if the keys are encrypted in memory: the scrambled root
+     * would render 25 valid-looking words that restore a DIFFERENT wallet.
+     *
+     * \return false if this wallet has no post-quantum root (a classic wallet).
+     */
+    bool get_pq_seed(epee::wipeable_string& electrum_words) const;
 
     /*!
      * \brief Gets the seed language

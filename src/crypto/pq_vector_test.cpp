@@ -17,6 +17,19 @@
 // take as-is: it would strand every existing BQ wallet, and needs a migration plan rather
 // than a version bump.
 //
+// ONE DELIBERATE REGENERATION HAS HAPPENED, 12 September 2026 — audit CRIT-4, decision R2a
+// (docs/audit/design_2c_pq_root_shor_resistance.md). The post-quantum keys used to be derived
+// from the Ed25519 spend key; they are now derived from an independent root secret with its
+// own mnemonic. That is a change of INPUT, not of derivation, so only the ACCOUNT-LEVEL
+// vectors below were regenerated (they are now a function of V_PQ_ROOT, and V_PQ_ROOT is
+// deliberately NOT equal to V_RECOVERY_KEY — otherwise this test would still pass against
+// the vulnerable code). The raw-seed vectors (V_RAW_*) and the per-output vectors
+// (V_OUT7_*, V_BIND_TAG) were NOT touched: they sit below the change and are exactly what
+// isolates a liboqs drift from one of our own. If one of THOSE moves, it is not this fix.
+//
+// The rule the header states stands: never edit an expected value to make a failing test
+// pass. Regenerate only against a written decision, and say which values and why, here.
+//
 // Note what pq_keygen_test does NOT cover: it checks that two derivations agree with each
 // other inside ONE build, which stays true even if the whole derivation shifts. Only a
 // frozen vector catches a cross-version change. See
@@ -48,21 +61,29 @@ static const char *V_RECOVERY_KEY =
   "377a478a20a052d8ec70cc8620fb41e72032435465768798a9bacbdcedfe0f00";
 static const char *V_VIEW_SK =
   "190f77729964bef50b83775a0ea0a20002cc918da993186d582d9e2276b39c04";
+// audit CRIT-4 / decision R2a: the post-quantum root, the SECOND seed. Raw entropy, never
+// reduced mod l, and chosen distinct from V_RECOVERY_KEY on purpose — with the two equal,
+// this vector could not tell the fixed derivation apart from the vulnerable one.
+static const char *V_PQ_ROOT =
+  "b7104c2e5d1f83a6c904e27b3af85160d2c73e94a1580bf6372ed0c845b9e719";
 
 // The user-visible artifact: the BQ... address this seed must always produce.
 static const char *V_BQ_ADDRESS_PREFIX = "BQSwT5LjQ7VGUiWWMh6uR9HoYNoXEd6gYPjYaD7QBKAPAwvmZRwavjkcCZjvg3Hii";
 static const size_t V_BQ_ADDRESS_LEN = 1725;
 // Keccak-256 of the whole address string, so the full 1725 chars are pinned, not just the head.
 static const char *V_BQ_ADDRESS_KECCAK =
-  "7f7debf90b40bd301bbc863fd0d6d19f29154672d6143fc6ac59b9ad6d27a5d0";
+  "c40e283e020a4923d8cb722507146b7b106091504ea7ec334c68d5d2f1a5a412";
 
-// Account-level keys derived from the spend key (Keccak-256 fingerprints).
-static const char *V_MLKEM_PK_KECCAK = "db06ce05413ac917bcb2c31da1e24a7f1eeeea335e49c6145aa5eba4c280d2ff";
-static const char *V_MLKEM_SK_KECCAK = "865e800064147287d5ba1d721072cb0388f55e4db21d19f70704c16691ff36a0";
-static const char *V_MLDSA_PK_KECCAK = "a63e8353f3b100ba0624aaeddb1ef31b5b2988aded32fa55242a036a4c7919e8";
-static const char *V_MLDSA_SK_KECCAK = "f1a4ce185fc85ef77f947622ff914bc9033a0b3072ae31d6d430ba217a83b206";
-static const char *V_MLKEM_PK_HEAD16 = "90e2a3c4aa1e484a1a1f704f1d708d6b";
-static const char *V_MLDSA_PK_HEAD16 = "62d97716904717a08861026a087ac946";
+// Account-level keys derived from V_PQ_ROOT (Keccak-256 fingerprints). REGENERATED
+// 12 Sep 2026 for CRIT-4 / R2a — see the header. Everything below the account level was
+// re-measured at the same time and came back byte-identical, which is what says the
+// derivation itself did not move.
+static const char *V_MLKEM_PK_KECCAK = "1b5b6df96296f511fdfec2f6d38fcd5e828b549b1f2db315faf4ec28d090a0d9";
+static const char *V_MLKEM_SK_KECCAK = "f221c7b375810e25da31ea36e6b829a418f1233e67d9ed539f2a62773da81040";
+static const char *V_MLDSA_PK_KECCAK = "da1bb5b11ceacdf16271f7b8535e857f838c3e7b7ebf9daccb5db624dc5398c2";
+static const char *V_MLDSA_SK_KECCAK = "ac722285cb9f364627e4251c75cd493807c1dac80c9274e855ee978d9293a6a6";
+static const char *V_MLKEM_PK_HEAD16 = "b7f46892723fda76523bbb749bc20498";
+static const char *V_MLDSA_PK_HEAD16 = "a692062fe4bd6ebdddfd9b91c4acdb4f";
 
 // Raw-seed derivation, isolating liboqs from Monero's key derivation: seed[i] = 0xA0 + i.
 static const char *V_RAW_MLKEM_PK_KECCAK = "105e923b335343d56c5c21a48b9d3dd37a1e981747bc63f50e3df6bd1de0a2f2";
@@ -107,12 +128,26 @@ static void fill_recovery_key(crypto::secret_key &rec)
   sc_reduce32((uint8_t *)rec.data);
 }
 
-// The account-level vector: the seed a user would restore from must still reach the same
-// BQ address and the same post-quantum keys.
+// audit CRIT-4 / decision R2a — the fixed post-quantum root behind the account vectors.
+static bool fill_pq_root(crypto::secret_key &root)
+{
+  for (int i = 0; i < 32; ++i)
+  {
+    unsigned byte = 0;
+    if (sscanf(V_PQ_ROOT + 2 * i, "%2x", &byte) != 1) return false;
+    ((uint8_t *)root.data)[i] = (uint8_t)byte;
+  }
+  return true;
+}
+
+// The account-level vector: the seeds a user would restore from must still reach the same
+// BQ address and the same post-quantum keys. Since CRIT-4 that is TWO seeds — the classic
+// one for the Ed25519 half, the post-quantum root for everything BQ.
 static bool test_account_vector()
 {
-  crypto::secret_key rec;
+  crypto::secret_key rec, root;
   fill_recovery_key(rec);
+  if (!fill_pq_root(root)) { printf("FAIL: cannot parse V_PQ_ROOT\n"); return false; }
 
   account_base acc;
   acc.generate(rec, true /*recover*/);
@@ -121,7 +156,9 @@ static bool test_account_vector()
   if (!eq("view secret key (test setup, not liboqs)", hexs(acc.get_keys().m_view_secret_key.data, 32), V_VIEW_SK))
     return false;
 
-  if (!generate_pq_keys(acc.get_keys_nonconst())) { printf("FAIL: generate_pq_keys\n"); return false; }
+  if (memcmp(&root, &acc.get_keys().m_spend_secret_key, sizeof(crypto::secret_key)) == 0)
+  { printf("FAIL: V_PQ_ROOT equals the spend key — this vector could not detect CRIT-4\n"); return false; }
+  if (!generate_pq_keys(acc.get_keys_nonconst(), root)) { printf("FAIL: generate_pq_keys\n"); return false; }
   const account_keys &k = acc.get_keys();
 
   bool ok = true;
@@ -140,7 +177,7 @@ static bool test_account_vector()
   ok &= eq("ML-DSA-65 public key (first 16 bytes)",  hexs(k.pq_dilithium->dilithium_pk, 16), V_MLDSA_PK_HEAD16);
 
   if (ok)
-    printf("PASS: account vector — seed still derives the same BQ address and the same ML-KEM/ML-DSA keys\n");
+    printf("PASS: account vector — the two seeds still derive the same BQ address and the same ML-KEM/ML-DSA keys\n");
   return ok;
 }
 

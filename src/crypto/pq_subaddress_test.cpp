@@ -88,14 +88,25 @@ namespace
     return k;
   }
 
+  // The post-quantum root (audit CRIT-4 / decision R2a): a SECOND seed, independent of the
+  // Ed25519 one. Derived here from a different constant so the tests stay deterministic.
+  crypto::secret_key pq_seed_key(uint8_t b)
+  {
+    crypto::secret_key k;
+    for (int i = 0; i < 32; ++i) ((uint8_t *)k.data)[i] = (uint8_t)(0x5A ^ (b + 7 * i));
+    return k; // raw entropy: deliberately NOT reduced mod l
+  }
+
   // A BQ wallet on disk (verify_password reads the keys file), keys encrypted in memory as by
-  // default. generate(use_pq) derives the BQ keys before setup_keys encrypts them.
+  // default. generate(use_pq) derives the BQ keys before setup_keys encrypts them. Restoring a
+  // BQ wallet takes BOTH seeds, so the PQ root is passed explicitly.
   void make_bq_wallet(tools::wallet2 &w, const std::string &name, uint8_t seed, const char *pw)
   {
     const std::string path = g_dir + "/" + name;
     for (const char *ext : {"", ".keys", ".address.txt"})
       boost::filesystem::remove(path + ext);
-    w.generate(path, pw, seed_key(seed), true /*recover*/, false, false, true /*use_pq*/);
+    const crypto::secret_key pq_root = pq_seed_key(seed);
+    w.generate(path, pw, seed_key(seed), true /*recover*/, false, false, true /*use_pq*/, &pq_root);
   }
 
   bool parse(const std::string &s, address_parse_info &info)
@@ -367,7 +378,7 @@ static bool test_extra_budget()
   // A transparent BQ spend: the input is a BQ output (its per-output ML-DSA key lives in vin,
   // not in extra), and the account-level ML-DSA-65 signature is appended to extra.
   account_base bqs; bqs.generate();
-  if (!generate_pq_keys(bqs.get_keys_nonconst())) { printf("FAIL: BQ sender keygen\n"); return false; }
+  if (!generate_pq_keys(bqs.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: BQ sender keygen\n"); return false; }
   size_t max_spend = 0, spend_extra_at_max = 0;
   for (size_t n = 1; n <= 3; ++n)
   {

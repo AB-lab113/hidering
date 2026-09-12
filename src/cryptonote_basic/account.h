@@ -71,6 +71,26 @@ namespace cryptonote
     // audit M4: mlocked for the same reason as pq_keys (pins dilithium_sk against swap).
     boost::optional<epee::mlocked<crypto::pqc::pq_dilithium_keys>> pq_dilithium;
 
+    // HIDERING Phase 5 (HFv16, audit CRIT-4, decision R2a) — the POST-QUANTUM ROOT SECRET.
+    //
+    // Every BQ key of the account (the primary ML-KEM/ML-DSA pair and every subaddress
+    // ML-KEM pair) is derived from this and from nothing else. It used to be
+    // m_spend_secret_key, which is the discrete log of the spend public key the BQ address
+    // publishes: Shor on that point handed an adversary the root and, through it, every BQ
+    // key the account would ever own. It is now 32 bytes of INDEPENDENT entropy, backed up
+    // by its own 25-word mnemonic (see wallet2::get_pq_seed) — nothing published on chain
+    // is a function of it, so no quantum attack on an Ed25519 point reaches it.
+    //
+    // It is raw entropy, NOT an Ed25519 scalar: it is never reduced mod l and never
+    // multiplied by a base point. crypto::secret_key is used purely as the carrier, for its
+    // mlocked+scrubbed storage and for ElectrumWords::{bytes_to,words_to}_bytes, which
+    // handle the 32 bytes verbatim (no sc_reduce32 on that path — crypto.cpp:159-166 is the
+    // only place reduction happens, and the root never goes through it).
+    //
+    // Present only for BQ accounts; boost::none for every classic account, which therefore
+    // emits no "pq_root" field and keeps its key_data byte-for-byte unchanged.
+    boost::optional<crypto::secret_key> pq_root;
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_account_address)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_spend_secret_key)
@@ -142,6 +162,27 @@ namespace cryptonote
         }
         else
           this_ref.pq_dilithium = boost::none;
+      }
+      // HIDERING Phase 5 (HFv16, audit CRIT-4 / decision R2a): persist the post-quantum
+      // root secret. Same shape as pq_keys/pq_dilithium: a named optional field written
+      // ONLY when set, so a classic wallet emits nothing and its key_data is unchanged.
+      // The 32 bytes are chacha20-encrypted in place by encrypt()/decrypt() before this
+      // map runs (xor_with_key_stream), exactly like m_spend_secret_key.
+      if (is_store)
+      {
+        if (this_ref.pq_root)
+        {
+          crypto::secret_key r_blob = *this_ref.pq_root; // mlocked+scrubbed carrier
+          epee::serialization::selector<is_store>::serialize_t_val_as_blob(r_blob, stg, hparent_section, "pq_root");
+        }
+      }
+      else
+      {
+        crypto::secret_key r_blob{};
+        if (epee::serialization::selector<is_store>::serialize_t_val_as_blob(r_blob, stg, hparent_section, "pq_root"))
+          this_ref.pq_root = r_blob;
+        else
+          this_ref.pq_root = boost::none;
       }
     END_KV_SERIALIZE_MAP()
 
@@ -216,18 +257,30 @@ namespace cryptonote
 
   // HIDERING Phase 5 (HFv16) — BQ... (post-quantum) account helpers.
   //
-  // generate_pq_keys() generates a fresh ML-KEM-768 keypair and attaches it to `keys`:
+  // generate_pq_keys() derives the account's ML-KEM-768 + ML-DSA-65 keypairs from
+  // `pq_root` and attaches them to `keys`:
+  //   - keys.pq_root                       <- the root itself (persisted, encrypted)
   //   - keys.pq_keys                       <- the ML-KEM-768 {pk, sk} (decapsulation key)
+  //   - keys.pq_dilithium                  <- the persistent ML-DSA-65 {pk, sk} (audit C-1)
   //   - keys.m_account_address.pq_kyber_pk <- the ML-KEM-768 public key (1184 bytes)
   // so that keys.m_account_address.is_pq() becomes true and a BQ... address can be
   // rendered/spent. Returns false if liboqs keygen fails. This is purely additive: it
   // is only ever called for accounts that opt into a BQ... address; classic accounts
   // leave pq_keys == boost::none and are byte-for-byte unchanged.
   //
-  // NB (Step 6 scope): pq_keys is NOT serialized (Step 5 kept the wallet file byte-
-  // identical), so the BQ keypair currently lives only for the session in which it was
-  // generated. Persisting it (encrypted, like the Ed25519 secrets) is future work.
-  bool generate_pq_keys(account_keys& keys);
+  // audit CRIT-4 / decision R2a: `pq_root` is an EXPLICIT input, and the caller owns where
+  // it comes from — generate_pq_root_secret() when creating, the user's BQ mnemonic when
+  // restoring. It is deliberately not derivable from anything else the account holds, so
+  // there is no default and no fallback: a restore that cannot supply it must fail loudly
+  // rather than mint a fresh root and strand the funds (that is M-4 all over again).
+  bool generate_pq_keys(account_keys& keys, const crypto::secret_key& pq_root);
+
+  // Draw a FRESH post-quantum root secret: 32 bytes straight from the system CSPRNG
+  // (audit CRIT-4 / decision R2a). It is deliberately NOT derived from the account's
+  // Ed25519 material — that independence is the whole point, see account_keys::pq_root.
+  // The caller is expected to show the user its 25-word backup (wallet2::get_pq_seed)
+  // and to feed it back to generate_pq_keys on a restore.
+  crypto::secret_key generate_pq_root_secret();
 
   // Render the BQ... address string for an account that owns a ML-KEM-768 key. Returns an
   // empty string if keys.m_account_address.is_pq() is false.
@@ -236,13 +289,20 @@ namespace cryptonote
   // HIDERING Phase 5 (HFv16, decision 4 / design 2b option B3) — BQ subaddresses.
   //
   // The secret every BQ key of the account is derived from: the primary keypair
-  // (generate_pq_keys, M-4) and every subaddress ML-KEM keypair. ONE definition, on purpose:
-  // it is currently the Ed25519 spend secret key, and that is a known weakness (audit
-  // CRIT-4, 11 Sep 2026): the spend key is the discrete log of the spend public key the BQ
-  // address publishes, so a quantum adversary recovers it and, through it, every BQ key.
-  // Replacing the root is a wallet-format decision still to be taken; keeping it behind this
-  // single function means the subaddress derivation follows automatically when it is.
-  const crypto::secret_key& get_pq_root_secret(const account_keys& keys);
+  // (generate_pq_keys) and every subaddress ML-KEM keypair. ONE definition, on purpose.
+  //
+  // audit CRIT-4 (11 Sep 2026), fixed by decision R2a (12 Sep 2026): this used to return
+  // keys.m_spend_secret_key, the discrete log of the spend public key published in the BQ
+  // address — a quantum adversary recovered it with Shor and, through it, every BQ key of
+  // the account. It now returns keys.pq_root, 32 bytes of independent entropy with their
+  // own mnemonic. Because the derivation was already funnelled through this one function,
+  // the subaddress half followed with no change of its own.
+  // See docs/audit/design_2c_pq_root_shor_resistance.md.
+  // Returns nullptr when the account has no root — a classic account, or a BQ account
+  // created before CRIT-4 (whose keys hung off the spend key). Callers MUST treat nullptr
+  // as "no BQ derivation possible" and fail; falling back to the spend key would put the
+  // vulnerability straight back.
+  const crypto::secret_key* get_pq_root_secret(const account_keys& keys);
 
   // The ML-KEM-768 keypair of BQ subaddress `index`. (0,0) is the primary BQ address and
   // returns keys.pq_keys as is; any other index is derived from get_pq_root_secret with

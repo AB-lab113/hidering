@@ -127,6 +127,29 @@ namespace boost
       {
         x.pq_dilithium = boost::none;
       }
+
+      // ---- HIDERING Phase 5 (HFv16, audit CRIT-4 / decision R2a) ----------------
+      // Version 1 archives stop here. Version 2 adds the post-quantum root secret,
+      // from which every BQ key of the account is derived; without it an archived BQ
+      // account is unusable (no subaddress derivation) even though pq_keys is present.
+      if (ver < 2)
+        return;
+
+      bool has_pq_root = static_cast<bool>(x.pq_root);
+      a & has_pq_root;
+      if (has_pq_root)
+      {
+        crypto::secret_key r_blob{};
+        if (!Archive::is_loading::value)
+          r_blob = *x.pq_root;
+        a & r_blob;
+        if (Archive::is_loading::value)
+          x.pq_root = r_blob;
+      }
+      else if (Archive::is_loading::value)
+      {
+        x.pq_root = boost::none;
+      }
     }
 
     template <class Archive>
@@ -139,6 +162,7 @@ namespace boost
   }
 }
 
-// HIDERING Phase 5: version 1 adds the optional post-quantum keypairs. Version 0
-// archives (anything written before HFv16 work) still load through the early return.
-BOOST_CLASS_VERSION(cryptonote::account_keys, 1)
+// HIDERING Phase 5: version 1 adds the optional post-quantum keypairs; version 2 adds
+// the post-quantum root secret they are derived from (audit CRIT-4 / decision R2a).
+// Older archives still load through the early returns above.
+BOOST_CLASS_VERSION(cryptonote::account_keys, 2)

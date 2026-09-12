@@ -49,7 +49,7 @@ static bool test_account_archive_round_trip()
 {
   account_base acc;
   acc.generate();
-  if (!generate_pq_keys(acc.get_keys_nonconst())) { printf("FAIL: generate_pq_keys\n"); return false; }
+  if (!generate_pq_keys(acc.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: generate_pq_keys\n"); return false; }
   const account_keys &orig = acc.get_keys();
   if (!orig.pq_keys || !orig.pq_dilithium) { printf("FAIL: BQ account missing PQ material (test setup)\n"); return false; }
 
@@ -91,7 +91,7 @@ static bool test_restored_account_can_sign_a_bq_spend()
 {
   account_base acc;
   acc.generate();
-  if (!generate_pq_keys(acc.get_keys_nonconst())) { printf("FAIL: generate_pq_keys\n"); return false; }
+  if (!generate_pq_keys(acc.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: generate_pq_keys\n"); return false; }
 
   std::stringstream ss;
   {
@@ -173,7 +173,7 @@ static bool test_structs_keep_no_pq_fields_on_the_wire()
   // --- output side ---
   account_base recipient;
   recipient.generate();
-  if (!generate_pq_keys(recipient.get_keys_nonconst())) { printf("FAIL: generate_pq_keys (recipient)\n"); return false; }
+  if (!generate_pq_keys(recipient.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: generate_pq_keys (recipient)\n"); return false; }
   tx_destination_entry dst(7, recipient.get_keys().m_account_address, false);
   dst.is_pq = true;
   if (!dst.addr.is_pq()) { printf("FAIL: destination address is not BQ (test setup)\n"); return false; }

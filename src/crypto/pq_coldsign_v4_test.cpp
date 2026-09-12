@@ -49,9 +49,15 @@ namespace
     crypto::secret_key rec;
     for (int i = 0; i < 32; ++i) ((uint8_t *)rec.data)[i] = (uint8_t)(seed_byte + i);
     sc_reduce32((uint8_t *)rec.data);
+    // audit CRIT-4 / decision R2a: a BQ wallet has a SECOND seed, the post-quantum root, and
+    // it is what every BQ key hangs off. The hot and the cold machine are the same account,
+    // so both must be restored with the same pair — derived here from the same seed byte.
+    crypto::secret_key pq_root;
+    for (int i = 0; i < 32; ++i) ((uint8_t *)pq_root.data)[i] = (uint8_t)(0x5A ^ (seed_byte + 7 * i));
     // use_pq: the BQ keys are derived inside generate(), before the keys get encrypted in
-    // memory — deriving them afterwards would hash the ENCRYPTED spend key.
-    w.generate("", "", rec, true /*recover*/, false /*two_random*/, false /*create_address_file*/, with_bq);
+    // memory — deriving them afterwards would hash the ENCRYPTED root.
+    w.generate("", "", rec, true /*recover*/, false /*two_random*/, false /*create_address_file*/, with_bq,
+               with_bq ? &pq_root : nullptr);
   }
 
   // A genuine BQ output of `keys` on subaddress `index`, at position `out_index` of its tx:
@@ -109,7 +115,7 @@ static bool test_bq_roundtrip_and_no_secrets()
 
   // A separate BQ recipient we are paying.
   account_base recip; recip.generate();
-  if (!generate_pq_keys(recip.get_keys_nonconst())) { printf("FAIL: recipient keygen\n"); return false; }
+  if (!generate_pq_keys(recip.get_keys_nonconst(), generate_pq_root_secret())) { printf("FAIL: recipient keygen\n"); return false; }
 
   // The hot wallet found a BQ output of ours: encapsulate to our own key to get the
   // (ciphertext, secret) pair the scanner would have recovered.

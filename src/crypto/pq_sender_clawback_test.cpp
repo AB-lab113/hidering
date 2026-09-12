@@ -200,7 +200,9 @@ int main()
 
   // The victim: a BQ wallet, unattended so its keys are not encrypted in memory.
   tools::wallet2 victim(MAINNET, 1, true);
-  victim.generate("", "", rct::rct2sk(rct::skGen()), true, false, false, true /*use_pq*/);
+  // audit CRIT-4 / decision R2a: a BQ restore takes the post-quantum root as a second seed.
+  const crypto::secret_key victim_pq_root = cryptonote::generate_pq_root_secret();
+  victim.generate("", "", rct::rct2sk(rct::skGen()), true, false, false, true /*use_pq*/, &victim_pq_root);
   const account_keys &vk = victim.get_account().get_keys();
   address_parse_info sub;
   if (!get_account_address_from_str(sub, MAINNET, victim.get_pq_subaddress_as_str({0, 3})))
@@ -312,7 +314,7 @@ int main()
 
   // --- 2. The sender, through the real builder ------------------------------------------------
   account_base attacker; attacker.generate();
-  generate_pq_keys(attacker.get_keys_nonconst());
+  generate_pq_keys(attacker.get_keys_nonconst(), generate_pq_root_secret());
   tx_source_entry src;
   src.amount = 5 * HRG; src.rct = true; src.real_output = 0; src.real_output_in_tx_index = i;
   src.mask = sender_mask;

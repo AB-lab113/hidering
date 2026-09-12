@@ -92,9 +92,13 @@ DISABLE_VS_WARNINGS(4244 4345)
     // (kyber_pk) is not secret and is left in the clear. Classic wallets have
     // pq_keys == boost::none, so the stream length and on-disk bytes are unchanged.
     // audit C-1: the persistent ML-DSA-65 signing key (dilithium_sk) is encrypted
-    // alongside kyber_sk and the Ed25519 secrets, appended last in the derived stream.
+    // alongside kyber_sk and the Ed25519 secrets, appended after it in the derived stream.
+    // audit CRIT-4 (decision R2a): the post-quantum root secret is appended LAST. The
+    // stream is consumed positionally, so anything new has to go at the end or every
+    // existing BQ .keys file would decrypt to garbage.
     const size_t pq_sk_bytes = (pq_keys ? crypto::pqc::ML_KEM_768_SECRET_KEY_BYTES : 0)
-                             + (pq_dilithium ? crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES : 0);
+                             + (pq_dilithium ? crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES : 0)
+                             + (pq_root ? sizeof(crypto::secret_key) : 0);
     // encrypt a large enough byte stream with chacha20
     epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()) + pq_sk_bytes);
     const char *ptr = key_stream.data();
@@ -116,6 +120,11 @@ DISABLE_VS_WARNINGS(4244 4345)
     {
       for (size_t i = 0; i < crypto::pqc::ML_DSA_65_SECRET_KEY_BYTES; ++i)
         pq_dilithium->dilithium_sk[i] ^= *ptr++;
+    }
+    if (pq_root)
+    {
+      for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
+        pq_root->data[i] ^= *ptr++;
     }
   }
   //-----------------------------------------------------------------
@@ -296,30 +305,41 @@ DISABLE_VS_WARNINGS(4244 4345)
   // HIDERING Phase 5 (HFv16): attach a ML-KEM-768 + ML-DSA-65 keypair to `keys`, turning
   // its account_public_address into a BQ... (post-quantum) address. Additive and opt-in.
   //
-  // audit M-4: the PQ keypair is derived DETERMINISTICALLY from the account's Ed25519
-  // spend secret key (already populated by account_base::generate before this is called,
-  // on both the create and the restore-from-mnemonic paths). Restoring a wallet from its
-  // 25-word seed therefore regenerates the exact same BQ... keys, instead of fresh random
-  // ones that would strand any BQ funds. The spend key flows through domain-separated
-  // SHAKE256 (see pqc_keygen_from_seed), so it is never recoverable from the PQ material.
-  const crypto::secret_key& get_pq_root_secret(const account_keys& keys)
+  // audit M-4: the PQ keypair is derived DETERMINISTICALLY from a root secret, so a restore
+  // regenerates the exact same BQ... keys instead of fresh random ones that would strand any
+  // BQ funds. audit CRIT-4 (decision R2a): that root is no longer the Ed25519 spend key —
+  // it is keys.pq_root, independent entropy with its own mnemonic. The root flows through
+  // domain-separated SHAKE256 (pqc_keygen_from_seed), so it is not recoverable from the PQ
+  // material either. See docs/audit/design_2c_pq_root_shor_resistance.md.
+  const crypto::secret_key* get_pq_root_secret(const account_keys& keys)
   {
-    // See account.h (audit CRIT-4): the spend secret key is the dlog of a published key.
-    return keys.m_spend_secret_key;
+    return keys.pq_root ? &*keys.pq_root : nullptr;
   }
   //-----------------------------------------------------------------
-  bool generate_pq_keys(account_keys& keys)
+  crypto::secret_key generate_pq_root_secret()
+  {
+    // audit CRIT-4: fresh system entropy, with NO input from m_spend_secret_key or
+    // m_view_secret_key. Not an Ed25519 scalar — deliberately not reduced mod l.
+    crypto::secret_key root;
+    crypto::rand(sizeof(root), reinterpret_cast<uint8_t*>(root.data));
+    return root;
+  }
+  //-----------------------------------------------------------------
+  bool generate_pq_keys(account_keys& keys, const crypto::secret_key& pq_root)
   {
     crypto::pqc::pq_public_key pq_pk;
     crypto::pqc::pq_secret_key pq_sk;
-    const crypto::secret_key& root = get_pq_root_secret(keys);
     if (!crypto::pqc::pqc_keygen_from_seed(
-            reinterpret_cast<const uint8_t*>(&root),
+            reinterpret_cast<const uint8_t*>(&pq_root),
             sizeof(crypto::secret_key), pq_pk, pq_sk))
     {
       MERROR("generate_pq_keys: liboqs ML-KEM-768/ML-DSA-65 seed-derived keygen failed");
       return false;
     }
+
+    // audit CRIT-4: keep the root itself — every subaddress ML-KEM pair is redrived from
+    // it on demand, and it is what the user's BQ mnemonic backs up.
+    keys.pq_root = pq_root;
 
     // Stealth (KEM) keypair: the ML-KEM-768 half drives BQ... address derivation.
     crypto::pqc::pq_stealth_keys sk{};
@@ -369,8 +389,14 @@ DISABLE_VS_WARNINGS(4244 4345)
       out = *keys.pq_keys;
       return true;
     }
-    const crypto::secret_key& root = get_pq_root_secret(keys);
-    return crypto::pqc::pqc_kem_keygen_subaddress(reinterpret_cast<const uint8_t*>(&root), sizeof(root),
+    const crypto::secret_key* root = get_pq_root_secret(keys);
+    if (root == nullptr)
+    {
+      // audit CRIT-4: no root, no derivation. Never fall back to the spend key.
+      MERROR("generate_pq_subaddress_keys: account has no post-quantum root secret");
+      return false;
+    }
+    return crypto::pqc::pqc_kem_keygen_subaddress(reinterpret_cast<const uint8_t*>(root), sizeof(*root),
                                                   index.major, index.minor, out);
   }
   //-----------------------------------------------------------------

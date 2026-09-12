@@ -301,6 +301,9 @@ namespace cryptonote
      * \param seed seed to print
      */
     void print_seed(const epee::wipeable_string &seed);
+    // HIDERING Phase 5 (audit CRIT-4 / decision R2a): the second, post-quantum seed of a
+    // BQ... wallet. No-op for a classic wallet.
+    void print_pq_seed(const epee::wipeable_string *password = nullptr);
 
     /*!
      * \brief Gets the word seed language from the user.
@@ -413,8 +416,14 @@ namespace cryptonote
     std::string m_restore_date;  // optional - converted to m_restore_height
 
     epee::wipeable_string m_electrum_seed;  // electrum-style seed parameter
+    // HIDERING Phase 5 (audit CRIT-4 / decision R2a): the SECOND seed of a BQ wallet, the
+    // 25-word backup of its post-quantum root. Independent of m_electrum_seed.
+    epee::wipeable_string m_bq_seed;
 
     crypto::secret_key m_recovery_key;  // recovery key (used as random for wallet gen)
+    // The post-quantum root recovered from m_bq_seed; only meaningful when m_bq_root_set.
+    crypto::secret_key m_bq_root;
+    bool m_bq_root_set = false;
     bool m_restore_deterministic_wallet;  // recover flag
     bool m_restore_multisig_wallet;  // recover flag
     bool m_non_deterministic;  // old 2-random generation
