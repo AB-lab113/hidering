@@ -2,6 +2,11 @@
 
 **Date de la revue :** 8 septembre 2026
 **Statut :** ⛔ **BLOCAGE MAINTENU** — la condition de levée n'est toujours pas remplie.
+**Réévalué le 13 septembre 2026** (`liboqs_0.16.0_upgrade_gate.md` §7-§11) : conclusion
+**inchangée**, le blocage tient. Deux mises à jour à connaître avant de citer ce document —
+(1) l'affirmation « aucun audit tiers publié » du §8 était **fausse** et est corrigée dans le
+tableau ; (2) le risque d'upgrade du §6 a été **mesuré** et ne se matérialise pas : le vecteur
+figé passe à l'identique sur 0.16.0.
 **Décision demandée :** aucune action d'upgrade n'a été prise. Ce document rapporte l'état
 et les options ; l'arbitrage 0.15.0 → 0.16.0 revient au mainteneur (voir §5).
 
@@ -103,7 +108,10 @@ Si c'est le cas, **la même seed 25 mots produirait une adresse BQ différente a
 l'upgrade** — c'est-à-dire exactement la perte de fonds que M-4 a corrigée, réintroduite par
 une bump de dépendance.
 
-**Test de non-régression obligatoire avant tout upgrade** (à faire, pas encore fait) :
+**Test de non-régression obligatoire avant tout upgrade** ~~(à faire, pas encore fait)~~ —
+**fait le 8 septembre (vecteur figé) et REJOUÉ EN VERT sur 0.16.0 le 13 septembre** : les deux
+backends lisent un unique bloc de 32 octets avant la dérivation normalisée FIPS 204, donc la clé
+ne bouge pas. Voir `liboqs_0.16.0_upgrade_gate.md` §8. Énoncé d'origine :
 figer un vecteur de test seed → (pk ML-DSA, pk ML-KEM) avec la 0.15.0, puis vérifier bit à
 bit qu'il est reproduit par la 0.16.0. Le test `pq_keygen_test::test_bq_keygen_is_deterministic`
 ne le détecte PAS : il compare deux dérivations faites par la *même* build.
@@ -122,7 +130,7 @@ upgrade ne le supprimerait pas. C'est ce contournement qui a produit le finding 
 
 | # | Condition (finding M-11) | État au 8 sept. 2026 |
 |---|---|---|
-| 1 | Le disclaimer « prototyping » a-t-il sauté ? Audit tiers publié ? | ❌ Disclaimer intact ; aucun audit tiers publié |
+| 1 | Le disclaimer « prototyping » a-t-il sauté ? Audit tiers publié ? | ❌ Disclaimer intact ; ~~aucun audit tiers publié~~ **CORRIGÉ le 13 sept. 2026 : un audit tiers EXISTE** — Trail of Bits, revue de **portions** de liboqs (2024, rapport publié en avril 2025), mentionné sur la page sécurité d'OQS. Il ne lève pas la condition pour autant : la revue est partielle, et OQS maintient **après** elle que le niveau d'audit reste insuffisant pour un usage à forte sécurité. Détail : `liboqs_0.16.0_upgrade_gate.md` §7 |
 | 2 | Implémentation FIPS-validée (CMVP) ou posture hybride | ⚠️ Aucune validation FIPS n'existe pour liboqs. **L'hybride est déjà notre posture de fait** (la dépense reste gardée par dlog Ed25519) mais n'est pas formalisée comme exigence |
 | 3 | Figer la version + re-audit constant-time des chemins réellement utilisés | ⚠️ Version figée (SHA pin) mais **désormais EOL upstream** ; re-audit constant-time non fait (on s'appuie sur les datasheets OQS) |
 
