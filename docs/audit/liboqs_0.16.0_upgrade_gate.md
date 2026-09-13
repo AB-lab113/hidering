@@ -271,11 +271,10 @@ partagent le fichier entier.
 tient à la dérivation ML-DSA par hook RNG (M-4), donc il existait depuis le 14 juin. Ce qui a
 changé le 13 septembre, c'est qu'il est **nommé, borné et vérifié** au lieu d'être implicite.
 
-**Action concrète qui en découle, à faire avant d'activer BQ dans un binaire ARM64 publié :**
-faire tourner `pq_vector_test` sur un runner ARM réel. La CI GUI construit déjà sur `macos-14`
-(ARM), donc c'est un ajout de quelques lignes, pas un chantier — et c'est la seule chose qui
-transformerait « spécifié identique » en « mesuré identique » sur l'architecture qui nous
-intéresse. Tant que ce n'est pas fait, le risque est **écarté par lecture, pas par mesure**.
+~~**Action concrète qui en découle, à faire avant d'activer BQ dans un binaire ARM64 publié :**
+faire tourner `pq_vector_test` sur un runner ARM réel.~~ → **FAITE le 13 septembre 2026 : le test
+s'exécute désormais sur `macos-14` à chaque build macOS, et il est vert. Le risque n'est plus
+« écarté par lecture » mais MESURÉ. Voir §13.**
 
 ## 9. Ce que ce résultat ne lève PAS
 
@@ -380,7 +379,86 @@ touchées, ce qui reste la règle absolue de ce fichier.
   C'est précisément pourquoi le vecteur existe, et pourquoi le §5 reste la bonne cible.
 * **Rien sur la chaîne live.** Tout le code PQC est gardé `hf_version >= HF_VERSION_PQ` ; le
   mainnet est en hf 15. L'upgrade est invisible pour les nœuds en production.
-* **L'écart ARM64 du §8.1/§8.2 reste ouvert** : la vérification est faite par lecture sur les deux
-  versions, jamais par exécution sur ARM. L'action (`pq_vector_test` sur `macos-14`) reste à
-  faire, et elle porte maintenant sur 0.16.0 — la version que les prochains binaires publiés
-  embarqueront.
+* ~~**L'écart ARM64 du §8.1/§8.2 reste ouvert**~~ → **FERMÉ le 13 septembre 2026** : la
+  vérification est désormais faite **par lecture ET par exécution**, sur un vrai runner ARM, et
+  elle porte sur 0.16.0 — la version que les prochains binaires publiés embarqueront. Voir §13.
+---
+
+## 13. L'écart ARM64 est fermé — par exécution réelle (13 septembre 2026)
+
+Les §8.1 et §8.2 écartaient le risque « une clé BQ dérive autrement sur macOS ARM64 » **par
+lecture de source**, sur les deux versions, en disant explicitement que rien n'avait jamais été
+**exécuté** sur ARM. C'est fait, et le sujet est clos.
+
+### 13.1 Le résultat
+
+**Run CI réel sur `macos-14` (Apple Silicon), 13 septembre 2026** — run `34766997637`, job
+`103749631530`, branche `ci/arm64-pq-vector-gate`, conclusion **success** :
+
+* `uname -m` → **`arm64`** (exécution bien sur ARM, pas une émulation) ;
+* liboqs **0.16.0** (pin `5a1a854b`) construit par le job lui-même pour arm64 ;
+* `pq_vector_test` compilé sur place et exécuté :
+
+```
+Frozen against liboqs 0.15.0 AND 0.16.0 — identical on both (current pin 5a1a854b).
+PASS: raw-seed vector — pqc_keygen_from_seed is unchanged (ML-KEM derand + ML-DSA over the SHAKE256 hook)
+PASS: account vector — the two seeds still derive the same BQ address and the same ML-KEM/ML-DSA keys
+PASS: spec 2e vector — per-subaddress identity key, commitment, blind and v2 binding tag unchanged
+PASS: output vector — per-output ML-DSA-65 key and binding tag unchanged
+RESULT: PASS
+```
+
+➡️ **Les vecteurs figés sur x86_64 se reproduisent bit pour bit sur ARM64.** La même seed de
+25 mots dérive la même adresse BQ quelle que soit l'architecture.
+
+### 13.2 C'est un gate, et c'est prouvé
+
+Le geste cosmétique aurait été d'ajouter l'étape et de la voir verte. La démonstration est
+meilleure que ça : **les deux premiers runs ont FAIT ÉCHOUER le job**, sur des problèmes
+d'outillage, avant que le troisième ne passe. Un échec de cette étape casse donc réellement la CI
+— vérifié en conditions réelles, pas déduit de la configuration.
+
+### 13.3 Ce que les deux runs rouges ont trouvé — et qui ne pouvait pas l'être ici
+
+Aucun n'était une divergence de dérivation : le binaire de test n'avait pas démarré. Les deux
+étaient dans la branche Darwin du script de build, écrite d'après la documentation et jamais
+exécutée.
+
+1. **`GROUP_BEGIN[@]: unbound variable`** — macOS livre encore **bash 3.2**, où étendre un tableau
+   **vide** sous `set -u` est une erreur (bash ≥ 4.4 l'autorise). Or c'est précisément sur Darwin
+   que le script laisse les drapeaux `--start-group` vides, Apple ld ne les connaissant pas : la
+   branche écrite *pour* macOS était celle qui ne pouvait pas y tourner. Corrigé par l'idiome
+   portable `${arr[@]+"${arr[@]}"}`.
+2. **Archives absentes** (`libwallet-crypto.a`, `liblmdb_lib.a`) — et ce n'est **pas** un problème
+   de plateforme mais de **configuration**, donc il pouvait mordre sur Linux aussi :
+   `wallet-crypto` est un **ALIAS de `cncrypto`** quand l'autodétection retombe sur le backend
+   interne « cn » (`src/crypto/wallet/CMakeLists.txt:53-55`) — aucune archive n'est alors produite,
+   alors qu'une machine dont l'autodétection choisit un autre backend en a une. Une liste recopiée
+   d'un build local qui marche était donc fausse partout ailleurs. Le script filtre désormais les
+   archives par existence et **nomme celles qu'il saute**.
+
+Au passage, le filtre boost a fait son office : `skipping -lboost_system (not present in
+/opt/homebrew/opt/boost/lib)` — Boost.System est *header-only* depuis 1.69 et Homebrew n'en livre
+plus de stub, contrairement aux distributions Linux.
+
+**Leçon, conforme au §11 :** une vérification par lecture reste une hypothèse sur l'outillage
+autant que sur le code. Il a fallu trois runs pour que le test s'exécute une seule fois — et le
+résultat, une fois arrivé, était le bon.
+
+### 13.4 Prérequis livré au passage
+
+La recette de build des tests standalone (`src/crypto/pq*_test.cpp`, sans cible CMake) ne vivait
+que dans des répertoires scratch éphémères et avait dû être reconstituée de mémoire plus d'une
+fois. Une CI ne peut pas dépendre d'un script régénéré à la volée : elle testerait la recette du
+jour. Elle est désormais dans le dépôt — `tests/standalone/build_pq_test.sh` — avec détection du
+répertoire de build, les deux jeux de bibliothèques nommés, `--list` et la branche Darwin. La CI
+invoque **ce** fichier : ce que CI construit est ce qu'un développeur construit.
+
+### 13.5 Ce que ça ne change pas
+
+**M-11 reste bloquant pour HFv16.** Cette mesure ferme une question d'*architecture*, pas de
+*maturité* : disclaimer « not for production » intact, pas de validation FIPS 140-3, posture
+hybride non formalisée, re-audit constant-time non fait. Et comme il n'existe toujours pas de
+`keypair_derand` pour SIG, la dérivation reste suspendue au hook RNG : le vecteur — désormais
+vérifié sur **deux versions et deux architectures** — reste un garde-fou, pas une solution. La
+cible du §5 est inchangée.
