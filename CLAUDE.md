@@ -560,6 +560,37 @@ Décisions prises après le rapport de la revue post-audit, et exécutées le m�
 - **Suite = 11 tests, tous verts.** `HF_HEIGHT_PQ` inchangé (2 000 000), chaîne live intacte.
 - **Reste ouvert** : la sélection d'entrées du wallet ne cherche pas *délibérément* à mélanger les deux mondes — construct_tx et le consensus acceptent l'hybride, donc elle apparaît quand la sélection prend les deux, mais aucune politique ne privilégie la consolidation.
 
+### 13 Septembre 2026 (fin) — l'écart ARM64 fermé **par mesure**, et la recette de test committée
+- **`pq_vector_test` tourne maintenant sur ARM, en CI, comme gate.** Étape ajoutée au job
+  `build-macos` existant (`macos-14`, Apple Silicon), qui construisait déjà liboqs et `cncrypto`
+  pour arm64 → coût : une étape, zéro build supplémentaire. Run réel **`34766997637`** :
+  `uname -m` = **arm64**, liboqs **0.16.0** (pin `5a1a854b`), **les 4 groupes de vecteurs PASS**.
+  ➡️ **Les vecteurs figés sur x86_64 se reproduisent bit pour bit sur ARM64** : la même seed de
+  25 mots dérive la même adresse BQ quelle que soit l'architecture. Le risque passe de « écarté
+  par lecture » à **mesuré**.
+- **C'est un gate, et c'est prouvé — pas déduit** : les **deux premiers runs ont fait ÉCHOUER le
+  job** avant que le troisième ne passe. Un échec de cette étape casse réellement la CI.
+- **Prérequis livré d'abord** : la recette de build des tests standalone ne vivait que dans des
+  répertoires scratch et avait dû être reconstituée de mémoire plus d'une fois. Une CI ne peut pas
+  dépendre d'un script régénéré à la volée — elle testerait la recette du jour. Elle est
+  désormais **dans le dépôt** : `tests/standalone/build_pq_test.sh` (détection du build dir, deux
+  jeux de bibliothèques, `--list`, branche Darwin). La CI invoque ce fichier.
+- **Ce que les 2 runs rouges ont trouvé** — aucun n'était une divergence de dérivation (le binaire
+  n'avait pas démarré), les deux étaient dans la branche Darwin jamais exécutée : (1) macOS livre
+  **bash 3.2**, où étendre un tableau **vide** sous `set -u` est une erreur — et Darwin est
+  justement là où le script laisse `--start-group` vide (Apple ld ne le connaît pas), donc la
+  branche écrite *pour* macOS était celle qui ne pouvait pas y tourner ; (2) archives absentes,
+  problème de **configuration** et non de plateforme (donc possible sur Linux aussi) :
+  `wallet-crypto` est un **ALIAS de `cncrypto`** quand l'autodétection retombe sur le backend
+  « cn » → aucune archive produite, alors qu'une machine qui choisit un autre backend en a une.
+  Le script filtre désormais les archives par existence et nomme celles qu'il saute.
+  **Leçon** : une vérification par lecture est une hypothèse sur l'outillage autant que sur le
+  code. 3 runs pour exécuter le test une fois — et le résultat, arrivé, était le bon.
+- **M-11 reste bloquant pour HFv16** : ceci ferme une question d'**architecture**, pas de
+  **maturité**. Toujours pas de `keypair_derand` pour SIG → la dérivation reste suspendue au hook
+  RNG ; le vecteur, désormais vérifié sur **deux versions et deux architectures**, reste un
+  garde-fou, pas une solution.
+
 ### 13 Septembre 2026 — M-11 réévalué, **upgrade liboqs 0.16.0 PRISE**
 - **Le gate du 8 septembre a été honoré, pas contourné.** Procédure de
   `docs/audit/liboqs_0.16.0_upgrade_gate.md` §4 suivie à la lettre : vert sur 0.15.0 d'abord,
@@ -723,7 +754,9 @@ Décisions prises après le rapport de la revue post-audit, et exécutées le m�
   garde-fou (§4.3, échec si change non-BQ) — le chemin normal n'est pas testé
   en isolation, ça demande un daemon. Backlog, pas bloquant tant que le
   garde-fou tient.
-- Backend ML-DSA aarch64 (0.16.0) vérifié identique par hash (source uniquement,
-  cette machine est x86_64) — jamais mesuré en exécution réelle sur ARM. À faire
-  avant d'activer BQ dans un binaire ARM64 publié : lancer pq_vector_test sur le
-  runner macos-14 déjà utilisé par la CI GUI.
+- ~~Backend ML-DSA aarch64 (0.16.0) vérifié identique par hash (source uniquement,
+  cette machine est x86_64) — jamais mesuré en exécution réelle sur ARM.~~
+  **FERMÉ le 13 sept. 2026** : `pq_vector_test` tourne désormais sur `macos-14`
+  (Apple Silicon) à chaque build macOS, comme **gate** du job — run `34766997637`,
+  `uname -m` = arm64, les 4 groupes de vecteurs PASS. Les vecteurs figés sur x86_64
+  se reproduisent **bit pour bit** sur ARM64. Détail : `liboqs_0.16.0_upgrade_gate.md` §13.
