@@ -18,14 +18,23 @@
 //     tag of the other. Without the blind, one revealed authorisation key would unmask every
 //     output ever sent to that subaddress.
 //
-//  3. T2 (§4.2), all three refusals: R-a a spent subaddress is never handed out again, R-b the
-//     change of a BQ spend lands on a FRESH BQ subaddress, R-c two BQ subaddresses are not
-//     merged into one transaction without an explicit opt-in.
+//  3. T2 (§4.2), the three refusals:
+//       R-a  a subaddress already committed to a spend is never handed out again, and the
+//            refusal is an exception, not an empty string;
+//       R-b  a freshly allocated BQ subaddress is never (major,0) and never an already-spent
+//            index, and construct_tx refuses outright a BQ spend whose change is not BQ (§4.3);
+//       R-c  two BQ subaddresses are not merged into one transaction without an explicit
+//            opt-in, and ARE merged once it is given.
+//     What is NOT covered here, stated so it is not mistaken for coverage: the wiring inside
+//     wallet2::transfer_selected_rct that feeds R-b and R-c needs a daemon and a real output
+//     set, which a standalone test has no way to provide. The §4.3 stop in construct_tx is the
+//     backstop for that path and it IS covered.
 //
 // Usage: pq_auth_binding_test <scratch directory>
 #include <cstdio>
 #include <cstring>
 #include <numeric>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -312,8 +321,54 @@ static bool test_t2_refusals()
     { printf("FAIL: §4.3 — construct_tx refused a BQ spend with a BQ change address\n"); return false; }
   }
 
-  printf("PASS: T2 — R-a refuses a spent subaddress with an explicit error, a fresh one is never\n"
-         "      (major,0), and construct_tx refuses a BQ spend whose change is not BQ (§4.3)\n");
+  // R-c: merging two BQ subaddresses in one transaction reveals both authorisation keys at once
+  // and welds their linkage sets together. Refused by default, allowed only on explicit opt-in.
+  {
+    const std::set<std::pair<uint32_t, uint32_t>> one{{0, 1}};
+    const std::set<std::pair<uint32_t, uint32_t>> two{{0, 1}, {0, 2}};
+    const std::set<std::pair<uint32_t, uint32_t>> three{{0, 1}, {0, 2}, {1, 7}};
+
+    // one subaddress is always fine, opt-in or not
+    try { w.enforce_pq_subaddress_merge_policy(one); }
+    catch (const std::exception &) { printf("FAIL: R-c — a single BQ subaddress was refused\n"); return false; }
+
+    if (w.pq_allow_subaddress_merge())
+    { printf("FAIL: R-c — merging is on by default; it must be opt-in\n"); return false; }
+
+    for (const auto &set : {two, three})
+    {
+      bool threw = false;
+      std::string what;
+      try { w.enforce_pq_subaddress_merge_policy(set); }
+      catch (const std::exception &e) { threw = true; what = e.what(); }
+      if (!threw)
+      { printf("FAIL: R-c — %zu BQ subaddresses were merged without an opt-in\n", set.size()); return false; }
+      // the error must name what would be merged, so the caller can split the spend
+      for (const auto &i : set)
+      {
+        const std::string name = std::to_string(i.first) + "/" + std::to_string(i.second);
+        if (what.find(name) == std::string::npos)
+        { printf("FAIL: R-c — the refusal does not name subaddress %s\n", name.c_str()); return false; }
+      }
+    }
+
+    // with the opt-in, the same sets go through
+    w.set_pq_allow_subaddress_merge(true);
+    try { w.enforce_pq_subaddress_merge_policy(three); }
+    catch (const std::exception &) { printf("FAIL: R-c — the explicit opt-in did not allow the merge\n"); return false; }
+    w.set_pq_allow_subaddress_merge(false);
+
+    // and it is session-only: it must not have been persisted into the cache
+    bool threw_again = false;
+    try { w.enforce_pq_subaddress_merge_policy(two); }
+    catch (const std::exception &) { threw_again = true; }
+    if (!threw_again) { printf("FAIL: R-c — the opt-in did not go back off\n"); return false; }
+  }
+
+  printf("PASS: T2 — R-a refuses a spent subaddress with an explicit error, R-b never allocates\n"
+         "      (major,0) or a spent index and construct_tx refuses a non-BQ change (§4.3), and\n"
+         "      R-c refuses to merge BQ subaddresses without an opt-in, naming them, then allows\n"
+         "      it when one is given\n");
   return true;
 }
 

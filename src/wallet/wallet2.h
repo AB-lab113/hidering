@@ -34,6 +34,7 @@
 
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <set>
 #if BOOST_VERSION >= 107400
 #include <boost/serialization/library_version_type.hpp>
 #endif
@@ -1283,6 +1284,9 @@ private:
     // Spec 2e / T2. True once a BQ subaddress has been committed to a spend.
     bool is_pq_subaddress_spent(const cryptonote::subaddress_index& index) const
       { return m_pq_spent_subaddresses.count(index) != 0; }
+    // Spec 2e §4.2 R-c. Throws if `spend_subaddrs` names more than one BQ subaddress and the
+    // caller has not opted into merging. Public so the policy can be exercised on its own.
+    void enforce_pq_subaddress_merge_policy(const std::set<std::pair<uint32_t, uint32_t>> &spend_subaddrs) const;
     // Allocate a BQ subaddress never yet used in a spend, on `major`. Used for the change of a
     // BQ spend (R-b) and available to callers that need a fresh payment-request address.
     cryptonote::subaddress_index allocate_fresh_pq_subaddress(uint32_t major);

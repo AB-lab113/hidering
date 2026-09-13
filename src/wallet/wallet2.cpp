@@ -2634,6 +2634,25 @@ static std::string pq_subaddr_list(const std::set<std::pair<uint32_t, uint32_t>>
   return out;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::enforce_pq_subaddress_merge_policy(const std::set<std::pair<uint32_t, uint32_t>> &spend_subaddrs) const
+{
+  // Spec 2e §4.2 R-c — refuse to merge two BQ subaddresses into one transaction unless the
+  // caller asked for it explicitly. Both authorisation keys would be revealed in the same
+  // transaction, welding their linkage sets together and destroying the "one payment request,
+  // one linkage set" property that T2 exists to provide. Refused by default; the message names
+  // what would be merged so the caller can split the spend instead.
+  //
+  // A free-standing rule rather than an inline check inside transfer_selected_rct: it is pure,
+  // it is a security policy, and a policy that cannot be exercised on its own does not get
+  // tested (it did not — the first cut of pq_auth_binding_test claimed to cover R-c and did not).
+  THROW_WALLET_EXCEPTION_IF(spend_subaddrs.size() > 1 && !m_pq_allow_subaddress_merge,
+      error::wallet_internal_error,
+      tr("this transaction would spend BQ outputs received on ") + std::to_string(spend_subaddrs.size())
+        + tr(" different subaddresses (") + pq_subaddr_list(spend_subaddrs)
+        + tr("), which would link them together for ever (spec 2e / T2). Split the spend, or "
+             "enable BQ subaddress merging explicitly."));
+}
+//----------------------------------------------------------------------------------------------------
 cryptonote::subaddress_index wallet2::allocate_fresh_pq_subaddress(uint32_t major)
 {
   // Spec 2e §4.2 — a BQ subaddress that has never been committed to a spend. Walks up from the
@@ -10989,17 +11008,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     splitted_dsts.push_back(change_dts);
   }
 
-  // Spec 2e §4.2 R-c — refuse to merge two BQ subaddresses into one transaction unless the
-  // caller asked for it explicitly. Both authorisation keys would be revealed in the same
-  // transaction, welding their linkage sets together and destroying the "one payment request,
-  // one linkage set" property that T2 exists to provide. Refused by default; the message names
-  // what would be merged so the caller can split the spend instead.
-  THROW_WALLET_EXCEPTION_IF(pq_spend_subaddrs.size() > 1 && !m_pq_allow_subaddress_merge,
-      error::wallet_internal_error,
-      tr("this transaction would spend BQ outputs received on ") + std::to_string(pq_spend_subaddrs.size())
-        + tr(" different subaddresses (") + pq_subaddr_list(pq_spend_subaddrs)
-        + tr("), which would link them together for ever (spec 2e / T2). Split the spend, or "
-             "enable BQ subaddress merging explicitly."));
+  // Spec 2e §4.2 R-c, then the bookkeeping R-a and R-b key on.
+  enforce_pq_subaddress_merge_policy(pq_spend_subaddrs);
   for (const auto &idx : pq_spend_subaddrs)
     mark_pq_subaddress_spent({idx.first, idx.second});
 
