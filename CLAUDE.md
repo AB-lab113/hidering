@@ -680,3 +680,7 @@ Décisions prises après le rapport de la revue post-audit, et exécutées le m�
   garde-fou (§4.3, échec si change non-BQ) — le chemin normal n'est pas testé
   en isolation, ça demande un daemon. Backlog, pas bloquant tant que le
   garde-fou tient.
+- Backend ML-DSA aarch64 (0.16.0) vérifié identique par hash (source uniquement,
+  cette machine est x86_64) — jamais mesuré en exécution réelle sur ARM. À faire
+  avant d'activer BQ dans un binaire ARM64 publié : lancer pq_vector_test sur le
+  runner macos-14 déjà utilisé par la CI GUI.
