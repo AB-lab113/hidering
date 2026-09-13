@@ -63,6 +63,28 @@ jobs:
             -DUSE_DEVICE_TREZOR=OFF -DOPENSSL_ROOT_DIR="${OPENSSL_ROOT}"
           make -j"${JOBS}" daemon simplewallet wallet_rpc_server
 
+      # Phase 5 PQC — ARM64 DERIVATION GATE.
+      #
+      # The BQ key derivation drives liboqs' randombytes hook (liboqs still exposes no
+      # derandomised keygen for SIG), so a derived BQ address depends on how many bytes the
+      # ML-DSA backend reads and in what order. That was checked by READING the source of every
+      # backend we compile — and never by RUNNING anything on ARM, because no ARM machine was
+      # involved in development. This job already builds liboqs and cncrypto for arm64, so it is
+      # the cheapest place to turn "specified identical" into "measured identical".
+      #
+      # pq_vector_test compares the derivation against values frozen on x86_64. A mismatch here
+      # would mean the same 25-word seed derives a DIFFERENT BQ address depending on the machine
+      # that created the wallet — i.e. M-4 (restore-from-seed cannot reach the funds) reachable
+      # by buying a different laptop. It must fail the build, not warn: the step inherits the
+      # default `bash -e`, the script exits non-zero on a build failure and the test binary exits
+      # non-zero on any vector mismatch, so either one fails the job.
+      - name: post-quantum derivation vector (arm64 gate)
+        run: |
+          set -euo pipefail
+          uname -m
+          ./tests/standalone/build_pq_test.sh pq_vector_test
+          ./build/standalone/pq_vector_test
+
       - name: package
         run: |
           PKG="hidering-macos-${{ env.ARCH }}"
