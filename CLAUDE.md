@@ -671,3 +671,12 @@ Décisions prises après le rapport de la revue post-audit, et exécutées le m�
 - **CRIT-4 — OUVERT, hors périmètre** : la racine PQ (primaire M-4 ET subaddresses) est la clé de dépense, logarithme discret de la clé publique de dépense publiée dans l'adresse BQ → un adversaire quantique retrouve toutes les clés BQ. Remplacer la racine = décision de format wallet (restauration depuis la seed). Isolé derrière `get_pq_root_secret()`.
 - **Suite standalone = 13 tests, tous verts** (ajouts : `pq_subaddress_test`, `pq_sender_clawback_test`). `HF_HEIGHT_PQ` inchangé (2 000 000), chaîne live intacte.
 
+
+**Résidus connus post spec_2e (12 sept 2026) :**
+- Cold-sign (`confirm_pq_output(require_binding=false)`) ne bénéficie pas de la
+  détection §3.4 (émetteur ayant engagé son propre auth_commit) — la machine
+  froide n'a pas la tx de création. Compromis accepté, pas corrigé.
+- R-b (redirection du change vers une subaddress BQ neuve) n'a qu'un test de
+  garde-fou (§4.3, échec si change non-BQ) — le chemin normal n'est pas testé
+  en isolation, ça demande un daemon. Backlog, pas bloquant tant que le
+  garde-fou tient.
