@@ -96,8 +96,8 @@ WALLET_LIBS=(
   "$OQS_LIB" "$B/external/db_drivers/liblmdb/liblmdb.a" "$B/src/lmdb/liblmdb_lib.a"
 )
 
-BOOST=(-lboost_system -lboost_filesystem -lboost_thread -lboost_serialization
-       -lboost_program_options -lboost_chrono -lboost_regex -lboost_date_time)
+BOOST_NAMES=(system filesystem thread serialization program_options chrono regex date_time)
+BOOST=()
 SYS=(-lsodium -lssl -lcrypto -lunbound -lpthread)
 
 # --- platform differences ---------------------------------------------------------------
@@ -107,13 +107,28 @@ EXTRA_LDFLAGS=()
 GROUP_BEGIN=(); GROUP_END=()
 case "$(uname -s)" in
   Darwin)
+    BOOST_LIBDIR=""
     for f in openssl unbound libsodium boost; do
       p="$(brew --prefix "$f" 2>/dev/null || true)"
       [ -n "$p" ] && [ -d "$p/lib" ] && EXTRA_LDFLAGS+=("-L$p/lib")
       [ -n "$p" ] && [ -d "$p/include" ] && INCLUDES+=(-I "$p/include")
+      [ "$f" = boost ] && [ -n "$p" ] && BOOST_LIBDIR="$p/lib"
+    done
+    # Boost.System has been header-only since 1.69 and Homebrew no longer ships a stub for it,
+    # while Linux distributions still do. Asking for a -l that has no library is a hard link
+    # error, so only request the ones that are actually on disk.
+    for n in "${BOOST_NAMES[@]}"; do
+      if [ -z "$BOOST_LIBDIR" ] \
+         || [ -e "$BOOST_LIBDIR/libboost_$n.dylib" ] || [ -e "$BOOST_LIBDIR/libboost_$n.a" ] \
+         || [ -e "$BOOST_LIBDIR/libboost_$n-mt.dylib" ]; then
+        BOOST+=("-lboost_$n")
+      else
+        echo "note: skipping -lboost_$n (not present in $BOOST_LIBDIR)" >&2
+      fi
     done
     ;;
   *)
+    for n in "${BOOST_NAMES[@]}"; do BOOST+=("-lboost_$n"); done
     SYS+=(-ldl)
     # hidapi is only linked into libdevice on Linux builds that found it
     if [ -e /usr/lib/x86_64-linux-gnu/libhidapi-libusb.so ] || ldconfig -p 2>/dev/null | grep -q hidapi-libusb; then
@@ -127,14 +142,18 @@ link() { # $1 = "crypto" | "wallet"
   local libs=()
   if [ "$1" = "wallet" ]; then
     libs=("${WALLET_LIBS[@]}")
-    BOOST+=(-lboost_locale)
+    case " ${BOOST[*]-} " in *" -lboost_locale "*) :;; *) BOOST+=(-lboost_locale);; esac
     SYS+=(-lzmq -lprotobuf -lusb-1.0 -lreadline)
   else
     libs=("${CRYPTO_LIBS[@]}")
   fi
+  # ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": macOS ships bash 3.2, where expanding an
+  # EMPTY array under `set -u` is an "unbound variable" error. bash >= 4.4 allows it, which is
+  # why this only showed up on the first real macOS CI run and never on Linux.
   g++ -std=c++17 -O1 -o "$OUT_DIR/$TEST" "$SRC" \
-    "${INCLUDES[@]}" "${GROUP_BEGIN[@]}" "${libs[@]}" "${GROUP_END[@]}" \
-    "${EXTRA_LDFLAGS[@]}" "${BOOST[@]}" "${SYS[@]}"
+    ${INCLUDES[@]+"${INCLUDES[@]}"} \
+    ${GROUP_BEGIN[@]+"${GROUP_BEGIN[@]}"} "${libs[@]}" ${GROUP_END[@]+"${GROUP_END[@]}"} \
+    ${EXTRA_LDFLAGS[@]+"${EXTRA_LDFLAGS[@]}"} ${BOOST[@]+"${BOOST[@]}"} ${SYS[@]+"${SYS[@]}"}
 }
 
 case " $WALLET_LINKED " in
