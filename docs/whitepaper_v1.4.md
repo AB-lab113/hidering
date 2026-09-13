@@ -177,7 +177,7 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (septembre 2026).** Le prototype post-quantique (intégration liboqs 0.15.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet de plusieurs audits de sécurité internes. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16, `HF_HEIGHT_PQ` = 2 000 000). Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible mainnet : **T2 2027** (inchangée).
+**État (septembre 2026).** Le prototype post-quantique (intégration liboqs 0.16.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet de plusieurs audits de sécurité internes. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16, `HF_HEIGHT_PQ` = 2 000 000). Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible mainnet : **T2 2027** (inchangée).
 
 ### 6.1 Délai réel d'activation — ce qu'il faut vraiment pour passer à HFv16
 

@@ -305,8 +305,8 @@ Two things differ from an ordinary Monero build and will bite you otherwise:
   since OQS publishes neither signatures nor checksums for releases:
 
     ```bash
-    git -C external/liboqs rev-parse HEAD          # 97f6b86b1b6d109cfd43cf276ae39c2e776aed80
-    git -C external/liboqs tag --points-at HEAD    # 0.15.0
+    git -C external/liboqs rev-parse HEAD          # 5a1a854b0dc9f2141bdc771c555ee60c37950183
+    git -C external/liboqs tag --points-at HEAD    # 0.16.0
     ```
 
 * **Do not link statically.** `-DSTATIC=ON` breaks libunbound. The official binaries are

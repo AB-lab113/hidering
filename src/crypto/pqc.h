@@ -20,7 +20,7 @@
 // (which are wire-incompatible: ML-DSA-65 sk/sig sizes differ, and ML-KEM's
 // shared-secret derivation changed even though all ML-KEM-768 sizes match Kyber768).
 //
-// Backed by the Open Quantum Safe library (liboqs 0.15.0, imported `oqs` target).
+// Backed by the Open Quantum Safe library (liboqs 0.16.0, imported `oqs` target).
 // Key/signature/ciphertext sizes below are the fixed liboqs sizes for these
 // algorithms and are asserted against the runtime liboqs values in pqc.cpp.
 

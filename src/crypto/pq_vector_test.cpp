@@ -7,15 +7,25 @@
 // stream. That makes the derived key a function not only of our seed but of HOW MANY BYTES,
 // AND IN WHAT ORDER, liboqs' ML-DSA implementation happens to read from that hook.
 //
-// liboqs 0.16.0 switches the ML-DSA backend to mldsa-native. If that backend reads entropy
-// differently, THE SAME 25-WORD SEED WOULD DERIVE A DIFFERENT BQ ADDRESS after the upgrade —
-// silently re-creating M-4, the bug where restore-from-seed could not reach your funds.
+// liboqs 0.16.0 switched the ML-DSA backend to mldsa-native. Had that backend read entropy
+// differently, THE SAME 25-WORD SEED WOULD HAVE DERIVED A DIFFERENT BQ ADDRESS after the
+// upgrade — silently re-creating M-4, the bug where restore-from-seed could not reach your
+// funds. That is the risk this file exists to catch, and it is why the 0.15.0 -> 0.16.0
+// upgrade was gated on replaying it.
 //
-// The values below were generated on the currently pinned liboqs (submodule
-// 97f6b86b1b6d109cfd43cf276ae39c2e776aed80 = tag 0.15.0) and are frozen here. Re-run this
-// test after ANY liboqs bump, before shipping it. If it fails, the upgrade is NOT safe to
-// take as-is: it would strand every existing BQ wallet, and needs a migration plan rather
-// than a version bump.
+// THE VALUES BELOW HOLD ON BOTH VERSIONS. They were generated on 0.15.0 (submodule
+// 97f6b86b1b6d109cfd43cf276ae39c2e776aed80) and re-measured BIT-FOR-BIT on 0.16.0 (submodule
+// 5a1a854b0dc9f2141bdc771c555ee60c37950183, the current pin) before the bump was taken. Not
+// luck: both backends draw exactly one 32-byte block from the RNG hook and then apply the
+// FIPS 204-specified xi -> (pk, sk) derivation, which is deterministic. See
+// docs/audit/liboqs_0.16.0_upgrade_gate.md §8.
+//
+// A vector that is known-good across two independent backends is worth more than one pinned
+// to a single version: a future bump now has two reference points, not one.
+//
+// Re-run this test after ANY liboqs bump, before shipping it. If it fails, the upgrade is NOT
+// safe to take as-is: it would strand every existing BQ wallet, and needs a migration plan
+// rather than a version bump.
 //
 // TWO DELIBERATE REGENERATIONS HAVE HAPPENED.
 //
@@ -61,9 +71,12 @@ using namespace cryptonote;
 using namespace crypto::pqc;
 
 // ---------------------------------------------------------------------------------------
-// FROZEN VECTOR — liboqs 0.15.0 (submodule pin 97f6b86b1b6d109cfd43cf276ae39c2e776aed80)
-// Generated 8 September 2026. Do not edit to make a failing test pass: a mismatch is the
-// signal this file exists to produce.
+// FROZEN VECTOR — verified identical on liboqs 0.15.0 AND 0.16.0.
+// Generated 8 September 2026 on 0.15.0 (97f6b86b1b6d109cfd43cf276ae39c2e776aed80);
+// re-measured unchanged on 0.16.0 (5a1a854b0dc9f2141bdc771c555ee60c37950183) on
+// 13 September 2026, which is what allowed the upgrade to be taken.
+// Do not edit to make a failing test pass: a mismatch is the signal this file exists to
+// produce.
 // ---------------------------------------------------------------------------------------
 
 // Test recovery key = the account's spend secret key (already reduced).
@@ -302,7 +315,7 @@ static bool test_output_vector()
 
 int main()
 {
-  printf("Frozen against liboqs 0.15.0 (pin 97f6b86b1b6d109cfd43cf276ae39c2e776aed80).\n"
+  printf("Frozen against liboqs 0.15.0 AND 0.16.0 — identical on both (current pin 5a1a854b).\n"
          "A failure here means a dependency change moved a derivation that user funds depend on.\n\n");
   bool ok = true;
   ok &= test_raw_seed_vector();
