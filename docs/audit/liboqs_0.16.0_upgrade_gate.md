@@ -205,6 +205,71 @@ même fonction *spécifiée* par FIPS 204 et (b) les KAT/ACVP qu'OQS exécute pa
 empiriquement, le §8 n'a mesuré que x86_64 : **aucun test n'a tourné sur ARM sur cette machine**
 (x86_64) et aucun ne le peut.
 
+### 8.2 Et sur **0.15.0** — la version réellement déployée aujourd'hui
+
+Le §8.1 porte sur la version *candidate*. Or les binaires macOS ARM64 publiés
+(daemon `v2.0.3`, GUI `v2.0.2-gui`) tournent sur la version **épinglée**, 0.15.0, dont la
+structure est différente — et ce contrôle-là n'avait jamais été fait non plus.
+
+**Différence structurelle à connaître : en 0.15.0, il n'existe AUCUN backend aarch64 pour
+ML-DSA.** Il n'y a que `ref` et `avx2` (`pqcrystals-dilithium-standard`). Le dispatch
+(`sig_ml_dsa_65.c`) est :
+
+```c
+#if defined(OQS_ENABLE_SIG_ml_dsa_65_avx2)
+    if (AVX2 && POPCNT)  return pqcrystals_ml_dsa_65_avx2_keypair(...);
+    else                 return pqcrystals_ml_dsa_65_ref_keypair(...);
+#else
+    return pqcrystals_ml_dsa_65_ref_keypair(...);
+#endif
+```
+
+➡️ **Sur ARM64, `OQS_ENABLE_SIG_ml_dsa_65_avx2` n'est pas défini : tout ARM tombe sur `ref`.**
+Nos binaires publiés utilisent donc **deux implémentations réellement distinctes** — `avx2` sur
+Linux/macOS x86_64, `ref` sur macOS ARM64. Contrairement à la 0.16.0 (où les trois backends
+partagent un `sign.c` identique), ici les fichiers **diffèrent** :
+`sha256(sign.c)` = `c8800160…fb6f` (ref) vs `2e21efe5…8cf5` (avx2).
+
+C'est donc le cas le plus exposé des deux, et il fallait le lire.
+
+| Vérification (ML-DSA-65, 0.15.0) | `ref` (→ ARM64) | `avx2` (→ x86_64) |
+|---|---|---|
+| `sha256(sign.c)` | `c8800160…fb6f` | `2e21efe5…8cf5` — **différent** |
+| `sha256(params.h)` | `1d6c1163…d20f` | `1d6c1163…d20f` — **identique** |
+| `SEEDBYTES` / `CRHBYTES` / `RNDBYTES` | 32 / 64 / 32 | 32 / 64 / 32 |
+| `K` / `L` (ML-DSA-65) | 6 / 5 | 6 / 5 |
+| Appels `randombytes` dans tout le backend | **2** (l.32, l.230) | **2** (l.76, l.322) |
+| … dans `crypto_sign_keypair` | **1**, `(seedbuf, SEEDBYTES)` | **1**, `(seedbuf, SEEDBYTES)` |
+| … dans `crypto_sign_signature` | 1, `(rnd, RNDBYTES)` — hedging | idem |
+
+**Et surtout : le prologue qui va de l'aléa à `(rho, rhoprime, key)` est byte-identique**
+(vérifié par `diff`, aucune différence) :
+
+```c
+  /* Get randomness for rho, rhoprime and key */
+  randombytes(seedbuf, SEEDBYTES);
+  seedbuf[SEEDBYTES+0] = K;
+  seedbuf[SEEDBYTES+1] = L;
+  shake256(seedbuf, 2*SEEDBYTES + CRHBYTES, seedbuf, SEEDBYTES+2);
+  rho = seedbuf;
+  rhoprime = rho + SEEDBYTES;
+  key = rhoprime + CRHBYTES;
+```
+
+Les deux implémentations lisent **un seul bloc de 32 octets**, y concatènent les mêmes octets de
+domaine `K` et `L`, et l'étendent par le **même** `shake256` vers le même triplet. Tout ce qui
+suit (`poly_uniform_eta_4x` en AVX2 contre l'échantillonnage séquentiel en `ref`) est une fonction
+**déterministe de `rhoprime`**, avec les mêmes nonces — pas une seconde consommation d'aléa.
+
+➡️ **Sur la version épinglée aussi, la clé dérivée ne dépend pas de l'architecture.** Le risque
+macOS ARM64 est donc écarté **sur 0.15.0 comme sur 0.16.0** — sur la première parce que deux
+implémentations distinctes partagent le même prologue, sur la seconde parce que les backends
+partagent le fichier entier.
+
+**Nuance de portée à ne pas perdre :** cet écart n'est pas né avec spec 2e ni avec la 0.16.0. Il
+tient à la dérivation ML-DSA par hook RNG (M-4), donc il existait depuis le 14 juin. Ce qui a
+changé le 13 septembre, c'est qu'il est **nommé, borné et vérifié** au lieu d'être implicite.
+
 **Action concrète qui en découle, à faire avant d'activer BQ dans un binaire ARM64 publié :**
 faire tourner `pq_vector_test` sur un runner ARM réel. La CI GUI construit déjà sur `macos-14`
 (ARM), donc c'est un ajout de quelques lignes, pas un chantier — et c'est la seule chose qui
