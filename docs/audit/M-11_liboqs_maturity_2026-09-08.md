@@ -2,11 +2,13 @@
 
 **Date de la revue :** 8 septembre 2026
 **Statut :** ⛔ **BLOCAGE MAINTENU** — la condition de levée n'est toujours pas remplie.
-**Réévalué le 13 septembre 2026** (`liboqs_0.16.0_upgrade_gate.md` §7-§11) : conclusion
-**inchangée**, le blocage tient. Deux mises à jour à connaître avant de citer ce document —
+**Réévalué le 13 septembre 2026** (`liboqs_0.16.0_upgrade_gate.md` §7-§12) : conclusion
+**inchangée, le blocage tient**. Trois mises à jour à connaître avant de citer ce document —
 (1) l'affirmation « aucun audit tiers publié » du §8 était **fausse** et est corrigée dans le
 tableau ; (2) le risque d'upgrade du §6 a été **mesuré** et ne se matérialise pas : le vecteur
-figé passe à l'identique sur 0.16.0.
+figé passe à l'identique sur 0.16.0 ; (3) **l'upgrade a donc été prise le 13 septembre** — le §1
+ci-dessous décrit désormais une version périmée, voir le tableau corrigé. Ce que ça ne change
+pas : aucune des trois conditions de levée n'est remplie, **HFv16 reste bloqué**.
 **Décision demandée :** aucune action d'upgrade n'a été prise. Ce document rapporte l'état
 et les options ; l'arbitrage 0.15.0 → 0.16.0 revient au mainteneur (voir §5).
 
@@ -21,8 +23,8 @@ d'une réévaluation avant toute activation de HFv16. Ce document est cette ré�
 | Élément | Valeur |
 |---|---|
 | Submodule | `external/liboqs` |
-| SHA épinglé | `97f6b86b1b6d109cfd43cf276ae39c2e776aed80` |
-| Tag correspondant | `0.15.0` (vérifié `git tag --points-at HEAD`) |
+| SHA épinglé | ~~`97f6b86b1b6d109cfd43cf276ae39c2e776aed80`~~ → **`5a1a854b0dc9f2141bdc771c555ee60c37950183`** (upgrade du 13 sept. 2026) |
+| Tag correspondant | ~~`0.15.0`~~ → **`0.16.0`** (vérifié `git tag --points-at HEAD`) |
 | Algorithmes utilisés | ML-KEM-768 (FIPS 203), ML-DSA-65 (FIPS 204) |
 | Build | statique, `OQS_USE_OPENSSL=ON`, `OQS_BUILD_ONLY_LIB=ON` |
 
@@ -80,9 +82,11 @@ CPU/matériel, injection de fautes, canaux d'observation physique (consommation,
 
 liboqs **0.16.0 est sorti le 9 juillet 2026**. Faits marquants :
 
-* **Notre 0.15.0 n'est plus une version supportée.** La politique OQS est « we only support
-  the most recent release ». C'est un **changement d'état réel** depuis juin : à l'époque,
-  0.15.0 *était* la version supportée. Aujourd'hui nous sommes sur une version EOL.
+* ~~**Notre 0.15.0 n'est plus une version supportée.**~~ La politique OQS est « we only support
+  the most recent release ». C'était un **changement d'état réel** depuis juin : à l'époque,
+  0.15.0 *était* la version supportée. **RÉSOLU le 13 septembre 2026** : l'upgrade vers 0.16.0 a
+  été prise une fois le vecteur figé rejoué en vert, donc nous sommes de nouveau sur la version
+  supportée. C'était le seul point de ce document qui se dégradait avec le temps.
 * Corrections de sécurité en 0.16.0 : déréférencement de pointeur non initialisé
   `encaps_derand` ; lecture hors bornes dans la vérification XMSS/XMSS^MT ; underflow entier
   dans `crypto_sign_open()` de CROSS ; taille de tableau incorrecte dans `secure_clean` ;
@@ -132,7 +136,7 @@ upgrade ne le supprimerait pas. C'est ce contournement qui a produit le finding 
 |---|---|---|
 | 1 | Le disclaimer « prototyping » a-t-il sauté ? Audit tiers publié ? | ❌ Disclaimer intact ; ~~aucun audit tiers publié~~ **CORRIGÉ le 13 sept. 2026 : un audit tiers EXISTE** — Trail of Bits, revue de **portions** de liboqs (2024, rapport publié en avril 2025), mentionné sur la page sécurité d'OQS. Il ne lève pas la condition pour autant : la revue est partielle, et OQS maintient **après** elle que le niveau d'audit reste insuffisant pour un usage à forte sécurité. Détail : `liboqs_0.16.0_upgrade_gate.md` §7 |
 | 2 | Implémentation FIPS-validée (CMVP) ou posture hybride | ⚠️ Aucune validation FIPS n'existe pour liboqs. **L'hybride est déjà notre posture de fait** (la dépense reste gardée par dlog Ed25519) mais n'est pas formalisée comme exigence |
-| 3 | Figer la version + re-audit constant-time des chemins réellement utilisés | ⚠️ Version figée (SHA pin) mais **désormais EOL upstream** ; re-audit constant-time non fait (on s'appuie sur les datasheets OQS) |
+| 3 | Figer la version + re-audit constant-time des chemins réellement utilisés | ⚠️ Version figée (SHA pin) ; ~~**désormais EOL upstream**~~ **plus EOL depuis l'upgrade 0.16.0 du 13 sept. 2026** ; re-audit constant-time **toujours non fait** (on s'appuie sur les datasheets OQS) → condition **toujours non remplie** |
 
 ### Recommandations (par ordre, aucune appliquée sans validation)
 

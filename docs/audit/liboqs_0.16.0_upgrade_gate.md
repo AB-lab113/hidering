@@ -1,11 +1,12 @@
-# Gate d'upgrade liboqs — le vecteur a été rejoué sur 0.16.0, **et il passe**
+# Gate d'upgrade liboqs — vecteur rejoué en vert, **upgrade 0.16.0 PRISE**
 
-**Date d'origine :** 8 septembre 2026 — **réévaluation : 13 septembre 2026 (§7 à §10).**
-**Statut :** ✅ vecteur figé vert sur 0.15.0 **ET sur 0.16.0** (mesuré, §8) → **l'obstacle
-TECHNIQUE à l'upgrade est levé.** ⛔ **Le blocage M-11 (maturité), lui, reste ENTIER** : il est
-indépendant de ce gate et ses trois conditions restent non remplies (§9).
-**Rien n'a été mergé.** Le submodule est resté épinglé sur 0.15.0 ; la décision d'upgrader
-revient au mainteneur (§10).
+**Date d'origine :** 8 septembre 2026 — **réévaluation : 13 septembre 2026 (§7 à §11)** —
+**upgrade exécutée le 13 septembre 2026 (§12).**
+**Statut :** ✅ **gate franchi et upgrade faite.** Le submodule est désormais épinglé sur
+`5a1a854b0dc9f2141bdc771c555ee60c37950183` = tag **0.16.0**. Le vecteur figé est vert sur les
+**deux** versions (mesuré, §8), ce qui est la condition qui a permis de la prendre.
+⛔ **Le blocage M-11 (maturité) reste ENTIER** : il est indépendant de ce gate, l'upgrade n'en
+lève aucune condition, et **HFv16 reste bloqué** (§9).
 
 > §1 à §6 sont le document d'origine du 8 septembre, conservé tel quel — il énonçait une
 > crainte, et la suite dit ce que la mesure en a fait.
@@ -318,3 +319,68 @@ indépendants ont choisi de lire 32 octets une fois. Rien ne garantit que le tro
 Tant que la dérivation BQ pilote un hook RNG, chaque bump restera un pari à vérifier — ce que le
 vecteur rend au moins détectable. La façon de supprimer le pari est inchangée : implémenter
 nous-mêmes `ξ → (pk, sk)` de FIPS 204, ou attendre un `keypair_derand` pour SIG.
+
+
+---
+
+## 12. L'upgrade, exécutée le 13 septembre 2026
+
+Décision prise par le mainteneur après le §10. Ce qui a été fait, dans l'ordre :
+
+| Étape | Détail |
+|---|---|
+| Bump du submodule | `external/liboqs` : `97f6b86…` (0.15.0) → **`5a1a854b0dc9f2141bdc771c555ee60c37950183`** (tag `0.16.0`) |
+| Rebuild liboqs | recette inchangée (`BUILD_SHARED_LIBS=OFF`, `OQS_USE_OPENSSL=ON`, `OQS_BUILD_ONLY_LIB=ON`) ; `OQS_VERSION_TEXT "0.16.0"` confirmé dans `oqsconfig.h` |
+| Rebuild complet | `daemon`, `wallet`, `simplewallet`, `unit_tests` |
+| Suite standalone | **15/15 verts** |
+| `unit_tests` | verts (hors la flakiness statistique connue de `select_outputs.*`) |
+
+**Fichiers de référence mis à jour** (le pin est cité à plusieurs endroits, et un pin périmé dans
+une procédure de vérification est pire que pas de procédure) :
+
+* `README.md` — la procédure de vérification de provenance **M-10** cite le SHA et le tag
+  attendus : mis à jour sur `5a1a854b` / `0.16.0`. C'est le fichier qu'un packageur lit.
+* `src/crypto/pqc.h` — l'en-tête annonçait « liboqs 0.15.0 ».
+* `src/crypto/pq_vector_test.cpp` — voir ci-dessous.
+* `docs/whitepaper_v1.4.md` — la version citée dans l'état de la Phase 5.
+
+### 12.1 Le vecteur figé vaut désormais pour DEUX versions
+
+`pq_vector_test.cpp` disait « Frozen against liboqs 0.15.0 ». C'est devenu faux au sens littéral
+et il fallait le corriger — mais la bonne correction n'est pas « Frozen against 0.16.0 » :
+
+> **Les valeurs sont inchangées entre les deux versions.** Elles ont été générées sur 0.15.0 et
+> **re-mesurées bit pour bit sur 0.16.0** avant que le bump ne soit pris.
+
+Le fichier le dit maintenant explicitement, et c'est un **gain** : un vecteur vérifié identique
+sur deux backends indépendants vaut mieux qu'un vecteur épinglé à une seule version — le prochain
+bump aura deux points de référence au lieu d'un. Les valeurs elles-mêmes n'ont **pas** été
+touchées, ce qui reste la règle absolue de ce fichier.
+
+### 12.2 Ce que l'upgrade change, et ce qu'elle ne change pas
+
+**Change :**
+* Nous ne sommes plus sur une version **EOL**. C'était le seul argument qui grossissait avec le
+  temps : une future CVE sur ML-KEM-768 / ML-DSA-65 ne sera corrigée que sur la branche courante,
+  et nous y sommes désormais.
+* Nous héritons des corrections 0.16.0 (`encaps_derand` non initialisé, hors-bornes XMSS/XMSS^MT,
+  underflow CROSS, `secure_clean`, barrière `OQS_MEM_BLACK_BOX` FrodoKEM). **Aucune ne nous
+  concernait** — nous ne compilons ni XMSS, ni CROSS, ni FrodoKEM, et n'appelons jamais
+  `encaps_derand` (le KEM passe par `keypair_derand`). Bénéfice immédiat : nul. Bénéfice
+  d'assurance : réel.
+* Nous héritons aussi des vecteurs Wycheproof/ACVP ajoutés pour ML-DSA en 0.16.0 — un signe de
+  maturation de l'implémentation, pas de la bibliothèque.
+
+**Ne change pas :**
+* **M-11 reste bloquant pour HFv16.** Disclaimer « not for production » intact, aucune validation
+  FIPS 140-3, posture hybride toujours pas formalisée, re-audit constant-time non fait. Une
+  version supportée n'est pas une version mûre.
+* **Toujours pas de `keypair_derand` pour SIG** en 0.16.0 : le contournement par le hook
+  `randombytes` reste nécessaire, donc le risque du §1 reste structurel pour les bumps futurs.
+  C'est précisément pourquoi le vecteur existe, et pourquoi le §5 reste la bonne cible.
+* **Rien sur la chaîne live.** Tout le code PQC est gardé `hf_version >= HF_VERSION_PQ` ; le
+  mainnet est en hf 15. L'upgrade est invisible pour les nœuds en production.
+* **L'écart ARM64 du §8.1/§8.2 reste ouvert** : la vérification est faite par lecture sur les deux
+  versions, jamais par exécution sur ARM. L'action (`pq_vector_test` sur `macos-14`) reste à
+  faire, et elle porte maintenant sur 0.16.0 — la version que les prochains binaires publiés
+  embarqueront.
