@@ -119,7 +119,7 @@ aucun audit.
 | 2. Branche jetable | `liboqs-0.16.0-gate-test`, submodule → `5a1a854b0dc9f2141bdc771c555ee60c37950183` (tag `0.16.0`) | — |
 | 3. Rebuild liboqs + `cncrypto` | `OQS_VERSION_TEXT "0.16.0"` confirmé dans `oqsconfig.h` | build propre |
 | 4. **Rejouer le vecteur** | `pq_vector_test` | ✅ **PASS — les 4 groupes, aucune valeur ne bouge** |
-| 5. Reste de la suite | les 15 tests standalone | ✅ **15/15 verts** |
+| 5. Reste de la suite | les 15 tests standalone | ✅ **15/15 verts** (sur x86_64 ; voir §8.1 pour ARM) |
 | 6. Restauration | submodule remis sur `97f6b86` (0.15.0), liboqs rebuildé | arbre rendu à l'état d'origine |
 
 Détail du vecteur, puisque c'est le point de décision :
@@ -156,6 +156,60 @@ Corollaire utile, vérifié au passage : la 0.16.0 dispatche `keypair` selon le 
 avant d'entrer dans la dérivation normalisée. **La clé dérivée ne dépend donc pas du CPU** — un
 risque qu'on n'avait pas formulé et qui aurait été autrement plus vicieux qu'un changement de
 version, puisqu'il aurait fait dépendre l'adresse BQ de la machine.
+
+### 8.1 Le backend **aarch64** — vérifié par lecture de source, plus par analogie (13 septembre)
+
+Le §8 ci-dessus avait lu `ref` et `x86_64` et **supposé** `aarch64` cohérent. Ce n'est pas une
+hypothèse qu'on peut se permettre ici : nos livrables publics incluent des binaires **macOS
+ARM64** (daemon `v2.0.3`, GUI `v2.0.2-gui`), donc une clé BQ créée là-bas doit dériver
+bit-identique à celle créée ailleurs, sous peine d'adresses BQ dépendantes de la machine. Le
+backend a donc été lu.
+
+**Résultat : identique, et pour une raison plus forte que « même comportement » — c'est le même
+fichier.** Lecture faite sur l'arbre `0.16.0` via `git show`, sans toucher au pin (le submodule
+est resté sur `97f6b86` = 0.15.0).
+
+| Vérification | `ref` | `x86_64` | `aarch64` |
+|---|---|---|---|
+| `sha256(mldsa/src/sign.c)` | `a18fd65d…8c25` | `a18fd65d…8c25` | `a18fd65d…8c25` |
+| `sha256(mldsa/src/params.h)` | `9752e4fb…390f` | `9752e4fb…390f` | `9752e4fb…390f` |
+| `MLDSA_SEEDBYTES` / `MLDSA_RNDBYTES` | 32 / 32 | 32 / 32 | 32 / 32 |
+| Appels `mld_randombytes` dans `sign.c` | l.414, l.982, l.1033 | idem | idem |
+| dont **dans `mld_sign_keypair`** | **1 seul**, `(seed, MLDSA_SEEDBYTES)` l.414 | idem | idem |
+| `mld_randombytes` → | `OQS_randombytes(ptr, len)` | idem | idem |
+| Occurrences de `randombytes` dans tout l'arbre du backend | 13 | 13 | 13 |
+| Fichiers communs qui **diffèrent** | — | — | **aucun** |
+
+Points saillants :
+
+* **Aucun fichier commun ne diffère entre `aarch64` et `ref`.** Le backend aarch64 **est** le
+  backend ref, *plus* un répertoire `native/aarch64/` qui n'ajoute que des noyaux arithmétiques
+  en assembleur (NTT/iNTT, `pointwise_montgomery`, `poly_caddq`, `poly_chknorm`,
+  `poly_decompose`, tables de zetas). **Rien de ce qui touche à l'aléa, au seed ou au flux de
+  contrôle n'est spécifique à l'architecture.**
+* Les deux autres appels (l.982, l.1033) sont dans le chemin de **signature** — le `rnd` de la
+  variante *hedged* de ML-DSA — pas dans la génération de clés. Sans effet sur la dérivation :
+  `pq_vector_test` documente déjà que la signature est randomisée et donc non épinglable.
+* `PQCP_MLDSA_NATIVE_MLDSA65_{C,X86_64,AARCH64}_keypair` sont trois instances **namespacées de la
+  même fonction** `mld_sign_keypair` du `sign.c` identique (`MLD_CONFIG_NAMESPACE_PREFIX`), pas
+  trois implémentations.
+
+➡️ **Le risque « une clé BQ créée sur macOS ARM64 dérive autrement » est écarté au niveau de la
+consommation d'aléa.** Les trois backends que nous compilons sont désormais vérifiés par lecture,
+zéro sur trois par déduction.
+
+**Ce que cette lecture n'établit pas, et qu'il faut dire.** Elle prouve que le **seed** est
+identique (même appel, même taille, même source). Elle ne prouve pas que les noyaux arithmétiques
+NEON calculent le même résultat que le C portable — ça, ça repose sur (a) le fait que c'est la
+même fonction *spécifiée* par FIPS 204 et (b) les KAT/ACVP qu'OQS exécute par backend en CI. Et
+empiriquement, le §8 n'a mesuré que x86_64 : **aucun test n'a tourné sur ARM sur cette machine**
+(x86_64) et aucun ne le peut.
+
+**Action concrète qui en découle, à faire avant d'activer BQ dans un binaire ARM64 publié :**
+faire tourner `pq_vector_test` sur un runner ARM réel. La CI GUI construit déjà sur `macos-14`
+(ARM), donc c'est un ajout de quelques lignes, pas un chantier — et c'est la seule chose qui
+transformerait « spécifié identique » en « mesuré identique » sur l'architecture qui nous
+intéresse. Tant que ce n'est pas fait, le risque est **écarté par lecture, pas par mesure**.
 
 ## 9. Ce que ce résultat ne lève PAS
 
