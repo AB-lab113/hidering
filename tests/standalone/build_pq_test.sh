@@ -138,6 +138,25 @@ case "$(uname -s)" in
     ;;
 esac
 
+# Keep only the archives that actually exist.
+#
+# The set is CONFIGURATION-dependent, not just platform-dependent, so a hardcoded list is wrong.
+# Two real examples, both found on the first macOS CI runs:
+#   * wallet-crypto is an ALIAS for cncrypto when the crypto autodetect falls back to the
+#     internal "cn" backend (src/crypto/wallet/CMakeLists.txt), so no libwallet-crypto.a is
+#     produced at all — while a machine whose autodetect picks another backend does have one;
+#   * liblmdb_lib.a only exists if a target that needs it was built, and CI builds just
+#     daemon/simplewallet/wallet_rpc_server.
+# Dropping a genuinely required archive still fails, just as "undefined symbol" instead of
+# "no such file" — and the note below names what was skipped, so the cause is visible.
+existing() {
+  local out=() f
+  for f in "$@"; do
+    if [ -f "$f" ]; then out+=("$f"); else echo "note: skipping $(basename "$f") (not built in this configuration)" >&2; fi
+  done
+  printf '%s\n' ${out[@]+"${out[@]}"}
+}
+
 link() { # $1 = "crypto" | "wallet"
   local libs=()
   if [ "$1" = "wallet" ]; then
@@ -147,6 +166,9 @@ link() { # $1 = "crypto" | "wallet"
   else
     libs=("${CRYPTO_LIBS[@]}")
   fi
+  local present=()
+  while IFS= read -r f; do [ -n "$f" ] && present+=("$f"); done < <(existing ${libs[@]+"${libs[@]}"})
+  libs=(${present[@]+"${present[@]}"})
   # ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": macOS ships bash 3.2, where expanding an
   # EMPTY array under `set -u` is an "unbound variable" error. bash >= 4.4 allows it, which is
   # why this only showed up on the first real macOS CI run and never on Linux.
