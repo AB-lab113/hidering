@@ -430,7 +430,7 @@
 
   <div class="chat-title">
     <h1>⬡ FLASH CHAT</h1>
-    <p>MESSAGES DISAPPEAR AFTER 1 HOUR · ANONYMOUS · DECENTRALIZED</p>
+    <p>MESSAGES DISAPPEAR AFTER 48 HOURS · ANONYMOUS · DECENTRALIZED</p>
   </div>
 
   <!-- PSEUDO -->
@@ -506,7 +506,7 @@
   /* ── GUN.JS FLASH CHAT ── */
   var GUN_RELAY = 'wss://gun.hidering.org/gun';
   var NAMESPACE = 'hidering-flashchat';
-  var MSG_TTL = 60 * 60 * 1000; // 1 hour
+  var MSG_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
   var gun = null;
   var pseudo = localStorage.getItem('hrg-chat-pseudo') || '';
@@ -584,6 +584,14 @@
     });
   }
 
+  function formatExpiry(ms) {
+    var mins = Math.max(0, Math.round(ms / 60000));
+    if (mins < 60) return '~' + mins + 'min';
+    var hrs = Math.floor(mins / 60);
+    var rem = mins % 60;
+    return rem ? '~' + hrs + 'h' + rem.toString().padStart(2,'0') : '~' + hrs + 'h';
+  }
+
   function renderMessage(msg) {
     var box = document.getElementById('messagesBox');
     var empty = document.getElementById('emptyState');
@@ -595,13 +603,13 @@
 
     var d = new Date(msg.ts);
     var timeStr = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-    var expireMin = Math.max(0, Math.round((MSG_TTL - (Date.now() - msg.ts)) / 60000));
+    var expireStr = formatExpiry(MSG_TTL - (Date.now() - msg.ts));
 
     el.innerHTML = [
       '<div class="msg-header">',
       '  <span class="msg-nick">' + escHtml(msg.nick) + '</span>',
       '  <span class="msg-time">' + timeStr + '</span>',
-      '  <span class="msg-expires">expires ~' + expireMin + 'min</span>',
+      '  <span class="msg-expires">expires ' + expireStr + '</span>',
       '</div>',
       '<div class="msg-body">' + escHtml(msg.text) + '</div>',
     ].join('');
