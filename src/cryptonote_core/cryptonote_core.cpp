@@ -859,15 +859,12 @@ namespace cryptonote
     }
     // HIDERING Phase 5 (HFv16): a transparent post-quantum (BQ...) spend is a version-2 tx with NO
     // RingCT signature (RCTTypeNull) and revealed output amounts → it has no outPk commitments. The
-    // outPk/vout count match only applies to real RingCT txs; detect a PQ transparent tx by a
-    // txin_to_key_pq input and skip the check for it. Only present at/after HFv16; classic txs
-    // unaffected.
-    bool pq_transparent = false;
-    if (hf_version >= HF_VERSION_PQ)
-    {
-      for (const auto& in: tx.vin)
-        if (in.type() == typeid(txin_to_key_pq)) { pq_transparent = true; break; }
-    }
+    // outPk/vout count match only applies to real RingCT txs, so only THAT shape is exempted:
+    // txin_to_key_pq AND RCTTypeNull (the consensus definition). A HYBRID tx (ring + BQ inputs) is
+    // a real RingCT tx whose outPk the DB stores per output (BlockchainDB::add_transaction), so it
+    // takes the check like any classic tx. Only present at/after HFv16; classic txs unaffected.
+    const bool pq_transparent = hf_version >= HF_VERSION_PQ
+        && tx.rct_signatures.type == rct::RCTTypeNull && has_transparent_pq_input(tx);
     if (tx.version > 1 && !pq_transparent)
     {
       if (tx.rct_signatures.outPk.size() != tx.vout.size())

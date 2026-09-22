@@ -362,6 +362,18 @@ class KEY_IMAGE_EXISTS : public DB_EXCEPTION
  * End of Exception Definitions
  ***********************************/
 
+/**
+ * @brief HIDERING — whether a transaction's outputs are stored "pseudo-rct"
+ *
+ * A v2 coinbase and a FULLY TRANSPARENT BQ spend (txin_to_key_pq inputs, RCTTypeNull) publish
+ * their output amounts; their outputs are stored in the RingCT bucket 0 with an identity-mask
+ * commitment zeroCommit(amount). Every other output is stored under its own amount, with
+ * rct_signatures.outPk[i].mask as commitment for a v2 tx. A HYBRID tx (ring + BQ inputs) is a real
+ * RingCT tx and is NOT pseudo-rct. One rule for add_transaction, the per-block RingCT count, the
+ * reorg removal (BlockchainLMDB::remove_tx_outputs) and the wallet's output classification.
+ */
+bool outputs_stored_as_pseudo_rct(const transaction& tx);
+
 
 /**
  * @brief The BlockchainDB backing store interface declaration/contract

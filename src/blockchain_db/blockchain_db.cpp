@@ -186,14 +186,22 @@ void BlockchainDB::pop_block()
 // add_block counts the block's RingCT outputs by it, so the per-block count behind
 // get_output_distribution is exactly what bucket 0 received — counting `amount == 0` instead missed
 // every transparent BQ output, and wallets then worked on a truncated bucket-0 index space.
-// BlockchainLMDB::remove_tx_outputs (is_pseudo_rct) mirrors the same rule on a reorg.
-static bool outputs_stored_as_pseudo_rct(const transaction& tx)
+// BlockchainLMDB::remove_tx_outputs mirrors the same rule on a reorg, and wallet2 classifies
+// received outputs by it.
+//
+// "Transparent" means txin_to_key_pq AND RCTTypeNull — the consensus definition
+// (Blockchain::check_tx_outputs, check_tx_inputs rule e). A HYBRID tx (ring + BQ inputs) is a real
+// RingCT tx: its outputs carry their commitments in outPk[i].mask and must be stored with them.
+// Keying on the PQ input alone stored them with zeroCommit(0) = G, so no hybrid output could ever
+// be spent at its real value.
+bool outputs_stored_as_pseudo_rct(const transaction& tx)
 {
   bool coinbase = false;
   for (const txin_v& in : tx.vin)
     if (in.type() == typeid(txin_gen))
       coinbase = true;
-  return (coinbase && tx.version == 2) || has_transparent_pq_input(tx);
+  return (coinbase && tx.version == 2)
+      || (has_transparent_pq_input(tx) && tx.rct_signatures.type == rct::RCTTypeNull);
 }
 
 static uint64_t num_outputs_in_rct_bucket(const transaction& tx)

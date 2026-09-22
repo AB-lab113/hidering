@@ -1158,8 +1158,8 @@ void BlockchainLMDB::remove_tx_outputs(const uint64_t tx_id, const transaction& 
   // an identity-mask commitment, exactly like a v2 coinbase — so on a reorg it must be
   // removed from bucket 0 too, not from tx.vout[i].amount. Getting this wrong would delete
   // the wrong output (or throw OUTPUT_DNE) and corrupt the DB.
-  bool is_pseudo_rct = (tx.version >= 2 && tx.vin.size() == 1 && tx.vin[0].type() == typeid(txin_gen))
-                    || has_transparent_pq_input(tx);
+  // One predicate, shared with add_transaction (blockchain_db.h).
+  const bool is_pseudo_rct = outputs_stored_as_pseudo_rct(tx);
   for (size_t i = tx.vout.size(); i-- > 0;)
   {
     uint64_t amount = is_pseudo_rct ? 0 : tx.vout[i].amount;

@@ -56,6 +56,7 @@ using namespace epee;
 #include "cryptonote_config.h"
 #include "hardforks/hardforks.h"
 #include "cryptonote_core/tx_sanity_check.h"
+#include "blockchain_db/blockchain_db.h"
 #include "wallet2.h"
 #include "wallet_args.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
@@ -2957,7 +2958,10 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   // set (`td.is_rct() || is_valid_decomposed_amount(td.amount())`, and the is_rct()-only
   // predicates in the transfer selectors), so the change could never be spent again even
   // once the daemon-side lookup was fixed. False for every classic tx → no impact on B...
-  const bool pq_transparent_tx = cryptonote::has_transparent_pq_input(tx);
+  // One predicate with the daemon (blockchain_db.h): a transparent BQ spend is txin_to_key_pq AND
+  // RCTTypeNull. A hybrid tx (ring + BQ inputs) is plain RingCT — zero amounts, real commitments —
+  // and its outputs already take the `amount == 0` branch below with their decoded mask.
+  const bool pq_transparent_tx = cryptonote::outputs_stored_as_pseudo_rct(tx) && !miner_tx;
 
   while (!tx.vout.empty())
   {
