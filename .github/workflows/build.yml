@@ -1,14 +1,7 @@
 name: ci/gh-actions/cli
 
 on:
-  push:
-    paths-ignore:
-      - 'docs/**'
-      - '**/README.md'
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '**/README.md'
+  workflow_dispatch:
 
 # The below variables reduce repetitions across similar targets
 env:
