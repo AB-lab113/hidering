@@ -538,6 +538,97 @@ def case_d(s_sweep, s_xfer, dest, miner):
     check([i for _, i in rows] == [0], "d: classic change back on the primary index (%s)" % rows)
 
 
+def daemon_log_lines(needle_re):
+    try:
+        with open(WORK + "/daemon.log", errors="replace") as f:
+            return [l.rstrip() for l in f if re.search(needle_re, l)]
+    except OSError:
+        return []
+
+
+def case_e(sender, recv, dest, miner):
+    """HYBRID: a BQ wallet holding one classic output (on its B... address) and one BQ output
+    pays an amount only both together cover -> one tx with a ring input AND a txin_to_key_pq
+    input, i.e. a real RingCT tx. Then the RECIPIENT spends the output it received from that
+    hybrid tx (a ring spend whose real ring member is that output). Question under test: is the
+    commitment the daemon stored for a hybrid output the real outPk mask (the recipient's spend
+    verifies) or zeroCommit(0) (it cannot)? The sender's change (a BQ output created by the hybrid)
+    is re-spent too, as a second probe of the same stored commitment (check b2)."""
+    log("\n== case e: hybrid tx (ring + BQ inputs), then the recipient spends what it received ==")
+    for w in (sender, recv, dest):
+        w.refresh()
+    s0, r0 = sender.balance(), recv.balance()
+    log("  before: hybrid sender %s (outputs %s) / recipient %s" % (fmt(s0[1]), [(fmt(a), i) for a, i in sender.unspent()], fmt(r0[0])))
+    amount = 30 * ATOMIC
+    fee = {}
+
+    def conf(o):
+        m = re.findall(r"The transaction fee is ([0-9.]+)", o)
+        if m:
+            fee["v"] = money(m[-1])
+        return "y"
+    out = sender.cmd("transfer %s %s" % (recv.addr, fmt(amount)), confirm=conf)
+    txid = txid_of(out)
+    if not check(txid is not None, "e: hybrid transfer of 30 HRG (needs both outputs) built and submitted"):
+        cli, loc = error_lines(sender, out)
+        log("  CLI: %s\n  log: %s" % (cli, "\n       ".join(loc)))
+        log("  daemon: %s" % "\n          ".join(daemon_log_lines(r"ERROR|mismatched|Sum check|PQ input")[-8:]))
+        return
+    kinds = input_kinds(txid)
+    j = tx_json(txid)
+    rct_type = j["rct_signatures"]["type"] if j else None
+    log("  tx %s, vin=%s, rct type %s, fee %s" % (txid, kinds, rct_type, fmt(fee.get("v", 0))))
+    if not check(kinds is not None and "key" in kinds and "key_pq" in kinds and rct_type not in (None, 0),
+                 "e: the tx is HYBRID (ring + key_pq inputs, rct type != Null)"):
+        return
+    mine(12, miner.addr)
+    sender.refresh(); recv.refresh()
+    tj = other_rpc("/get_transactions", {"txs_hashes": [txid]})
+    check(not tj["txs"][0].get("in_pool", True), "e: hybrid tx mined (block_height=%s)" % tj["txs"][0].get("block_height"))
+    s1, r1 = sender.balance(), recv.balance()
+    log("  after:  sender %s / recipient %s" % (fmt(s1[0]), fmt(r1[0])))
+    check(r1[0] == r0[0] + amount, "e: recipient credited with exactly 30")
+    rct_invariant("after the hybrid tx")
+
+    # the daemon's view of the recipient's output: the commitment it will put in any ring
+    outs_json = j["rct_signatures"]["outPk"] if j else []
+    log("  on-wire outPk of the hybrid tx: %s" % outs_json)
+    oi = other_rpc("/get_transactions", {"txs_hashes": [txid]})["txs"][0].get("output_indices", [])
+    if oi:
+        got = other_rpc("/get_outs", {"outputs": [{"amount": 0, "index": i} for i in oi], "get_txid": False})
+        stored = [o["mask"] for o in got.get("outs", [])]
+        log("  daemon get_outs commitments for those outputs: %s" % stored)
+        G = "5866666666666666666666666666666666666666666666666666666666666666"
+        check(stored == outs_json, "e: daemon stores each hybrid output with its outPk mask (stored %s)"
+              % ["G=zeroCommit(0)" if m == G else m[:16] for m in stored])
+
+    # second hop: the recipient spends the output it received from the hybrid tx
+    d0 = dest.balance()
+    out2 = recv.cmd("transfer %s 5" % dest.addr, confirm="y")
+    txid2 = txid_of(out2)
+    if check(txid2 is not None, "e: recipient's spend of the hybrid output built and accepted by the daemon"):
+        mine(12, miner.addr)
+        recv.refresh(); dest.refresh()
+        check(dest.balance()[0] == d0[0] + 5 * ATOMIC, "e: destination received exactly 5 from the recipient")
+    else:
+        cli, loc = error_lines(recv, out2)
+        log("  CLI: %s\n  log: %s" % (cli, "\n       ".join(loc)))
+        log("  daemon: %s" % "\n          ".join(daemon_log_lines(r"ERROR|mismatched|Sum check|PQ input|Failed to check")[-8:]))
+
+    # third probe: the sender's change from the hybrid (a BQ output) spent through check b2
+    rows = sender.unspent()
+    log("  sender unspent after the hybrid (amount, minor): %s" % [(fmt(a), i) for a, i in rows])
+    if rows:
+        out3 = sender.cmd("transfer %s 1" % dest.addr, confirm="y")
+        txid3 = txid_of(out3)
+        if check(txid3 is not None, "e: sender's change from the hybrid tx is spendable"):
+            log("  change spend %s vin=%s" % (txid3, input_kinds(txid3)))
+        else:
+            cli, loc = error_lines(sender, out3)
+            log("  CLI: %s\n  log: %s" % (cli, "\n       ".join(loc)))
+            log("  daemon: %s" % "\n          ".join(daemon_log_lines(r"ERROR|mismatched|Sum check|PQ input|Failed to check")[-8:]))
+
+
 # ---------------------------------------------------------------------------------------------
 def main():
     os.makedirs(WORK + "/wallets"); os.makedirs(WORK + "/logs")
@@ -548,7 +639,7 @@ def main():
         miner = Wallet("miner", bq=False); wallets.append(miner)
         dst_c = Wallet("dest_classic", bq=False); wallets.append(dst_c)
         dst_q = Wallet("dest_bq", bq=True); wallets.append(dst_q)
-        cases = os.environ.get("CASES", "a b1 b2 c d").split()
+        cases = os.environ.get("CASES", "a b1 b2 c d e").split()
         senders, funded = {}, []   # funded: (wallet, address to fund)
         for case in [c for c in cases if c in ("a", "b1", "b2")]:
             for label in ("classic", "bq"):
@@ -563,6 +654,10 @@ def main():
             for label in ("sweep", "xfer"):
                 w = Wallet("s_d_%s" % label, bq=False); wallets.append(w)
                 senders[("d", label)] = w; funded.append((w, w.addr))
+        if "e" in cases:
+            # funded separately below: one 20 HRG output on its B... AND one on its BQ... address
+            senders[("e", "sender")] = Wallet("s_e_hybrid", bq=True); wallets.append(senders[("e", "sender")])
+            senders[("e", "recv")] = Wallet("r_e_classic", bq=False); wallets.append(senders[("e", "recv")])
         log("mining 150 blocks to the miner (coinbase unlock 60, ring 32)")
         mine(150, miner.addr)
         r = miner.refresh()
@@ -585,6 +680,20 @@ def main():
                 log("BENCH: %s not funded as expected: balance %s" % (w.name, (fmt(b[0]), fmt(b[1]))))
                 return 2
         log("all %d senders hold one unlocked 20 HRG output at index 0 (height %d)" % (len(funded), height()))
+        if ("e", "sender") in senders:
+            w = senders[("e", "sender")]
+            for a in (w.addr, w.bq_addr):
+                out = miner.cmd("transfer %s 20" % a, confirm="y")
+                if not txid_of(out):
+                    log("BENCH: funding %s failed:\n%s" % (w.name, out[-800:]))
+                    return 2
+                mine(1, miner.addr); miner.refresh()
+            mine(12, miner.addr)
+            w.refresh()
+            if w.balance() != (40 * ATOMIC, 40 * ATOMIC) or len(w.unspent()) != 2:
+                log("BENCH: %s not funded as expected: %s" % (w.name, w.unspent()))
+                return 2
+            log("hybrid sender holds 20 HRG classic (B...) + 20 HRG BQ, both unlocked")
 
         rct_invariant("after funding")
         dests = {"classic": (dst_c, dst_c.addr), "bq": (dst_q, dst_q.bq_addr)}
@@ -600,6 +709,8 @@ def main():
         rct_invariant("after case c")
         if ("d", "sweep") in senders:
             case_d(senders[("d", "sweep")], senders[("d", "xfer")], dst_c, miner)
+        if ("e", "sender") in senders:
+            case_e(senders[("e", "sender")], senders[("e", "recv")], dst_c, miner)
     finally:
         for w in wallets:
             w.close()

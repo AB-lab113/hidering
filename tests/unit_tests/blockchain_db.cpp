@@ -26,6 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <algorithm>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <cstdio>
@@ -39,6 +40,10 @@
 #include "blockchain_db/blockchain_db.h"
 #include "blockchain_db/lmdb/db_lmdb.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "ringct/rctOps.h"
+#include "ringct/rctSigs.h"
+#include "cryptonote_basic/account.h"
+#include "cryptonote_core/cryptonote_tx_utils.h"
 
 using namespace cryptonote;
 using epee::string_tools::pod_to_hex;
@@ -528,4 +533,500 @@ TYPED_TEST(BlockchainDBTest, PqTransparentOutputsCountedInRctDistribution)
       << "the cumulative RingCT count (get_output_distribution) lags the bucket-0 index space";
   // all three transparent outputs, the revealed non-zero ones included, are in bucket 0
   EXPECT_LE(3u, bucket0_added);
+}
+
+// HIDERING Phase 5 — HYBRID transactions (ring inputs + transparent BQ inputs) and the commitment
+// their outputs are stored with.
+//
+// A hybrid tx is a genuine RingCT transaction: its outputs have amount 0 on the wire, and their
+// real Pedersen commitments sit in rct_signatures.outPk[i].mask (the transparent PQ inputs enter
+// the balance as a public term, see construct_tx's "structure H2"). The outputs_stored_as_pseudo_rct
+// rule, however, fires on has_transparent_pq_input(tx) alone — true for a hybrid too — and then
+// stores every output with zeroCommit(vout.amount) = zeroCommit(0) = G instead of outPk[i].mask.
+//
+// The wallet keeps the real mask (vout.amount == 0 -> td.m_mask from the ECDH decode), and the
+// verifier reads the stored commitment (mixRing from get_output_key, check b2 for a BQ output), so
+// any output of a hybrid tx would become unspendable at its real value. This test pins the storage
+// primitive: each output of a hybrid tx must be stored with exactly outPk[i].mask.
+//
+// The synthetic tx only has to be stored, not verified: the CLSAG / range proof contents are
+// placeholders, sized so the tx serialises (the DB needs a blob to split pruned/prunable).
+TYPED_TEST(BlockchainDBTest, HybridTxOutputsKeepTheirRctCommitments)
+{
+  boost::filesystem::path tempPath = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+  std::string dirPath = tempPath.string();
+  this->set_prefix(dirPath);
+
+  ASSERT_NO_THROW(this->m_db->open(dirPath));
+  this->get_filenames();
+  this->init_hard_fork();
+
+  db_wtxn_guard guard(this->m_db);
+
+  ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0], t_diffs[0], t_coins[0], this->m_txs[0]));
+  const uint64_t bucket0_before = this->m_db->get_num_outputs(0);
+
+  // ---- a hybrid tx: one ring input first, then one transparent BQ input (consensus order) ----
+  const size_t RING_SIZE = 32;
+  transaction hy{};
+  hy.version = 2;
+
+  txin_to_key ring_in{};
+  ring_in.amount = 0;
+  for (size_t m = 0; m < RING_SIZE; ++m)
+    ring_in.key_offsets.push_back(1);
+  ring_in.k_image = rct::rct2ki(rct::pkGen());
+  hy.vin.push_back(ring_in);
+
+  txin_to_key_pq pq_in{};
+  pq_in.amount = 15000000000000ull;
+  pq_in.spent_output_index = 0;
+  pq_in.real_output_key = rct::rct2pk(rct::pkGen());
+  hy.vin.push_back(pq_in);
+  ASSERT_TRUE(has_transparent_pq_input(hy)) << "precondition: a hybrid tx has a transparent PQ input";
+
+  // two RingCT outputs: amount 0 on the wire, the value is in the commitment
+  const size_t N_OUT = 2;
+  const uint64_t out_amounts[N_OUT] = {12000000000000ull, 7990000000000ull};
+  std::vector<crypto::public_key> out_keys;
+  for (size_t o = 0; o < N_OUT; ++o)
+  {
+    tx_out out{};
+    out.amount = 0;
+    txout_to_tagged_key tagged{};
+    tagged.key = rct::rct2pk(rct::pkGen());
+    tagged.view_tag = crypto::view_tag{};
+    out.target = tagged;
+    out_keys.push_back(tagged.key);
+    hy.vout.push_back(out);
+  }
+
+  rct::rctSig &rv = hy.rct_signatures;
+  rv.type = rct::RCTTypeBulletproofPlus;
+  rv.txnFee = 10000000000ull;
+  for (size_t o = 0; o < N_OUT; ++o)
+  {
+    rct::ctkey pk;
+    pk.dest = rct::pk2rct(out_keys[o]);
+    pk.mask = rct::commit(out_amounts[o], rct::skGen());   // a real, non-trivial commitment
+    ASSERT_FALSE(pk.mask == rct::zeroCommit(0)) << "precondition: outPk mask differs from zeroCommit(0)";
+    ASSERT_FALSE(pk.mask == rct::zeroCommit(out_amounts[o]));
+    rv.outPk.push_back(pk);
+    rct::ecdhTuple e{};
+    rv.ecdhInfo.push_back(e);
+  }
+  // placeholder prunable data, sized to serialise (one BP+ covering 2 outputs: L,R of 7 keys);
+  // one CLSAG and one pseudoOut for the one RING input, as genRctSimple produces for a hybrid
+  rct::BulletproofPlus bpp{};
+  bpp.L.assign(7, rct::identity());
+  bpp.R.assign(7, rct::identity());
+  rv.p.bulletproofs_plus.push_back(bpp);
+  rct::clsag c{};
+  c.s.assign(RING_SIZE, rct::identity());
+  rv.p.CLSAGs.push_back(c);
+  rv.p.pseudoOuts.push_back(rct::identity());
+
+  const blobdata hy_blob = tx_to_blob(hy);
+  ASSERT_FALSE(hy_blob.empty()) << "precondition: the synthetic hybrid tx serialises";
+
+  std::pair<block, blobdata> blk = this->m_blocks[1];
+  blk.first.tx_hashes.clear();
+  blk.first.tx_hashes.push_back(get_transaction_hash(hy));
+  std::vector<std::pair<transaction, blobdata>> blk_txs;
+  blk_txs.push_back(std::make_pair(hy, hy_blob));
+  ASSERT_NO_THROW(this->m_db->add_block(blk, t_sizes[1], t_sizes[1], t_diffs[1], t_coins[1], blk_txs));
+
+  // both outputs are RingCT outputs: bucket 0 either way (this part is not in question)
+  ASSERT_EQ(bucket0_before + N_OUT, this->m_db->get_num_outputs(0));
+  const std::vector<std::vector<uint64_t>> amount_indices =
+      this->m_db->get_tx_amount_output_indices(this->m_db->get_tx_count() - 1, 1);
+  ASSERT_EQ(1u, amount_indices.size());
+  ASSERT_EQ(N_OUT, amount_indices.front().size());
+
+  // ---- the assertion under test: stored commitment == outPk[i].mask ----
+  for (size_t o = 0; o < N_OUT; ++o)
+  {
+    output_data_t od{};
+    ASSERT_NO_THROW(od = this->m_db->get_output_key((uint64_t)0, amount_indices.front()[o], true));
+    EXPECT_EQ(out_keys[o], od.pubkey);
+    EXPECT_TRUE(od.commitment == rv.outPk[o].mask)
+        << "output " << o << " of a hybrid tx stored with commitment " << epee::string_tools::pod_to_hex(od.commitment)
+        << " instead of outPk.mask " << epee::string_tools::pod_to_hex(rv.outPk[o].mask)
+        << (od.commitment == rct::zeroCommit(0) ? " (== zeroCommit(0) = G: the pseudo-rct rule fired on a real RingCT tx)" : "");
+  }
+}
+
+// HIDERING Phase 5 — found by tests/pq_e2e case e: a hybrid tx built by the wallet is rejected by
+// the daemon with "Failed to parse transaction from blob". construct_tx feeds genRctSimple the RING
+// sources only, so CLSAGs and p.pseudoOuts hold one entry per RING input ("structure H2"), while the
+// transaction serialiser passes inputs = vin.size() (ring + PQ) to serialize_rctsig_prunable, which
+// requires CLSAGs.size() == inputs and pseudoOuts.size() == inputs. This pins the round trip of that
+// exact shape (1 ring input + 1 txin_to_key_pq, 1 CLSAG, 1 pseudoOut). Not a DB test strictly, but it
+// is the reason no hybrid output can reach the DB today.
+TYPED_TEST(BlockchainDBTest, HybridTxShapedLikeConstructTxRoundTrips)
+{
+  const size_t RING_SIZE = 32;
+  transaction hy{};
+  hy.version = 2;
+  txin_to_key ring_in{};
+  for (size_t m = 0; m < RING_SIZE; ++m)
+    ring_in.key_offsets.push_back(1);
+  ring_in.k_image = rct::rct2ki(rct::pkGen());
+  hy.vin.push_back(ring_in);
+  txin_to_key_pq pq_in{};
+  pq_in.amount = 15000000000000ull;
+  pq_in.real_output_key = rct::rct2pk(rct::pkGen());
+  hy.vin.push_back(pq_in);
+  for (size_t o = 0; o < 2; ++o)
+  {
+    tx_out out{};
+    txout_to_tagged_key tagged{};
+    tagged.key = rct::rct2pk(rct::pkGen());
+    out.target = tagged;
+    hy.vout.push_back(out);
+    hy.rct_signatures.outPk.push_back({rct::pk2rct(tagged.key), rct::commit(1000, rct::skGen())});
+    hy.rct_signatures.ecdhInfo.push_back(rct::ecdhTuple{});
+  }
+  rct::rctSig &rv = hy.rct_signatures;
+  rv.type = rct::RCTTypeBulletproofPlus;
+  rv.txnFee = 10000000000ull;
+  rct::BulletproofPlus bpp{};
+  bpp.L.assign(7, rct::identity());
+  bpp.R.assign(7, rct::identity());
+  rv.p.bulletproofs_plus.push_back(bpp);
+  // as genRctSimple returns it for a hybrid: ONE CLSAG and ONE pseudoOut, for the one ring input
+  rct::clsag c{};
+  c.s.assign(RING_SIZE, rct::identity());
+  rv.p.CLSAGs.push_back(c);
+  rv.p.pseudoOuts.push_back(rct::identity());
+
+  blobdata blob;
+  const bool serialised = tx_to_blob(hy, blob);
+  EXPECT_TRUE(serialised) << "a hybrid tx with one CLSAG per RING input does not serialise (vin.size()="
+                          << hy.vin.size() << ", CLSAGs=" << rv.p.CLSAGs.size() << ")";
+  transaction back;
+  EXPECT_TRUE(serialised && parse_and_validate_tx_from_blob(blob, back))
+      << "the daemon cannot parse a hybrid tx of the shape construct_tx builds (blob " << blob.size() << " bytes)";
+}
+
+// HIDERING Phase 5 — the real round trip: construct_tx builds a HYBRID tx (one ring input + one
+// transparent BQ input) exactly as the wallet does, the tx goes to a blob, the blob is parsed back,
+// and the parsed tx is (1) byte- and hash-identical, (2) still balanced (verRctSemanticsSimple with
+// the transparent term, which also verifies the BP+ range proof), and (3) stored by the DB with each
+// output's real commitment outPk[i].mask. Before the serialisation fix step (1) failed — the blob was
+// truncated — which is what the daemon reported as "Failed to parse transaction from blob".
+TYPED_TEST(BlockchainDBTest, HybridTxFromConstructTxRoundTripsAndIsStoredWithItsCommitments)
+{
+  // sender: a BQ account (ML-KEM + ML-DSA keys from an independent PQ root, as --bq-wallet makes it)
+  account_base sender_acc;
+  sender_acc.generate();
+  account_keys keys = sender_acc.get_keys();
+  ASSERT_TRUE(generate_pq_keys(keys, generate_pq_root_secret()));
+  std::unordered_map<crypto::public_key, subaddress_index> subaddresses;
+  subaddresses[keys.m_account_address.m_spend_public_key] = {0, 0};
+
+  // an output of the sender's primary address, as a tx with secret key r would have created it
+  auto owned_output = [&](crypto::public_key &tx_pub, crypto::public_key &out_key)
+  {
+    const crypto::secret_key r = rct::rct2sk(rct::skGen());
+    ASSERT_TRUE(crypto::secret_key_to_public_key(r, tx_pub));
+    crypto::key_derivation d;
+    ASSERT_TRUE(crypto::generate_key_derivation(keys.m_account_address.m_view_public_key, r, d));
+    ASSERT_TRUE(crypto::derive_public_key(d, 0, keys.m_account_address.m_spend_public_key, out_key));
+  };
+
+  const uint64_t RING_AMOUNT = 20000000000000ull, PQ_AMOUNT = 20000000000000ull, FEE = 60000000000ull;
+  std::vector<tx_source_entry> sources(2);
+
+  // ring source: a classic RingCT output of ours at position 7 in a ring of 16
+  {
+    tx_source_entry &src = sources[0];
+    crypto::public_key out_key;
+    owned_output(src.real_out_tx_key, out_key);
+    src.amount = RING_AMOUNT;
+    src.rct = true;
+    src.mask = rct::skGen();
+    src.real_output = 7;
+    src.real_output_in_tx_index = 0;
+    for (uint64_t n = 0; n < 16; ++n)
+    {
+      rct::ctkey ck;
+      ck.dest = n == 7 ? rct::pk2rct(out_key) : rct::pkGen();
+      ck.mask = n == 7 ? rct::commit(RING_AMOUNT, src.mask) : rct::pkGen();
+      src.outputs.push_back({100 + 3 * n, ck});
+    }
+  }
+  // BQ source: our output P, tweaked to P' = P + t*G by the ML-KEM shared secret (spent transparently)
+  {
+    tx_source_entry &src = sources[1];
+    crypto::public_key untweaked;
+    owned_output(src.real_out_tx_key, untweaked);
+    crypto::pqc::kyber_shared_secret ss;
+    const rct::key ss_bytes = rct::skGen();
+    memcpy(ss.ss, ss_bytes.bytes, sizeof(ss.ss));
+    crypto::secret_key tweak;
+    ASSERT_TRUE(derive_bq_output_tweak(ss, 0, tweak));
+    const rct::key tweaked = rct::addKeys(rct::pk2rct(untweaked), rct::scalarmultBase(rct::sk2rct(tweak)));
+    src.amount = PQ_AMOUNT;
+    src.rct = true;
+    src.mask = rct::skGen();
+    src.real_output = 0;
+    src.real_output_in_tx_index = 0;
+    src.outputs.push_back({500, {tweaked, rct::commit(PQ_AMOUNT, src.mask)}});
+    src.is_pq = true;
+    src.pq_ss = ss;
+    src.pq_subaddr = subaddress_index{0, 0};
+  }
+
+  // two classic destinations, no change: every atomic unit is accounted for
+  account_base d1, d2;
+  d1.generate(); d2.generate();
+  std::vector<tx_destination_entry> dests;
+  dests.push_back(tx_destination_entry(30000000000000ull, d1.get_keys().m_account_address, false));
+  dests.push_back(tx_destination_entry(RING_AMOUNT + PQ_AMOUNT - FEE - 30000000000000ull, d2.get_keys().m_account_address, false));
+
+  transaction tx;
+  crypto::secret_key tx_key;
+  std::vector<crypto::secret_key> additional_tx_keys;
+  ASSERT_TRUE(construct_tx_and_get_tx_key(keys, subaddresses, sources, dests, boost::none, {}, tx, tx_key, additional_tx_keys,
+                                          true, {rct::RangeProofPaddedBulletproof, 4}, true, HF_VERSION_PQ))
+      << "construct_tx refused the hybrid";
+
+  // it is a hybrid, with RingCT parts sized on the ring input
+  ASSERT_EQ(2u, tx.vin.size());
+  EXPECT_EQ(typeid(txin_to_key), tx.vin[0].type()) << "ring inputs come first";
+  EXPECT_EQ(typeid(txin_to_key_pq), tx.vin[1].type());
+  ASSERT_EQ(rct::RCTTypeBulletproofPlus, tx.rct_signatures.type);
+  EXPECT_EQ(1u, tx.rct_signatures.p.CLSAGs.size());
+  EXPECT_EQ(1u, tx.rct_signatures.p.pseudoOuts.size());
+  ASSERT_EQ(tx.vout.size(), tx.rct_signatures.outPk.size());
+  EXPECT_EQ(FEE, tx.rct_signatures.txnFee);
+
+  // (1) blob round trip
+  blobdata blob;
+  ASSERT_TRUE(tx_to_blob(tx, blob)) << "construct_tx's hybrid does not serialise";
+  transaction parsed;
+  ASSERT_TRUE(parse_and_validate_tx_from_blob(blob, parsed)) << "the daemon cannot parse construct_tx's hybrid";
+  EXPECT_EQ(blob, tx_to_blob(parsed)) << "re-serialising the parsed hybrid does not give the same bytes";
+  EXPECT_EQ(get_transaction_hash(tx), get_transaction_hash(parsed));
+  ASSERT_EQ(2u, parsed.vin.size());
+  EXPECT_EQ(1u, parsed.rct_signatures.p.CLSAGs.size());
+  EXPECT_EQ(1u, parsed.rct_signatures.p.pseudoOuts.size());
+  for (size_t o = 0; o < tx.vout.size(); ++o)
+    EXPECT_TRUE(parsed.rct_signatures.outPk[o].mask == tx.rct_signatures.outPk[o].mask);
+
+  // (2) the parsed tx still balances with the transparent term the node recomputes from vin
+  uint64_t pq_in = 0;
+  ASSERT_TRUE(get_pq_transparent_input_sum(parsed, pq_in));
+  EXPECT_EQ(PQ_AMOUNT, pq_in);
+  parsed.rct_signatures.pq_transparent_in = pq_in;
+  EXPECT_TRUE(rct::verRctSemanticsSimple(parsed.rct_signatures)) << "balance / range proof of the parsed hybrid";
+  parsed.rct_signatures.pq_transparent_in = 0;
+  EXPECT_FALSE(rct::verRctSemanticsSimple(parsed.rct_signatures)) << "control: without the transparent term it must not balance";
+  EXPECT_FALSE(outputs_stored_as_pseudo_rct(parsed)) << "a hybrid is a real RingCT tx, not pseudo-rct";
+
+  // (3) stored by the DB with each output's real commitment
+  boost::filesystem::path tempPath = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+  std::string dirPath = tempPath.string();
+  this->set_prefix(dirPath);
+  ASSERT_NO_THROW(this->m_db->open(dirPath));
+  this->get_filenames();
+  this->init_hard_fork();
+  db_wtxn_guard guard(this->m_db);
+  ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0], t_diffs[0], t_coins[0], this->m_txs[0]));
+  std::pair<block, blobdata> blk = this->m_blocks[1];
+  blk.first.tx_hashes.clear();
+  blk.first.tx_hashes.push_back(get_transaction_hash(parsed));
+  std::vector<std::pair<transaction, blobdata>> blk_txs;
+  blk_txs.push_back(std::make_pair(parsed, blob));
+  ASSERT_NO_THROW(this->m_db->add_block(blk, t_sizes[1], t_sizes[1], t_diffs[1], t_coins[1], blk_txs));
+  const std::vector<std::vector<uint64_t>> idx = this->m_db->get_tx_amount_output_indices(this->m_db->get_tx_count() - 1, 1);
+  ASSERT_EQ(1u, idx.size());
+  ASSERT_EQ(tx.vout.size(), idx.front().size());
+  for (size_t o = 0; o < tx.vout.size(); ++o)
+  {
+    output_data_t od{};
+    ASSERT_NO_THROW(od = this->m_db->get_output_key((uint64_t)0, idx.front()[o], true));
+    EXPECT_TRUE(od.commitment == tx.rct_signatures.outPk[o].mask)
+        << "output " << o << " of construct_tx's hybrid stored with " << epee::string_tools::pod_to_hex(od.commitment);
+  }
+}
+
+// HIDERING — the pseudo-rct predicate on each transaction shape (one rule for DB, count, reorg,
+// wallet). Only a v2 coinbase and a FULLY transparent BQ spend (key_pq + RCTTypeNull) qualify.
+TYPED_TEST(BlockchainDBTest, PseudoRctPredicateByShape)
+{
+  transaction coinbase{};
+  coinbase.version = 2;
+  coinbase.vin.push_back(txin_gen{});
+  EXPECT_TRUE(outputs_stored_as_pseudo_rct(coinbase));
+  coinbase.version = 1;
+  EXPECT_FALSE(outputs_stored_as_pseudo_rct(coinbase)) << "a v1 coinbase keeps its per-amount buckets";
+
+  transaction classic{};
+  classic.version = 2;
+  classic.vin.push_back(txin_to_key{});
+  classic.rct_signatures.type = rct::RCTTypeBulletproofPlus;
+  EXPECT_FALSE(outputs_stored_as_pseudo_rct(classic));
+
+  transaction bq{};
+  bq.version = 2;
+  bq.vin.push_back(txin_to_key_pq{});
+  bq.rct_signatures.type = rct::RCTTypeNull;
+  EXPECT_TRUE(outputs_stored_as_pseudo_rct(bq));
+
+  transaction hybrid = classic;
+  hybrid.vin.push_back(txin_to_key_pq{});
+  EXPECT_FALSE(outputs_stored_as_pseudo_rct(hybrid)) << "a hybrid is RingCT: outputs keep outPk";
+}
+
+// HIDERING Phase 5 — same real round trip with TWO ring inputs + one BQ input, so n_ring (2) differs
+// from both 1 and vin.size() (3): CLSAGs and pseudoOuts must count exactly the ring inputs, the two
+// ring inputs must precede the BQ one, and the blob / balance / DB commitments must hold as above.
+TYPED_TEST(BlockchainDBTest, HybridTxTwoRingInputsFromConstructTxRoundTripsAndIsStoredWithItsCommitments)
+{
+  account_base sender_acc;
+  sender_acc.generate();
+  account_keys keys = sender_acc.get_keys();
+  ASSERT_TRUE(generate_pq_keys(keys, generate_pq_root_secret()));
+  std::unordered_map<crypto::public_key, subaddress_index> subaddresses;
+  subaddresses[keys.m_account_address.m_spend_public_key] = {0, 0};
+
+  auto owned_output = [&](crypto::public_key &tx_pub, crypto::public_key &out_key)
+  {
+    const crypto::secret_key r = rct::rct2sk(rct::skGen());
+    ASSERT_TRUE(crypto::secret_key_to_public_key(r, tx_pub));
+    crypto::key_derivation d;
+    ASSERT_TRUE(crypto::generate_key_derivation(keys.m_account_address.m_view_public_key, r, d));
+    ASSERT_TRUE(crypto::derive_public_key(d, 0, keys.m_account_address.m_spend_public_key, out_key));
+  };
+
+  const size_t N_RING = 2;
+  const uint64_t RING_AMOUNTS[N_RING] = {12000000000000ull, 9000000000000ull};
+  const uint64_t PQ_AMOUNT = 20000000000000ull, FEE = 70000000000ull;
+  std::vector<tx_source_entry> sources(N_RING + 1);
+
+  // two ring sources, each a RingCT output of ours in its own ring of 16 (real at 7, then at 11)
+  for (size_t r = 0; r < N_RING; ++r)
+  {
+    tx_source_entry &src = sources[r];
+    crypto::public_key out_key;
+    owned_output(src.real_out_tx_key, out_key);
+    src.amount = RING_AMOUNTS[r];
+    src.rct = true;
+    src.mask = rct::skGen();
+    src.real_output = r == 0 ? 7 : 11;
+    src.real_output_in_tx_index = 0;
+    for (uint64_t n = 0; n < 16; ++n)
+    {
+      rct::ctkey ck;
+      const bool real = n == src.real_output;
+      ck.dest = real ? rct::pk2rct(out_key) : rct::pkGen();
+      ck.mask = real ? rct::commit(src.amount, src.mask) : rct::pkGen();
+      src.outputs.push_back({100 + 1000 * r + 3 * n, ck});
+    }
+  }
+  // the BQ source, LAST in the sources list here; construct_tx must still order ring inputs first
+  {
+    tx_source_entry &src = sources[N_RING];
+    crypto::public_key untweaked;
+    owned_output(src.real_out_tx_key, untweaked);
+    crypto::pqc::kyber_shared_secret ss;
+    const rct::key ss_bytes = rct::skGen();
+    memcpy(ss.ss, ss_bytes.bytes, sizeof(ss.ss));
+    crypto::secret_key tweak;
+    ASSERT_TRUE(derive_bq_output_tweak(ss, 0, tweak));
+    const rct::key tweaked = rct::addKeys(rct::pk2rct(untweaked), rct::scalarmultBase(rct::sk2rct(tweak)));
+    src.amount = PQ_AMOUNT;
+    src.rct = true;
+    src.mask = rct::skGen();
+    src.real_output = 0;
+    src.real_output_in_tx_index = 0;
+    src.outputs.push_back({5000, {tweaked, rct::commit(PQ_AMOUNT, src.mask)}});
+    src.is_pq = true;
+    src.pq_ss = ss;
+    src.pq_subaddr = subaddress_index{0, 0};
+  }
+  // put the BQ source FIRST in the list handed to construct_tx, to exercise its reordering
+  std::rotate(sources.begin(), sources.begin() + N_RING, sources.end());
+
+  const uint64_t total_in = RING_AMOUNTS[0] + RING_AMOUNTS[1] + PQ_AMOUNT;
+  account_base d1, d2;
+  d1.generate(); d2.generate();
+  std::vector<tx_destination_entry> dests;
+  dests.push_back(tx_destination_entry(25000000000000ull, d1.get_keys().m_account_address, false));
+  dests.push_back(tx_destination_entry(total_in - FEE - 25000000000000ull, d2.get_keys().m_account_address, false));
+
+  transaction tx;
+  crypto::secret_key tx_key;
+  std::vector<crypto::secret_key> additional_tx_keys;
+  ASSERT_TRUE(construct_tx_and_get_tx_key(keys, subaddresses, sources, dests, boost::none, {}, tx, tx_key, additional_tx_keys,
+                                          true, {rct::RangeProofPaddedBulletproof, 4}, true, HF_VERSION_PQ))
+      << "construct_tx refused the 2-ring + 1-BQ hybrid";
+
+  // n_ring = 2: two ring inputs first, then the BQ input; RingCT parts sized on the ring inputs
+  ASSERT_EQ(N_RING + 1, tx.vin.size());
+  EXPECT_EQ(typeid(txin_to_key), tx.vin[0].type()) << "ring inputs come first";
+  EXPECT_EQ(typeid(txin_to_key), tx.vin[1].type()) << "ring inputs come first";
+  EXPECT_EQ(typeid(txin_to_key_pq), tx.vin[2].type());
+  ASSERT_EQ(rct::RCTTypeBulletproofPlus, tx.rct_signatures.type);
+  EXPECT_EQ(N_RING, tx.rct_signatures.p.CLSAGs.size());
+  EXPECT_EQ(N_RING, tx.rct_signatures.p.pseudoOuts.size());
+  ASSERT_EQ(tx.vout.size(), tx.rct_signatures.outPk.size());
+  EXPECT_EQ(FEE, tx.rct_signatures.txnFee);
+
+  // (1) blob round trip
+  blobdata blob;
+  ASSERT_TRUE(tx_to_blob(tx, blob)) << "construct_tx's 2-ring hybrid does not serialise";
+  transaction parsed;
+  ASSERT_TRUE(parse_and_validate_tx_from_blob(blob, parsed)) << "the daemon cannot parse construct_tx's 2-ring hybrid";
+  EXPECT_EQ(blob, tx_to_blob(parsed)) << "re-serialising the parsed hybrid does not give the same bytes";
+  EXPECT_EQ(get_transaction_hash(tx), get_transaction_hash(parsed));
+  ASSERT_EQ(N_RING + 1, parsed.vin.size());
+  EXPECT_EQ(N_RING, parsed.rct_signatures.p.CLSAGs.size());
+  EXPECT_EQ(N_RING, parsed.rct_signatures.p.pseudoOuts.size());
+  for (size_t i = 0; i < N_RING; ++i)
+  {
+    EXPECT_TRUE(parsed.rct_signatures.p.pseudoOuts[i] == tx.rct_signatures.p.pseudoOuts[i]);
+    EXPECT_TRUE(parsed.rct_signatures.p.CLSAGs[i].c1 == tx.rct_signatures.p.CLSAGs[i].c1);
+    EXPECT_EQ(16u, parsed.rct_signatures.p.CLSAGs[i].s.size());
+  }
+  for (size_t o = 0; o < tx.vout.size(); ++o)
+    EXPECT_TRUE(parsed.rct_signatures.outPk[o].mask == tx.rct_signatures.outPk[o].mask);
+
+  // (2) balance with the transparent term (and the BP+ proof), negative control without it
+  uint64_t pq_in = 0;
+  ASSERT_TRUE(get_pq_transparent_input_sum(parsed, pq_in));
+  EXPECT_EQ(PQ_AMOUNT, pq_in);
+  parsed.rct_signatures.pq_transparent_in = pq_in;
+  EXPECT_TRUE(rct::verRctSemanticsSimple(parsed.rct_signatures)) << "balance / range proof of the parsed 2-ring hybrid";
+  parsed.rct_signatures.pq_transparent_in = 0;
+  EXPECT_FALSE(rct::verRctSemanticsSimple(parsed.rct_signatures)) << "control: without the transparent term it must not balance";
+  EXPECT_FALSE(outputs_stored_as_pseudo_rct(parsed)) << "a hybrid is a real RingCT tx, not pseudo-rct";
+
+  // (3) stored by the DB with each output's real commitment
+  boost::filesystem::path tempPath = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+  std::string dirPath = tempPath.string();
+  this->set_prefix(dirPath);
+  ASSERT_NO_THROW(this->m_db->open(dirPath));
+  this->get_filenames();
+  this->init_hard_fork();
+  db_wtxn_guard guard(this->m_db);
+  ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0], t_diffs[0], t_coins[0], this->m_txs[0]));
+  std::pair<block, blobdata> blk = this->m_blocks[1];
+  blk.first.tx_hashes.clear();
+  blk.first.tx_hashes.push_back(get_transaction_hash(parsed));
+  std::vector<std::pair<transaction, blobdata>> blk_txs;
+  blk_txs.push_back(std::make_pair(parsed, blob));
+  ASSERT_NO_THROW(this->m_db->add_block(blk, t_sizes[1], t_sizes[1], t_diffs[1], t_coins[1], blk_txs));
+  const std::vector<std::vector<uint64_t>> idx = this->m_db->get_tx_amount_output_indices(this->m_db->get_tx_count() - 1, 1);
+  ASSERT_EQ(1u, idx.size());
+  ASSERT_EQ(tx.vout.size(), idx.front().size());
+  for (size_t o = 0; o < tx.vout.size(); ++o)
+  {
+    output_data_t od{};
+    ASSERT_NO_THROW(od = this->m_db->get_output_key((uint64_t)0, idx.front()[o], true));
+    EXPECT_TRUE(od.commitment == tx.rct_signatures.outPk[o].mask)
+        << "output " << o << " of the 2-ring hybrid stored with " << epee::string_tools::pod_to_hex(od.commitment);
+  }
 }

@@ -21,7 +21,7 @@
 #
 # Known-defect flags (both fixed, default 0): ZERO_CHANGE_XFAIL (zero-change BQ spend refused), CHANGE_INDEX_XFAIL
 # (change subaddress indices skipped). Set to 1 to turn those failures into "expected failures" when
-# testing an unfixed build. Optional: CASES="a b1 b2 c d" (subset), E2E_WALLET_LOGLEVEL (wallet log level).
+# testing an unfixed build. Optional: CASES="a b1 b2 c d e" (subset), E2E_WALLET_LOGLEVEL (wallet log level).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
