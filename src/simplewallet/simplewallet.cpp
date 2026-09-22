@@ -9450,6 +9450,15 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
     success_msg_writer() << index << "  " << m_wallet->get_subaddress_as_str({m_current_subaddress_account, index}) << "  " << (index == 0 ? tr("Primary address") : m_wallet->get_subaddress_label({m_current_subaddress_account, index})) << " " << (used ? tr("(used)") : "");
   };
 
+  // Spec 2e §4.2 R-a — a BQ (sub)address already committed to a spend is never handed out again.
+  // wallet2 throws for it, but an exception from a console command only reaches the log
+  // (console_handler.h), so say it here, with the way to get a fresh one. Nothing is allocated.
+  const auto refuse_spent_bq = [this](const cryptonote::subaddress_index &idx) {
+    fail_msg_writer() << (boost::format(tr("BQ address %u,%u has already been used in a spend and must not be handed out "
+                                           "again (spec 2e / T2). For a fresh one: \"address new\", then \"address bq <new index>\"."))
+                          % idx.major % idx.minor);
+  };
+
   uint32_t index = 0;
   if (local_args.empty())
   {
@@ -9457,8 +9466,13 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
     // HIDERING Phase 5 (HFv16): if this is a BQ... wallet, also show its post-quantum address so
     // it can be handed out to receive BQ outputs. is_pq() is false for every classic wallet.
     if (m_wallet->get_account().get_keys().m_account_address.is_pq())
-      success_msg_writer() << tr("Post-quantum BQ... address: ")
-        << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
+    {
+      if (m_wallet->is_pq_subaddress_spent({0, 0}))
+        refuse_spent_bq({0, 0});
+      else
+        success_msg_writer() << tr("Post-quantum BQ... address: ")
+          << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
+    }
   }
   else if ((local_args.size() == 1 || local_args.size() == 2) && local_args[0] == "bq")
   {
@@ -9472,7 +9486,10 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
     }
     if (local_args.size() == 1)
     {
-      success_msg_writer() << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
+      if (m_wallet->is_pq_subaddress_spent({0, 0}))
+        refuse_spent_bq({0, 0});
+      else
+        success_msg_writer() << cryptonote::get_pq_address_str(m_wallet->get_account().get_keys(), m_wallet->nettype());
       return true;
     }
     uint32_t minor = 0;
@@ -9486,9 +9503,24 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
       fail_msg_writer() << tr("<index> is out of bounds");
       return true;
     }
+    if (m_wallet->is_pq_subaddress_spent({m_current_subaddress_account, minor}))
+    {
+      refuse_spent_bq({m_current_subaddress_account, minor});
+      return true;
+    }
     // The subaddress ML-KEM key is derived from the wallet secret, which is encrypted in memory.
     SCOPED_WALLET_UNLOCK();
-    success_msg_writer() << minor << "  " << m_wallet->get_pq_subaddress_as_str({m_current_subaddress_account, minor});
+    std::string bq_address;
+    try
+    {
+      bq_address = m_wallet->get_pq_subaddress_as_str({m_current_subaddress_account, minor});
+    }
+    catch (const std::exception &e)
+    {
+      fail_msg_writer() << e.what();
+      return true;
+    }
+    success_msg_writer() << minor << "  " << bq_address;
   }
   else if (local_args.size() == 1 && local_args[0] == "all")
   {

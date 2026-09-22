@@ -2653,23 +2653,29 @@ void wallet2::enforce_pq_subaddress_merge_policy(const std::set<std::pair<uint32
              "enable BQ subaddress merging explicitly."));
 }
 //----------------------------------------------------------------------------------------------------
+// The index allocate_fresh_pq_subaddress would return, without allocating it (no table expansion,
+// nothing marked): lets the fee-estimation passes of a BQ spend size the change output exactly
+// as the real pass will build it.
+static cryptonote::subaddress_index peek_fresh_pq_subaddress(const wallet2 &w, uint32_t major)
+{
+  const uint32_t n = (uint32_t)w.get_num_subaddresses(major);
+  uint32_t minor = n == 0 ? 1 : n;
+  while (w.is_pq_subaddress_spent({major, minor}))
+  {
+    THROW_WALLET_EXCEPTION_IF(minor == std::numeric_limits<uint32_t>::max(), error::wallet_internal_error,
+        wallet2::tr("no fresh BQ subaddress left on this account"));
+    ++minor;
+  }
+  return {major, minor};
+}
+//----------------------------------------------------------------------------------------------------
 cryptonote::subaddress_index wallet2::allocate_fresh_pq_subaddress(uint32_t major)
 {
   // Spec 2e §4.2 — a BQ subaddress that has never been committed to a spend. Walks up from the
   // first unused minor index of `major`, expanding the table as needed, and skipping anything
   // already burnt. Never returns (major, 0): the primary/account index is where the previous
   // design silently parked every change output, which is the worst case for T1 linkability.
-  const uint32_t n = (uint32_t)get_num_subaddresses(major);
-  uint32_t minor = n == 0 ? 1 : n;
-  if (minor == 0)
-    minor = 1;
-  while (is_pq_subaddress_spent({major, minor}))
-  {
-    THROW_WALLET_EXCEPTION_IF(minor == std::numeric_limits<uint32_t>::max(), error::wallet_internal_error,
-        tr("no fresh BQ subaddress left on this account"));
-    ++minor;
-  }
-  const cryptonote::subaddress_index index{major, minor};
+  const cryptonote::subaddress_index index = peek_fresh_pq_subaddress(*this, major);
   expand_subaddresses(index);
   return index;
 }
@@ -10785,6 +10791,9 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   using namespace cryptonote;
   // throw if attempting a transaction with no destinations
   THROW_WALLET_EXCEPTION_IF(dsts.empty(), error::zero_destination);
+  // Read before the BQ sources are resolved: recover_pq_spend_secret switches the device to
+  // TRANSACTION_PARSE, which would hide whether this is a sizing pass or the real construction.
+  const bool sizing_pass = m_account.get_device().get_mode() == hw::device::TRANSACTION_CREATE_FAKE;
 
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   uint64_t needed_money = fee;
@@ -10935,7 +10944,12 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     {
       crypto::pqc::kyber_shared_secret pq_ss;
       crypto::pqc::kyber_ciphertext pq_ct;
-      if (recover_pq_spend_secret(td, pq_ss, &pq_ct))
+      // recover_pq_spend_secret leaves the device in TRANSACTION_PARSE; put back the caller's
+      // mode, or the next fee-estimation pass would no longer be seen as one (sizing_pass).
+      const hw::device::device_mode caller_mode = m_account.get_device().get_mode();
+      const bool is_bq_source = recover_pq_spend_secret(td, pq_ss, &pq_ct);
+      m_account.get_device().set_mode(caller_mode);
+      if (is_bq_source)
       {
         src.is_pq = true;
         src.pq_ss = pq_ss;
@@ -10962,7 +10976,41 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   std::vector<cryptonote::tx_destination_entry> splitted_dsts = dsts;
   cryptonote::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
   change_dts.amount = found_money - needed_money;
-  if (change_dts.amount == 0)
+  // Spec 2e §4.2 R-b — the change of a BQ spend goes to a FRESH BQ subaddress, a zero change
+  // included: the classic zero-change path below pays a random CLASSIC dummy address, which
+  // construct_tx refuses for a BQ spend (§4.3), so a BQ wallet could never be swept or emptied.
+  // The output cannot simply be dropped: consensus requires two outputs (blockchain.cpp:3651).
+  //
+  // What it used to do, and why both cases were wrong: get_subaddress({major, 0}) returns
+  // m_account_address for major == 0, i.e. the PRIMARY BQ address — so every BQ spend's
+  // change landed on one index, and under T1 the first spend of any such change reveals the
+  // primary authorisation key and merges nearly the whole wallet into one linkage set. For
+  // major > 0 it returns a plain (C, D) pair with no ML-KEM key at all, so the change of a BQ
+  // spend was a classic B... output: spending BQ funds silently converted the remainder back
+  // into quantum-vulnerable money.
+  if (!pq_spend_subaddrs.empty() && (change_dts.amount != 0 || splitted_dsts.size() == 1))
+  {
+    // One allocation per transaction actually built. create_transactions_2/_from call this
+    // function several times per transaction in TRANSACTION_CREATE_FAKE mode (fee estimation),
+    // then once in TRANSACTION_CREATE_REAL mode: allocating on every call burnt a subaddress per
+    // attempt. The sizing passes use the index the real pass will take, without side effects.
+    cryptonote::subaddress_index fresh;
+    if (sizing_pass)
+      fresh = peek_fresh_pq_subaddress(*this, subaddr_account);
+    else
+    {
+      fresh = allocate_fresh_pq_subaddress(subaddr_account);
+      mark_pq_subaddress_spent(fresh); // never hand this one out as a payment address
+    }
+    cryptonote::account_public_address bq_change;
+    THROW_WALLET_EXCEPTION_IF(!cryptonote::get_pq_subaddress(m_account.get_keys(), fresh, bq_change),
+        error::wallet_internal_error, tr("cannot derive a fresh BQ change subaddress"));
+    change_dts.addr = bq_change;
+    change_dts.is_subaddress = true;
+    change_dts.is_pq = true;
+    splitted_dsts.push_back(change_dts);
+  }
+  else if (change_dts.amount == 0)
   {
     if (splitted_dsts.size() == 1)
     {
@@ -10980,31 +11028,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   }
   else
   {
-    // Spec 2e §4.2 R-b — the change of a BQ spend goes to a FRESH BQ subaddress.
-    //
-    // What it used to do, and why both cases were wrong: get_subaddress({major, 0}) returns
-    // m_account_address for major == 0, i.e. the PRIMARY BQ address — so every BQ spend's
-    // change landed on one index, and under T1 the first spend of any such change reveals the
-    // primary authorisation key and merges nearly the whole wallet into one linkage set. For
-    // major > 0 it returns a plain (C, D) pair with no ML-KEM key at all, so the change of a BQ
-    // spend was a classic B... output: spending BQ funds silently converted the remainder back
-    // into quantum-vulnerable money.
-    if (!pq_spend_subaddrs.empty())
-    {
-      const cryptonote::subaddress_index fresh = allocate_fresh_pq_subaddress(subaddr_account);
-      cryptonote::account_public_address bq_change;
-      THROW_WALLET_EXCEPTION_IF(!cryptonote::get_pq_subaddress(m_account.get_keys(), fresh, bq_change),
-          error::wallet_internal_error, tr("cannot derive a fresh BQ change subaddress"));
-      change_dts.addr = bq_change;
-      change_dts.is_subaddress = true;
-      change_dts.is_pq = true;
-      mark_pq_subaddress_spent(fresh); // never hand this one out as a payment address
-    }
-    else
-    {
-      change_dts.addr = get_subaddress({subaddr_account, 0});
-      change_dts.is_subaddress = subaddr_account != 0;
-    }
+    change_dts.addr = get_subaddress({subaddr_account, 0});
+    change_dts.is_subaddress = subaddr_account != 0;
     splitted_dsts.push_back(change_dts);
   }
 
@@ -11012,6 +11037,13 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   enforce_pq_subaddress_merge_policy(pq_spend_subaddrs);
   for (const auto &idx : pq_spend_subaddrs)
     mark_pq_subaddress_spent({idx.first, idx.second});
+
+  // Spec 2e §4.3, surfaced: construct_tx refuses a BQ spend whose change is not BQ, but logs it
+  // under the "serialization" category, which the default wallet log level hides — all the user
+  // got was "transaction was not constructed". Refuse here too, with the reason, in the wallet log.
+  THROW_WALLET_EXCEPTION_IF(!pq_spend_subaddrs.empty() && change_dts.addr.m_spend_public_key != crypto::null_pkey
+      && !change_dts.addr.is_pq(), error::wallet_internal_error,
+      tr("a BQ spend must not send its change to a non-BQ address (spec 2e §4.3)"));
 
   crypto::secret_key tx_key;
   std::vector<crypto::secret_key> additional_tx_keys;
