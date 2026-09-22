@@ -467,3 +467,65 @@ TYPED_TEST(BlockchainDBTest, PqTransparentOutputsLiveInRctBucketZero)
   EXPECT_EQ(rct_outs_before, this->m_db->get_num_outputs(0))
       << "the BQ output was not removed from bucket 0 on reorg";
 }
+
+// HIDERING Phase 5 — the per-block RingCT output count must follow the SAME rule as the bucket-0
+// storage above. The count (bi_cum_rct) is what get_output_distribution hands wallets: gamma decoy
+// selection draws from it, and wallet2's get_outs sanity check refuses to build any transaction
+// once it lags the real bucket-0 index space ("Daemon reports suspicious number of rct outputs").
+// It used to count `vout.amount == 0` only, so every transparent BQ output — stored in bucket 0,
+// but with its amount revealed — was missing from the distribution: one output lost per output.
+// Found by tests/pq_e2e (the distribution fell 12 behind bucket 0 after a few BQ spends, and a
+// later BQ spend failed with "failed to get output distribution").
+TYPED_TEST(BlockchainDBTest, PqTransparentOutputsCountedInRctDistribution)
+{
+  boost::filesystem::path tempPath = boost::filesystem::temp_directory_path() / boost::filesystem::unique_path();
+  std::string dirPath = tempPath.string();
+  this->set_prefix(dirPath);
+
+  ASSERT_NO_THROW(this->m_db->open(dirPath));
+  this->get_filenames();
+  this->init_hard_fork();
+
+  db_wtxn_guard guard(this->m_db);
+
+  ASSERT_NO_THROW(this->m_db->add_block(this->m_blocks[0], t_sizes[0], t_sizes[0], t_diffs[0], t_coins[0], this->m_txs[0]));
+  const uint64_t bucket0_before = this->m_db->get_num_outputs(0);
+  const uint64_t cum_before = this->m_db->get_block_cumulative_rct_outputs({0}).front();
+
+  // a transparent BQ spend with two REVEALED, non-zero outputs (payment + change) and a zero one
+  transaction pq_tx{};
+  pq_tx.version = 2;
+  pq_tx.rct_signatures.type = rct::RCTTypeNull;
+  txin_to_key_pq pq_in{};
+  pq_in.amount = 30000000000000ull;
+  for (size_t i = 0; i < sizeof(pq_in.real_output_key); ++i)
+    ((uint8_t*)&pq_in.real_output_key)[i] = (uint8_t)(0x50 + i);
+  pq_tx.vin.push_back(pq_in);
+  const uint64_t amounts[] = {20000000000000ull, 9990000000000ull, 0};
+  for (size_t o = 0; o < 3; ++o)
+  {
+    tx_out out{};
+    out.amount = amounts[o];
+    txout_to_tagged_key tagged{};
+    for (size_t i = 0; i < sizeof(tagged.key); ++i)
+      ((uint8_t*)&tagged.key)[i] = (uint8_t)(0xB0 + 16 * o + i);
+    out.target = tagged;
+    pq_tx.vout.push_back(out);
+  }
+
+  std::pair<block, blobdata> blk = this->m_blocks[1];
+  blk.first.tx_hashes.clear();
+  blk.first.tx_hashes.push_back(get_transaction_hash(pq_tx));
+  std::vector<std::pair<transaction, blobdata>> blk_txs;
+  blk_txs.push_back(std::make_pair(pq_tx, tx_to_blob(pq_tx)));
+  ASSERT_NO_THROW(this->m_db->add_block(blk, t_sizes[1], t_sizes[1], t_diffs[1], t_coins[1], blk_txs));
+
+  const uint64_t bucket0_added = this->m_db->get_num_outputs(0) - bucket0_before;
+  const uint64_t cum_after = this->m_db->get_block_cumulative_rct_outputs({1}).front();
+  EXPECT_EQ(bucket0_added, cum_after - cum_before)
+      << "the block's RingCT output count differs from what bucket 0 received";
+  EXPECT_EQ(this->m_db->get_num_outputs(0), cum_after)
+      << "the cumulative RingCT count (get_output_distribution) lags the bucket-0 index space";
+  // all three transparent outputs, the revealed non-zero ones included, are in bucket 0
+  EXPECT_LE(3u, bucket0_added);
+}

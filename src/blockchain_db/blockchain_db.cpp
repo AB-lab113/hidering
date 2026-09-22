@@ -179,9 +179,36 @@ void BlockchainDB::pop_block()
   pop_block(blk, txs);
 }
 
+// HIDERING — the one rule for which amount bucket each output of a transaction is stored under.
+// A v2 coinbase and a transparent BQ spend (CRIT-1) are "pseudo-rct": every output goes to the
+// RingCT bucket 0 with an identity-mask commitment, whatever its revealed amount. Any other output
+// is stored under its own amount (0 for a RingCT output). add_transaction stores by this rule and
+// add_block counts the block's RingCT outputs by it, so the per-block count behind
+// get_output_distribution is exactly what bucket 0 received — counting `amount == 0` instead missed
+// every transparent BQ output, and wallets then worked on a truncated bucket-0 index space.
+// BlockchainLMDB::remove_tx_outputs (is_pseudo_rct) mirrors the same rule on a reorg.
+static bool outputs_stored_as_pseudo_rct(const transaction& tx)
+{
+  bool coinbase = false;
+  for (const txin_v& in : tx.vin)
+    if (in.type() == typeid(txin_gen))
+      coinbase = true;
+  return (coinbase && tx.version == 2) || has_transparent_pq_input(tx);
+}
+
+static uint64_t num_outputs_in_rct_bucket(const transaction& tx)
+{
+  if (outputs_stored_as_pseudo_rct(tx))
+    return tx.vout.size();
+  uint64_t n = 0;
+  for (const auto& vout : tx.vout)
+    if (vout.amount == 0)
+      ++n;
+  return n;
+}
+
 void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transaction& tx, const epee::span<const std::uint8_t> blob, const crypto::hash* tx_hash_ptr, const crypto::hash* tx_prunable_hash_ptr)
 {
-  bool miner_tx = false;
   crypto::hash tx_hash, tx_prunable_hash;
   if (!tx_hash_ptr)
   {
@@ -218,7 +245,6 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
     else if (tx_input.type() == typeid(txin_gen))
     {
       /* nothing to do here */
-      miner_tx = true;
     }
     else
     {
@@ -258,7 +284,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
   // Gated by the input variant, which can only exist at/after HF_VERSION_PQ (enforced in
   // check_inputs_types_supported and Blockchain::check_tx_inputs). Classic B... txs are
   // byte-identical, on the wire and on disk.
-  const bool pq_transparent_tx = has_transparent_pq_input(tx);
+  const bool pseudo_rct = outputs_stored_as_pseudo_rct(tx);
 
   // iterate tx.vout using indices instead of C++11 foreach syntax because
   // we need the index
@@ -267,7 +293,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const transacti
     // miner v2 txes have their coinbase output in one single out to save space,
     // and we store them as rct outputs with an identity mask.
     // HIDERING: transparent BQ spends take the same path (see CRIT-1 note above).
-    if ((miner_tx && tx.version == 2) || pq_transparent_tx)
+    if (pseudo_rct)
     {
       cryptonote::tx_out vout = tx.vout[i];
       rct::key commitment = rct::zeroCommit(vout.amount);
@@ -312,19 +338,14 @@ uint64_t BlockchainDB::add_block( const std::pair<block, blobdata>& blck
   uint64_t num_rct_outs = 0;
   blobdata miner_bd = tx_to_blob(blk.miner_tx);
   add_transaction(blk_hash, blk.miner_tx, epee::strspan<std::uint8_t>(miner_bd));
-  if (blk.miner_tx.version == 2)
-    num_rct_outs += blk.miner_tx.vout.size();
+  num_rct_outs += num_outputs_in_rct_bucket(blk.miner_tx);
   int tx_i = 0;
   crypto::hash tx_hash = crypto::null_hash;
   for (const std::pair<transaction, blobdata>& tx : txs)
   {
     tx_hash = blk.tx_hashes[tx_i];
     add_transaction(blk_hash, tx.first, epee::strspan<std::uint8_t>(tx.second), &tx_hash);
-    for (const auto &vout: tx.first.vout)
-    {
-      if (vout.amount == 0)
-        ++num_rct_outs;
-    }
+    num_rct_outs += num_outputs_in_rct_bucket(tx.first);
     ++tx_i;
   }
   TIME_MEASURE_FINISH(time1);
