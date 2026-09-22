@@ -382,8 +382,18 @@ namespace cryptonote
         ar.tag("rct_signatures");
         if (!vin.empty())
         {
+          // HIDERING Phase 5 (HFv16): the RingCT parts of a HYBRID tx (CLSAGs/MGs/pseudoOuts)
+          // cover its RING inputs only (structure H2: genRctSimple sees the ring sources, and
+          // Blockchain::expand_transaction_2 checks CLSAGs.size() == n_ring). Sizing them on
+          // vin.size() truncated every hybrid blob. n_ring == vin.size() for every tx without a
+          // txin_to_key_pq, and an all-PQ tx is RCTTypeNull (no prunable part, and the base
+          // only carries the type), so the wire format of everything else is unchanged.
+          size_t n_ring = 0;
+          for (const auto &in: vin)
+            if (in.type() != typeid(txin_to_key_pq))
+              ++n_ring;
           ar.begin_object();
-          bool r = rct_signatures.serialize_rctsig_base(ar, vin.size(), vout.size());
+          bool r = rct_signatures.serialize_rctsig_base(ar, n_ring, vout.size());
           if (!r || !ar.good()) return false;
           ar.end_object();
 
@@ -394,7 +404,7 @@ namespace cryptonote
           {
             ar.tag("rctsig_prunable");
             ar.begin_object();
-            r = rct_signatures.p.serialize_rctsig_prunable(ar, rct_signatures.type, vin.size(), vout.size(),
+            r = rct_signatures.p.serialize_rctsig_prunable(ar, rct_signatures.type, n_ring, vout.size(),
                 vin.size() > 0 && vin[0].type() == typeid(txin_to_key) ? boost::get<txin_to_key>(vin[0]).key_offsets.size() - 1 : 0);
             if (!r || !ar.good()) return false;
             ar.end_object();
@@ -418,8 +428,13 @@ namespace cryptonote
         ar.tag("rct_signatures");
         if (!vin.empty())
         {
+          // HIDERING: ring inputs only, as in the full serialiser above
+          size_t n_ring = 0;
+          for (const auto &in: vin)
+            if (in.type() != typeid(txin_to_key_pq))
+              ++n_ring;
           ar.begin_object();
-          bool r = rct_signatures.serialize_rctsig_base(ar, vin.size(), vout.size());
+          bool r = rct_signatures.serialize_rctsig_base(ar, n_ring, vout.size());
           if (!r || !ar.good()) return false;
           ar.end_object();
         }
