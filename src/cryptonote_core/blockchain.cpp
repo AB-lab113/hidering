@@ -3551,10 +3551,13 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         // SENDER spend any BQ output it paid. The one-time secret x' (P' = x'*G) needs the
         // recipient's spend key; require a signature by it over the same message.
         //
-        // An Ed25519 signature is not quantum-resistant: a sender that can ALSO run Shor on P'
-        // is not stopped by this. Closing that case needs a recipient-held post-quantum key in the
-        // output binding — a design decision tracked with C-1, see
-        // docs/audit/CRIT-3_sender_can_reclaim_bq_output_2026-09-11.md.
+        // An Ed25519 signature is not quantum-resistant, so (d2) alone does not stop a sender that
+        // can ALSO run Shor on P'. That case is CLOSED by check (c): spec 2e (commit 740a6c983)
+        // made the authorisation key a RECIPIENT-HELD post-quantum key, derived from pq_root and
+        // committed to in the output's binding tag, which no sender can open. See
+        // docs/audit/CRIT-3_sender_can_reclaim_bq_output_2026-09-11.md,
+        // docs/audit/spec_2e_bq_address_auth_binding.md, and the failure matrix in
+        // docs/audit/M-11_risk_acceptance_2026-09-22.md §4.
         if (!crypto::check_signature(pq_in_hash, in.real_output_key, in.owner_sig))
         {
           MERROR_VER("Tx " << get_transaction_hash(tx) << " PQ input is not signed by the owner of output " << in.spent_output_index);
