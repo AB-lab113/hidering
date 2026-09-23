@@ -22,10 +22,11 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: #000; }
 
 body {
-  background: var(--black);
+  /* transparent so the fixed matrix canvas (z-index:-1) shows through */
+  background: transparent;
   color: var(--text);
   font-family: 'Inter', sans-serif;
   font-weight: 300;
@@ -162,6 +163,7 @@ section {
   padding: 6rem 2rem;
   max-width: 1100px;
   margin: 0 auto;
+  background: rgba(0,0,0,0.75);
 }
 
 /* page header used by inner pages */
@@ -171,6 +173,7 @@ section {
   text-align: center;
   padding: calc(var(--nav-h) + 5rem) 2rem 4rem;
   overflow: hidden;
+  background: rgba(0,0,0,0.75);
 }
 
 .page-head .hero-glow {
@@ -294,6 +297,7 @@ footer {
   text-align: center;
   position: relative;
   z-index: 1;
+  background: rgba(0,0,0,0.75);
 }
 
 .footer-logo {

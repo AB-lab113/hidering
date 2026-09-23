@@ -9,6 +9,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+<script src="/matrix.js" defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
@@ -27,35 +28,16 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  html { background: #000; }
+
   body {
-    background: var(--bg);
+    /* transparent so the fixed matrix canvas (z-index:-1) shows through */
+    background: transparent;
     color: var(--text);
     font-family: 'Share Tech Mono', monospace;
     min-height: 100vh;
     overflow-x: hidden;
     position: relative;
-  }
-
-  /* ── 64 GOLDEN RINGS BACKGROUND ── */
-  .rings-bg {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-
-  .ring {
-    position: absolute;
-    border-radius: 50%;
-    border: 1px solid rgba(201, 135, 39, 0.12);
-    animation: ringPulse linear infinite;
-  }
-
-  @keyframes ringPulse {
-    0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
-    50%  { transform: translate(-50%, -50%) scale(1.04); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.6; }
   }
 
   /* ── HEADER ── */
@@ -145,6 +127,9 @@
   }
 
   .chat-title {
+    background: rgba(0,0,0,0.75);
+    padding: 20px;
+    border-radius: 4px;
     text-align: center;
   }
 
@@ -372,6 +357,9 @@
 
   /* ── STATUS BAR ── */
   .status-bar {
+    background: rgba(0,0,0,0.75);
+    border-radius: 4px;
+    padding: 8px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -404,9 +392,6 @@
 </style>
 </head>
 <body>
-
-<!-- 64 RINGS BACKGROUND -->
-<div class="rings-bg" id="ringsBg"></div>
 
 <!-- HEADER -->
 <header>
@@ -476,33 +461,6 @@
 </div>
 
 <script>
-  /* ── 64 RINGS GENERATION ── */
-  (function() {
-    var bg = document.getElementById('ringsBg');
-    var cols = ['rgba(201,135,39,', 'rgba(240,168,64,', 'rgba(150,97,20,'];
-    for (var i = 0; i < 64; i++) {
-      var el = document.createElement('div');
-      el.className = 'ring';
-      var size = 40 + Math.random() * 280;
-      var x = Math.random() * 110 - 5;
-      var y = Math.random() * 110 - 5;
-      var dur = 3 + Math.random() * 8;
-      var delay = -Math.random() * 8;
-      var opacity = 0.04 + Math.random() * 0.18;
-      var col = cols[Math.floor(Math.random() * cols.length)];
-      el.style.cssText = [
-        'width:' + size + 'px',
-        'height:' + size + 'px',
-        'left:' + x + '%',
-        'top:' + y + '%',
-        'border-color:' + col + opacity + ')',
-        'animation-duration:' + dur + 's',
-        'animation-delay:' + delay + 's',
-      ].join(';');
-      bg.appendChild(el);
-    }
-  })();
-
   /* ── GUN.JS FLASH CHAT ── */
   var GUN_RELAY = 'wss://gun.hidering.org/gun';
   var NAMESPACE = 'hidering-flashchat';

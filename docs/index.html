@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Fira+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="/matrix.js" defer></script>
 <style>
   /* ---- home-only ---- */
   .hero {
@@ -32,21 +33,6 @@
     background: radial-gradient(ellipse, rgba(201,150,76,0.08) 0%, transparent 70%);
     pointer-events: none;
   }
-  .hero-ring {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -55%);
-    width: 480px; height: 480px;
-    border-radius: 50%;
-    border: 1px solid rgba(201,150,76,0.06);
-    pointer-events: none;
-    animation: rotate 60s linear infinite;
-  }
-  .hero-ring::after {
-    content: ''; position: absolute; top: -1px; left: 30%;
-    width: 40%; height: 2px;
-    background: linear-gradient(90deg, transparent, var(--gold), transparent);
-  }
-  @keyframes rotate { to { transform: translate(-50%, -55%) rotate(360deg); } }
   .hero-badge {
     display: inline-block;
     border: 1px solid var(--border-bright);
@@ -135,6 +121,7 @@
   .fairlaunch-box {
     border: 1px solid var(--border-bright); padding: 3rem; text-align: center;
     position: relative; overflow: hidden; margin-top: 4rem;
+    background: rgba(0,0,0,0.75);
   }
   .fairlaunch-box::before {
     content: ''; position: absolute; inset: 0;
@@ -187,7 +174,6 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-glow"></div>
-  <div class="hero-ring"></div>
 
   <a href="/chat" aria-label="Open Flash Chat"><img src="logo1.png" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:1.5rem;border:2px solid rgba(201,150,76,0.4);cursor:pointer;" alt="HRG Logo"></a>
   <div class="hero-badge">Fair Launch · 100% PoW · RandomX CPU</div>
