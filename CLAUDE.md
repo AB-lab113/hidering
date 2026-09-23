@@ -82,7 +82,7 @@ Fork de Monero v0.18.1 rebrandé en HIDERING.
 - src/cryptonote_config.h — config réseau, ring size, fees, magic bytes
 - src/cryptonote_core/blockchain.cpp — logique blockchain (call sites de get_block_reward)
 - src/hardforks/hardforks.cpp — schedule HFv15 (présent dès bloc 1)
-- src/checkpoints/checkpoints.cpp — ancres mainnet h=2939/5000/11000/16000/20000/25000, hash-enforced depuis `934b43b01` (6 juin 2026) ; branches TESTNET/STAGENET **vidées** (M-1, 13 juin) — anciennes ancres Monero héritées retirées (auraient halté tout testnet/stagenet HRG sous enforcement)
+- src/checkpoints/checkpoints.cpp — ancres mainnet h=2939/5000/11000/16000/20000/25000/80386/90000, hash-enforced depuis `934b43b01` (6 juin 2026) ; branches TESTNET/STAGENET **vidées** (M-1, 13 juin) — anciennes ancres Monero héritées retirées (auraient halté tout testnet/stagenet HRG sous enforcement)
 - src/cryptonote_basic/cryptonote_basic_impl.cpp — impl. de base, **get_block_reward()** (halving)
 - src/simplewallet/simplewallet.{h,cpp} — wallet CLI
 - src/p2p/net_node.inl — réseau P2P ; seeds Tor/i2p Monero purgés (M-5, commit `eee5dec50` 12 juin 2026 : 6 `.onion` + 3 `.b32.i2p` retirés de `get_seed_nodes`, zones tor/i2p mainnet rendent `{}` ; support Tor/i2p `--proxy`/`--anonymous-inbound` conservé, pas encore de seeds cachés HRG)
