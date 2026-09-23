@@ -4,15 +4,15 @@
    ============================================================ */
 
 :root {
-  --gold: #C9A84C;
-  --gold-bright: #E8C97A;
-  --gold-dim: #7A6230;
+  --gold: #C9964C;
+  --gold-bright: #E8BB7A;
+  --gold-dim: #7F6032;
   --black: #080808;
   --dark: #0E0E0E;
   --dark2: #161616;
   --dark3: #1E1E1E;
-  --border: rgba(201,168,76,0.18);
-  --border-bright: rgba(201,168,76,0.5);
+  --border: rgba(201,150,76,0.18);
+  --border-bright: rgba(201,150,76,0.5);
   --text: #D4CFC0;
   --text-dim: #7A7060;
   --white: #F0ECE0;
@@ -143,7 +143,7 @@ nav {
 }
 
 .btn-outline:hover {
-  background: rgba(201,168,76,0.07);
+  background: rgba(201,150,76,0.07);
   transform: translateY(-1px);
 }
 
@@ -178,7 +178,7 @@ section {
   top: 0; left: 50%;
   transform: translateX(-50%);
   width: 600px; height: 400px;
-  background: radial-gradient(ellipse, rgba(201,168,76,0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(201,150,76,0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -250,7 +250,7 @@ section {
   vertical-align: top;
 }
 
-.data-table tr:hover td { background: rgba(201,168,76,0.03); }
+.data-table tr:hover td { background: rgba(201,150,76,0.03); }
 .data-table .gold { color: var(--gold); font-family: 'Fira Mono', monospace; }
 
 /* ============================== CODE ============================== */

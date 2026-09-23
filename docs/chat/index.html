@@ -13,9 +13,9 @@
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
   :root {
-    --gold: #c9a227;
-    --gold-light: #f0c040;
-    --gold-dim: #7a5f10;
+    --gold: #c98727;
+    --gold-light: #f0a840;
+    --gold-dim: #895812;
     --bg: #06060a;
     --bg2: #0e0e16;
     --bg3: #141420;
@@ -48,7 +48,7 @@
   .ring {
     position: absolute;
     border-radius: 50%;
-    border: 1px solid rgba(201, 162, 39, 0.12);
+    border: 1px solid rgba(201, 135, 39, 0.12);
     animation: ringPulse linear infinite;
   }
 
@@ -217,7 +217,7 @@
   }
 
   .btn:hover {
-    background: rgba(201,162,39,0.08);
+    background: rgba(201,135,39,0.08);
     border-color: var(--gold);
   }
 
@@ -350,7 +350,7 @@
   .msg-input:disabled { opacity: 0.4; }
 
   .send-btn {
-    background: rgba(201,162,39,0.12);
+    background: rgba(201,135,39,0.12);
     border: 1px solid var(--gold-dim);
     color: var(--gold);
     font-family: 'Orbitron', sans-serif;
@@ -364,7 +364,7 @@
   }
 
   .send-btn:hover {
-    background: rgba(201,162,39,0.22);
+    background: rgba(201,135,39,0.22);
     border-color: var(--gold);
   }
 
@@ -479,7 +479,7 @@
   /* ── 64 RINGS GENERATION ── */
   (function() {
     var bg = document.getElementById('ringsBg');
-    var cols = ['rgba(201,162,39,', 'rgba(240,192,64,', 'rgba(150,110,20,'];
+    var cols = ['rgba(201,135,39,', 'rgba(240,168,64,', 'rgba(150,97,20,'];
     for (var i = 0; i < 64; i++) {
       var el = document.createElement('div');
       el.className = 'ring';
