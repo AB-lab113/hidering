@@ -152,3 +152,6 @@ hrg-wallet*
 
 # local operational notes (may contain wallet addresses / passwords)
 REPRISE_DEMAIN_MINING.md
+
+# raw logo/branding sources for the site (large originals, not served)
+/docs/assets-src/
