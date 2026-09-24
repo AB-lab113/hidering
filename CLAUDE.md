@@ -47,7 +47,7 @@ Fork de Monero v0.18.1 rebrandé en HIDERING.
 - Émission : **100% PoW** (algo RandomX, CPU-only) — pas de seed round, pas de vente privée, pas de token allocation équipe
 - Phase pré-publique v2.0.0 : depuis le hard fork du 16 mai 2026 (post-attaque 51% sur v1.x à h≈3577), les nœuds fondateurs minent en réseau privé avant ré-ouverture publique. Volume + durée non encore fixés ; communication publique au launch. Voir whitepaper §7.1 et FAQ site web pour le narratif officiel. **NB :** la promesse "Premine : 0 HRG" du v1.x N'EST PLUS valable depuis v2.0.0 — toute doc résiduelle à harmoniser.
 - Block time : 120 secondes
-- Halving interval : 210,000 blocs (~2.66 ans)
+- Halving interval : 210,000 blocs (~292 jours)
 - Récompense initiale : **42.86 HRG/bloc** (= 9,000,000 / 210,000 — série géométrique somme à 18M)
 - Algorithme PoW : RandomX (CPU-only, ASIC-resistant)
 

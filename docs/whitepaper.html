@@ -157,7 +157,7 @@
         <tr><td>Max circulating supply</td><td>18,000,000.00 HRG exact — the genesis NUMS 157.14 HRG is unspendable and excluded from emission accounting, so it is not deducted from the cap</td></tr>
         <tr><td>Emission</td><td>100% PoW (no seed round, no private sale) — see §7</td></tr>
         <tr><td>Block time</td><td class="gold">120 seconds</td></tr>
-        <tr><td>Halving interval</td><td class="gold">210,000 blocks (~2.66 years)</td></tr>
+        <tr><td>Halving interval</td><td class="gold">210,000 blocks (~292 days)</td></tr>
         <tr><td>PoW algorithm</td><td>RandomX (CPU-only)</td></tr>
         <tr><td>Initial reward</td><td class="gold">42.86 HRG / block</td></tr>
         <tr><td>Addresses</td><td>Begin with "B" (prefix 60)</td></tr>
@@ -189,13 +189,13 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs 0.15.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits. All PQ code remains <strong>inert</strong> until the hard fork (HFv16, <code class="inline">HF_HEIGHT_PQ</code> = 2,000,000). The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Mainnet target: <strong>Q2 2027</strong> (unchanged).</div>
+    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs 0.16.0 integration, BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits. All PQ code remains <strong>inert</strong> until the hard fork (HFv16, <code class="inline">HF_HEIGHT_PQ</code> = 2,000,000). The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Mainnet target: <strong>Q2 2027</strong> (unchanged).</div>
 
     <h3>6.1 · What activating HFv16 actually takes</h3>
     <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
     <ul>
-      <li><strong>Security blockers.</strong> The post-quantum library we use (liboqs) still carries its authors' own warning, in its current release: <em>"we do not currently recommend relying on this library in a production environment or to protect any sensitive data"</em>. It holds no FIPS 140-3 validation — only the <em>algorithms</em> (ML-KEM, ML-DSA) are final NIST standards, not the implementation. Until that is resolved (third-party audit, a validated implementation, or a formalised hybrid posture), <strong>HFv16 will not be activated</strong>.</li>
-      <li><strong>Open functional gaps.</strong> BQ subaddresses do not exist yet. (Two gaps closed on 8 September 2026: cold-signing a BQ spend — the transfer file carries the ML-KEM-768 ciphertext and never the shared secret, and the offline machine re-derives that secret with its own keys — and B.../BQ consolidation, via the hybrid transactions described in §6.3.)</li>
+      <li><strong>Security blockers.</strong> The post-quantum library we use (liboqs) still carries its authors' own warning, in its current release: <em>"we do not currently recommend relying on this library in a production environment or to protect any sensitive data"</em>. It holds no FIPS 140-3 validation — only the <em>algorithms</em> (ML-KEM, ML-DSA) are final NIST standards, not the implementation. HIDERING's post-quantum cryptography has undergone an AI-assisted review and a documented risk acceptance rather than a third-party audit (see M-11). <strong>HFv16 will not be activated</strong> until the remaining hardening work — constant-time verification and NIST ACVP test vectors — is delivered.</li>
+      <li><strong>Open functional gaps.</strong> BQ subaddresses are implemented in the wallet core and CLI (decision 4 / option B3, delivered 11 September 2026), but not yet exposed via wallet-rpc or the GUI wallet, and remain inert until HFv16. Two open points remain: a view-only wallet cannot detect a BQ output, and change from a subaccount above index 0 currently falls back to a classic (non-BQ) subaddress pending a finalized change policy. (Two related gaps were closed on 8 September 2026: cold-signing a BQ spend, and B.../BQ consolidation via the hybrid transactions described in §6.3.)</li>
       <li><strong>The real cost is coordination.</strong> A hard fork is not a software deployment. Binaries must be published for every platform, miners, pools, services and wallet holders must upgrade, and the activation height must be announced well in advance so the network converges. A node that has not upgraded ends up on a dead chain. That process takes <strong>weeks</strong>, and no amount of urgency compresses it.</li>
     </ul>
     <p><strong>If a real quantum threat emerged</strong>, the schedule would be compressed as far as it can go and communicated as an emergency — but the order of magnitude remains <strong>weeks, not hours</strong>. Any promise to the contrary would be dishonest.</p>
@@ -247,7 +247,7 @@
       </tbody>
     </table>
     <div class="code-block" style="margin-top:1.25rem;">xmrig -o pool.hidering.org:3333 -u <span class="cmd">&lt;your_B..._address&gt;</span> -p x -a rx/0</div>
-    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000, 25000, 80386) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW.</p>
+    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW.</p>
 
     <h2 id="specs">9 · Technical Specifications</h2>
     <table class="data-table">
@@ -264,7 +264,7 @@
         <tr><td>Ring size</td><td class="gold">32–64</td></tr>
         <tr><td>Supply</td><td class="gold">18,000,000 HRG</td></tr>
         <tr><td>Initial reward</td><td>42.857142857143 HRG / block</td></tr>
-        <tr><td>Halving</td><td>210,000 blocks (~2.66 years)</td></tr>
+        <tr><td>Halving</td><td>210,000 blocks (~292 days)</td></tr>
         <tr><td>Unlock window</td><td>60 blocks</td></tr>
         <tr><td>License</td><td>BSD 3-Clause (as Monero)</td></tr>
         <tr><td>Repository</td><td>github.com/AB-lab113/hidering</td></tr>
