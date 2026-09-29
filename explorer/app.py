@@ -1,15 +1,46 @@
 from flask import Flask, render_template_string, jsonify
-import os, requests, json
+import os, sys, time, threading, requests
 
 app = Flask(__name__)
-DAEMON = os.environ.get("HRG_DAEMON_RPC", "http://135.125.243.137:19741/json_rpc")
+DAEMON = os.environ.get("HRG_DAEMON_RPC")
+if not DAEMON:
+    sys.exit("HRG_DAEMON_RPC is required, e.g. http://host.docker.internal:19741/json_rpc")
 
-def rpc(method, params={}):
+RECENT_BLOCKS = 20
+CACHE_TTL = 5  # seconds; every page view inside the window reuses one snapshot
+_cache = {"at": 0.0, "data": None}
+_cache_lock = threading.Lock()
+
+def rpc(method, params=None):
     try:
-        r = requests.post(DAEMON, json={"jsonrpc":"2.0","id":"0","method":method,"params":params}, timeout=10)
+        r = requests.post(DAEMON, json={"jsonrpc":"2.0","id":"0","method":method,"params":params or {}}, timeout=10)
         return r.json().get("result", {})
-    except:
+    except Exception:
         return {}
+
+def snapshot():
+    # 2 RPC calls per refresh (get_info + one header range), at most once per CACHE_TTL.
+    # The lock also coalesces concurrent requests onto a single refresh.
+    with _cache_lock:
+        now = time.monotonic()
+        if _cache["data"] is not None and now - _cache["at"] < CACHE_TTL:
+            return _cache["data"]
+        info = rpc("get_info")
+        height = info.get("height", 0)
+        blocks = []
+        if height > 0:
+            r = rpc("get_block_headers_range", {"start_height": max(0, height-RECENT_BLOCKS), "end_height": height-1})
+            for hdr in r.get("headers", []):
+                blocks.append({
+                    "height": hdr.get("height", 0),
+                    "hash": hdr.get("hash", ""),
+                    "num_txes": hdr.get("num_txes", 0),
+                    "block_size": hdr.get("block_size", 0)
+                })
+        blocks.reverse()
+        _cache["data"] = (info, blocks)
+        _cache["at"] = now
+        return _cache["data"]
 
 HTML = """<!DOCTYPE html>
 <html><head>
@@ -72,25 +103,12 @@ h2{font-family:Georgia,serif;color:#F0ECE0;margin-bottom:1rem;font-size:1.2rem}
 
 @app.route("/")
 def index():
-    info = rpc("get_info")
-    height = info.get("height", 0)
-    blocks = []
-    for h in range(max(0, height-20), height):
-        b = rpc("get_block", {"height": h})
-        if b:
-            hdr = b.get("block_header", {})
-            blocks.append({
-                "height": hdr.get("height", h),
-                "hash": hdr.get("hash", ""),
-                "num_txes": hdr.get("num_txes", 0),
-                "block_size": hdr.get("block_size", 0)
-            })
-    blocks.reverse()
+    info, blocks = snapshot()
     return render_template_string(HTML, info=info, blocks=blocks)
 
 @app.route("/api/info")
 def api_info():
-    return jsonify(rpc("get_info"))
+    return jsonify(snapshot()[0])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8081)
