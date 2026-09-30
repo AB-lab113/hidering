@@ -108,3 +108,5 @@ Source corresponds exactly to the `v1.0.2` git tag on branch `v2-privacy`. The `
 ---
 
 License: see `LICENSE` (BSD-3-Clause, inherited from Monero).
+
+> Correction (30/09/2026): the halving interval is about 292 days, not 2.66 years. / Correction du 30/09/2026 : l'intervalle de halving est d'environ 292 jours, pas 2,66 ans.

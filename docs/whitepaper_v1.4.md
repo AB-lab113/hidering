@@ -99,7 +99,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 | Supply circulant max | **18,000,000.00 HRG exact** (le NUMS genesis 157.14 HRG est unspendable ET hors comptabilité d'émission — `already_generated_coins` exclut le coinbase genesis, `blockchain.cpp:4427` — donc NON déduit du cap) |
 | Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
 | Block time | 120 secondes |
-| Halving interval | 210,000 blocs (~2.66 ans) |
+| Halving interval | 210,000 blocs (~292 jours) |
 | Difficulty adjustment | Chaque bloc (RandomX) |
 | Algorithme PoW | RandomX (CPU-only) |
 | Récompense initiale | **42.86 HRG/bloc** |
@@ -141,7 +141,7 @@ Le cap original de 33M HRG provoquait un **overflow uint64** (33 × 10¹⁹ > UI
 |--------|---------|--------------|
 | Supply cap | 21M BTC | **18M HRG** |
 | Émission | 100% PoW (fair launch) | **100% PoW (fair launch)** |
-| Mécanisme | Halving q/4 ans | Halving q/2.66 ans |
+| Mécanisme | Halving tous les ~4 ans | Halving tous les ~292 jours |
 | PoW | SHA-256 (ASIC) | RandomX (CPU-only) |
 
 ### 5.2 Code Halving C++
@@ -363,7 +363,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386) facilitant la synchronisation initiale et l'alignement des nœuds. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000) ; les ancres 80386 et 90000 arriveront avec la prochaine release. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 
@@ -401,7 +401,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Ring size | 32–64 |
 | Supply | 18,000,000 HRG |
 | Reward initial | 42.857142857143 HRG/bloc |
-| Halving | 210,000 blocs (~2.66 ans) |
+| Halving | 210,000 blocs (~292 jours) |
 | Unlock window | 60 blocs |
 | Émission | 100% PoW (voir §7) |
 | Repo | github.com/AB-lab113/hidering |

@@ -84,7 +84,7 @@ means, stated plainly.
 | Ticker | XMR | HRG |
 | Supply cap | tail emission, no cap | **18,000,000 HRG** hard cap |
 | Initial block reward | — | 42.86 HRG |
-| Halving | none (tail emission) | every 210,000 blocks (~2.66 years) |
+| Halving | none (tail emission) | every 210,000 blocks (~292 days) |
 | Block time | 120 s | 120 s |
 | Ring size | fixed 16 | **dynamic 32–64** |
 | Address prefix | `4...` | `B...` (and `BQ...` post-quantum, see below) |

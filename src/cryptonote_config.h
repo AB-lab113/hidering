@@ -54,7 +54,7 @@
 // 18M HRG cap (18M x 10^12 atomic units = 1.8e19, fits uint64 max 1.844e19, ~2.5% headroom).
 // Adopted 2026-05-11 after the original 33M literal was found to overflow uint64_t.
 #define MONEY_SUPPLY ((uint64_t)18000000000000000000ULL)
-#define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~2.66 years)
+#define HALVING_INTERVAL                                210000  // Halving every 210k blocks (~292 days)
 #define INITIAL_BLOCK_REWARD                            ((uint64_t)42857142857143ULL) // 42.857142... HRG fair launch (= 9e18 / 210000, so geometric series sums to 18M)
 #define EMISSION_SPEED_FACTOR_PER_MINUTE                (20)
 #define FINAL_SUBSIDY_PER_MINUTE                        ((uint64_t)0) // No tail emission
