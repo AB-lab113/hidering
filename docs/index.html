@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HIDERING (HRG) — Privacy Cryptocurrency</title>
-<meta name="description" content="HIDERING (HRG) is a maximum-privacy cryptocurrency forked from Monero with a Bitcoin-style 18M hard cap, 100% RandomX CPU PoW emission, and dynamic 32–64 ring signatures.">
+<meta name="description" content="HIDERING (HRG) is a maximum-privacy cryptocurrency forked from Monero with a Bitcoin-style 18M hard cap, 100% RandomX CPU PoW emission, and ring signatures (32 members by default, 32–64 allowed).">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -181,12 +181,12 @@
   <h1>HIDE<span>RING</span></h1>
   <div class="hero-ticker">HRG · MAINNET LIVE</div>
 
-  <p>Maximum privacy cryptocurrency. Bitcoin-style emission with Monero-grade anonymity — dynamic ring signatures, Dandelion++ propagation, and one-time stealth addresses.</p>
+  <p>Maximum privacy cryptocurrency. Bitcoin-style emission with Monero-grade anonymity — ring signatures (32 members by default, 32–64 allowed), Dandelion++ propagation, and one-time stealth addresses.</p>
 
   <div class="hero-stats">
     <div class="stat"><span class="stat-value">18M</span><span class="stat-label">Hard Cap</span></div>
     <div class="stat"><span class="stat-value">42.86</span><span class="stat-label">HRG / Block</span></div>
-    <div class="stat"><span class="stat-value">32–64</span><span class="stat-label">Ring Size</span></div>
+    <div class="stat"><span class="stat-value">32</span><span class="stat-label">Ring Size</span></div>
     <div class="stat"><span class="stat-value">CPU</span><span class="stat-label">RandomX Only</span></div>
   </div>
 
@@ -230,14 +230,14 @@
   <div class="features-grid reveal">
     <div class="feature">
       <div class="feature-icon">◎</div>
-      <h3>Dynamic Ring Size</h3>
-      <p>Ring size scales dynamically from 32 to 64 signers per transaction — 2–4× Monero's fixed 16. Makes statistical analysis exponentially harder.</p>
-      <span class="feature-tag">ring-size: 32–64</span>
+      <h3>Large Ring Size</h3>
+      <p>Every transaction uses a ring of 32 signers by default — twice Monero's 16. Consensus accepts rings of 32 to 64 members, constant within a transaction; keeping the default keeps you in the largest crowd.</p>
+      <span class="feature-tag">ring-size: 32 (default)</span>
     </div>
     <div class="feature">
       <div class="feature-icon">▦</div>
       <h3>TX Padding</h3>
-      <p>Each transaction's tx_extra is padded to a fixed 2500 bytes internally, removing size-based fingerprints. Network-layer relay padding is inherited from Monero (1024-byte granularity).</p>
+      <p>The HRG wallet pads each transaction's tx_extra field to 2500 bytes (a wallet rule, not a consensus rule). The overall transaction size still depends on its inputs and outputs. Network-layer relay padding is inherited from Monero (1024-byte granularity).</p>
       <span class="feature-tag">tx_extra: 2500B</span>
     </div>
     <div class="feature">
@@ -260,9 +260,9 @@
     </div>
     <div class="feature">
       <div class="feature-icon">⊛</div>
-      <h3>Post-Quantum Ready</h3>
-      <p>ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signature upgrade in development via a non-destructive hard fork targeted for 2027 — liboqs already integrated. Existing history is fully preserved.</p>
-      <span class="feature-tag">ML-DSA-65 · In Progress</span>
+      <h3>Post-Quantum Roadmap</h3>
+      <p>ML-DSA-65 (FIPS 204) and ML-KEM-768 (FIPS 203) are in development for a future, non-destructive hard fork (target 2027, not yet scheduled). The code is present but inactive on today's network; existing history will be fully preserved.</p>
+      <span class="feature-tag">ML-DSA-65 · Not active yet</span>
     </div>
   </div>
 </section>
@@ -285,8 +285,8 @@
   </div>
 
   <div class="fairlaunch-box reveal">
-    <h3>Fair Launch · PoW Only</h3>
-    <p>Genesis (block 0) carries zero spendable reward. Emission follows a pure proof-of-work schedule with no seed round and no private sale. After the v1.x 51% attack, v2.0.0 includes a short pre-public mining phase to harden the network before opening — once public, every miner competes under the same RandomX rules.</p>
+    <h3>Pure PoW</h3>
+    <p>Genesis (block 0) holds a single 157.14 HRG output locked under a NUMS key: provably unspendable and not counted in the 18M supply. Every coin since block 1 is created by RandomX proof-of-work under the rules in the open-source code, which contains no premine, no seed round and no private sale.</p>
     <div class="fairlaunch-items">
       <span class="fi">Pure PoW</span>
       <span class="fi">No Private Sale</span>
