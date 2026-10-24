@@ -97,7 +97,7 @@ HIDERING est un fork de **Monero (branche de développement, décembre 2025)** (
 | Ticker | HRG |
 | Supply maximum | **18,000,000 HRG (hard cap irrévocable)** |
 | Supply circulant max | **18,000,000 HRG** (somme exacte 17,999,999.99999418 HRG : la récompense est arrondie vers le bas à chaque halving) — le NUMS genesis 157.14 HRG est unspendable et hors comptabilité d'émission, donc non déduit du cap |
-| Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
+| Émission | **100% PoW** (pas de seed round, pas de vente privée) |
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~292 jours) |
 | Difficulty adjustment | Chaque bloc (RandomX) |
@@ -450,7 +450,7 @@ La distribution se fait par compétition PoW. La roadmap post-quantique (2027) a
 
 ---
 
-*Whitepaper v1.4.2 — Juin 2026 (révisé 26 juin 2026 : implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; révisions antérieures : audit sécurité juin 2026, corrections privacy, transparence réserve minée, pool mining + checkpoints)*  
+*Whitepaper v1.4.3 — Octobre 2026 (révisions antérieures : 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; audit sécurité juin 2026, corrections privacy, pool mining + checkpoints)*  
 *SHA256 release v2.0.3 (dernière publique) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
