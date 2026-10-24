@@ -237,7 +237,7 @@
     <div class="feature">
       <div class="feature-icon">▦</div>
       <h3>TX Padding</h3>
-      <p>The HRG wallet pads each transaction's tx_extra field to 2500 bytes (a wallet rule, not a consensus rule). The overall transaction size still depends on its inputs and outputs. Network-layer relay padding is inherited from Monero (1024-byte granularity).</p>
+      <p>The HIDERING wallet CLI and RPC pad each transaction's tx_extra field to 2500 bytes (a wallet rule, not a consensus rule). The overall transaction size still depends on its inputs and outputs. Network-layer relay padding is inherited from Monero (1024-byte granularity).</p>
       <span class="feature-tag">tx_extra: 2500B</span>
     </div>
     <div class="feature">
@@ -261,7 +261,7 @@
     <div class="feature">
       <div class="feature-icon">⊛</div>
       <h3>Post-Quantum Roadmap</h3>
-      <p>ML-DSA-65 (FIPS 204) and ML-KEM-768 (FIPS 203) are in development for a future, non-destructive hard fork (target 2027, not yet scheduled). The code is present but inactive on today's network; existing history will be fully preserved.</p>
+      <p>ML-DSA-65 (FIPS 204) and ML-KEM-768 (FIPS 203) are in development for a future, non-destructive hard fork (target: 2027, not yet scheduled). The code is present but inactive on today's network; the hard fork is designed to preserve existing history.</p>
       <span class="feature-tag">ML-DSA-65 · Not active yet</span>
     </div>
   </div>
@@ -286,7 +286,7 @@
 
   <div class="fairlaunch-box reveal">
     <h3>Pure PoW</h3>
-    <p>Genesis (block 0) holds a single 157.14 HRG output locked under a NUMS key: provably unspendable and not counted in the 18M supply. Every coin since block 1 is created by RandomX proof-of-work under the rules in the open-source code, which contains no premine, no seed round and no private sale.</p>
+    <p>Genesis (block 0) holds a single 157.14 HRG output locked under a NUMS key: provably unspendable and not counted in the 18M supply. Every coin since block 1 is created by RandomX proof-of-work under the rules in the open-source code, which contains no premine, no seed round and no private sale. A short private mining phase of the founder nodes preceded the public opening of v2.0.0; its blocks were orphaned and are not part of the live chain (see whitepaper §7.1).</p>
     <div class="fairlaunch-items">
       <span class="fi">Pure PoW</span>
       <span class="fi">No Private Sale</span>
