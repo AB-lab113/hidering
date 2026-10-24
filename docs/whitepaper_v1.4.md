@@ -51,7 +51,7 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 
 HIDERING vise la confidentialité maximale par construction :
 
-- **Anonymat on-chain** : ring signatures 32–64, stealth addresses one-time, RingCT
+- **Anonymat on-chain** : ring signatures (32 membres par défaut, jusqu'à 64), stealth addresses one-time, RingCT. Un anneau plus grand contient plus de leurres par entrée, mais la taille d'anneau est publique on-chain : une taille peu utilisée rend la transaction plus facile à reconnaître ; la taille par défaut (32) est recommandée.
 - **Anonymat réseau** : propagation Dandelion++ (héritée de Monero). Le trafic P2P n'est pas chiffré.
 - **Confidentialité des montants** : RingCT (engagements de Pedersen) ; padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus)
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
