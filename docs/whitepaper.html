@@ -74,7 +74,7 @@
   <div class="hero-glow"></div>
   <div class="section-label">Whitepaper</div>
   <h1 class="section-title">HIDERING Whitepaper</h1>
-  <p class="section-sub">Enhanced-privacy cryptocurrency with Bitcoin-style emission. Fair launch · 100% PoW · RandomX CPU.</p>
+  <p class="section-sub">Enhanced-privacy cryptocurrency with Bitcoin-style emission. 100% PoW · RandomX CPU.</p>
   <div class="wp-meta" style="justify-content:center;">
     <div>VERSION <span>1.4.3</span></div>
     <div>REVISED <span>OCT 2026</span></div>
@@ -189,7 +189,7 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits (no third-party audit). All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced well in advance. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
+    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal, AI-assisted security reviews (no third-party audit). All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced well in advance. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
 
     <h3>6.1 · What activating HFv16 actually takes</h3>
     <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
@@ -276,7 +276,7 @@
       <li><strong>OTC desk:</strong> <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a></li>
       <li><strong>Seed nodes:</strong> seed1.hidering.org · seed2.hidering.org</li>
     </ul>
-    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Fair by launch.</strong><br>Whitepaper v1.4.3 — revised October 2026 (earlier revisions: post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
+    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Pure PoW.</strong><br>Whitepaper v1.4.3 — revised October 2026 (earlier revisions: post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
 
   </article>
 </div>
@@ -294,7 +294,7 @@
     <li><a href="https://github.com/AB-lab113/hidering">GitHub</a></li>
     <li><a href="https://explorer.hidering.org">Block Explorer</a></li>
   </ul>
-  <div class="footer-copy">© 2026 HIDERING. Fair launch. Pure PoW. Open source.</div>
+  <div class="footer-copy">© 2026 HIDERING. Pure PoW. Open source.</div>
 </footer>
 
 <script src="site.js"></script>
