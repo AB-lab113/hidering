@@ -130,12 +130,12 @@
       <a href="https://github.com/AB-lab113/hidering/releases/download/v2.0.3/hidering-windows-x64.zip" class="btn btn-outline">Download Windows x64</a>
     </div>
 
-    <p class="release-note">Native binaries for Linux x86_64, macOS ARM64, and Windows x64. Every asset ships with a matching <code>.sha256</code> sidecar — verify your download before extracting with <code>sha256sum -c &lt;file&gt;.sha256</code> (it should print <code>OK</code>). <strong style="color:var(--gold-dim);">Linux:</strong> built on Ubuntu 22.04; needs glibc 2.34 or newer and the Boost 1.74, OpenSSL 3, readline, unbound, ZeroMQ and libsodium shared libraries. <strong style="color:var(--gold-dim);">macOS:</strong> the binary depends on Homebrew libraries and may not start on a clean system. If it does not start, build from source.</p>
+    <p class="release-note">Native binaries for Linux x86_64, macOS ARM64, and Windows x64. Every asset ships with a matching <code>.sha256</code> sidecar — verify your download before extracting with <code>sha256sum -c &lt;file&gt;.sha256</code> (it should print <code>OK</code>). <strong style="color:var(--gold-dim);">Linux:</strong> built on Ubuntu 22.04; needs glibc 2.34 or newer, libstdc++ from GCC 12 or newer, and the Boost 1.74, OpenSSL 3, readline, unbound, ZeroMQ and libsodium shared libraries. <strong style="color:var(--gold-dim);">macOS:</strong> the binary depends on Homebrew libraries and may not start on a clean system. If it does not start, build from source.</p>
   </div>
 
   <!-- GUI WALLET -->
   <div class="release-card reveal">
-    <p class="release-warning" role="note"><strong style="color:var(--gold);">⚠ Known issue in v2.0.2-gui:</strong> the GUI rounds every amount you send down to a multiple of 0.1 HRG, so the recipient may receive slightly less than you typed (an amount below 0.1 HRG is rounded down to 0). A fixed GUI is not yet available: send amounts that are exact multiples of 0.1 HRG, or use hidering-wallet-cli v2.0.3.</p>
+    <p class="release-warning" role="note"><strong style="color:var(--gold);">⚠ Known issue in v2.0.2-gui:</strong> when you send a specific amount, the GUI rounds it down to a multiple of 0.01 HRG, so the recipient may receive slightly less than you typed (an amount below 0.01 HRG becomes 0); the difference stays in your wallet as change. A fixed GUI is not yet available: send amounts that are exact multiples of 0.01 HRG, or use hidering-wallet-cli v2.0.3.</p>
     <div class="release-header">
       <div>
         <h2>Wallet GUI Desktop — v2.0.2-gui</h2>
