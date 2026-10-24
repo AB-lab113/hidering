@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OTC Desk — HIDERING (HRG)</title>
-<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC peer-to-peer through @HideringOTCBot — an escrow-backed Telegram trading bot. No order book, no custody beyond escrow.">
+<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC through @HideringOTCBot, a Telegram escrow bot operated by HIDERING. No order book; the bot holds both legs until settlement.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -68,7 +68,7 @@
   <div class="hero-glow"></div>
   <div class="section-label">OTC Desk</div>
   <h1 class="section-title">Swap HRG ⇄ USDT / USDC</h1>
-  <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No order book, no exchange listing required.</p>
+  <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot, operated by HIDERING, holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No order book, no exchange listing required.</p>
   <div class="otc-hero-cta">
     <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Open @HideringOTCBot</a>
   </div>
@@ -93,12 +93,12 @@
     <div class="flow-step">
       <div class="n">03</div>
       <h3>Bot settles</h3>
-      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller — each leg is idempotent so it never double-pays.</p>
+      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller. Each leg is recorded with its transaction ID so that a restart does not resend it.</p>
     </div>
     <div class="flow-step">
       <div class="n">04</div>
       <h3>Done</h3>
-      <p>Both parties get an on-chain confirmation. Any leftover gas is refunded, and an unmatched order can be cancelled for a full HRG refund.</p>
+      <p>Both parties get an on-chain confirmation. Leftover gas is refunded on a best-effort basis, and an unmatched order can be cancelled for a refund of the escrowed HRG.</p>
     </div>
   </div>
 
@@ -113,7 +113,7 @@
     </div>
     <div class="cmd-card">
       <h3>/buy</h3>
-      <p>Take an open order and pay the stablecoin leg. Optionally pass an ETH address so any leftover settlement gas is refunded to you.</p>
+      <p>Take an open order and pay the stablecoin leg. Optionally pass an ETH address so leftover settlement gas can be sent back to you.</p>
     </div>
     <div class="cmd-card">
       <h3>/cancel</h3>
@@ -130,16 +130,16 @@
   <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">How the desk protects you</h2>
   <div class="feat-row reveal">
     <div class="feat-cell">
-      <h3>Escrow-backed</h3>
-      <p>HRG is locked by the bot before any stablecoin moves, so neither side can walk away mid-trade with the other's funds.</p>
+      <h3>Escrow by the operator</h3>
+      <p>The seller's HRG must be deposited with the bot (and confirmed) before an order goes live, and the buyer's stablecoin is paid to a deposit address the bot controls. The bot is operated by HIDERING, which holds both legs until settlement.</p>
     </div>
     <div class="feat-cell">
-      <h3>Idempotent settlement</h3>
-      <p>Each leg of the swap is settled exactly once. A retry or network hiccup can't cause a double payout.</p>
+      <h3>Recorded settlement</h3>
+      <p>Each leg is tracked by its on-chain transaction ID, which protects against accidental resends after a restart or a network error.</p>
     </div>
     <div class="feat-cell">
       <h3>Buyer-pays-gas</h3>
-      <p>The on-chain stablecoin gas is paid by the buyer; any unused gas is refunded to the buyer's ETH address.</p>
+      <p>The on-chain stablecoin gas is paid by the buyer; leftover gas is sent back to the buyer's ETH address on a best-effort basis.</p>
     </div>
     <div class="feat-cell">
       <h3>Refund on cancel</h3>
