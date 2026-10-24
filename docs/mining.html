@@ -82,7 +82,7 @@
     <div class="panel-label">Requirements</div>
     <ul class="req-list">
       <li><span class="k">OS</span> &nbsp; Linux x86_64 · macOS ARM64 · Windows x64</li>
-      <li><span class="k">RAM</span> &nbsp; ≈ 3 GB free in total (the ~2 GB RandomX dataset is shared by all mining threads, plus ~2 MB per thread)</li>
+      <li><span class="k">RAM</span> &nbsp; the ~2 GB RandomX dataset is shared by all mining threads, plus ~2 MB per thread</li>
       <li><span class="k">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
       <li><span class="k">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
     </ul>
@@ -107,7 +107,7 @@
         <li><span class="k">FEE</span><span style="color:var(--text);">1%</span></li>
         <li><span class="k">MIN PAYOUT</span><span style="color:var(--text);">1 HRG</span></li>
         <li><span class="k">PAYOUTS</span><span style="color:var(--text);">PROP (proportional per round)</span></li>
-        <li><span class="k">PAYOUT CYCLE</span><span style="color:var(--text);">every 30 min · currently max 50 HRG per payment (larger balances are paid over several cycles)</span></li>
+        <li><span class="k">PAYOUT CYCLE</span><span style="color:var(--text);">every 30 min · currently max 50 HRG per payment (balances above 50 HRG are paid in installments of 50 HRG, one per cycle)</span></li>
       </ul>
       <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:0.6rem;">One-line command (XMRig)</div>
       <div class="code-block">xmrig -o pool.hidering.org:3333 -u <span class="cmd">YOUR_HRG_ADDRESS</span> -p x -a rx/0</div>
