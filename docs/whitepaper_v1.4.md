@@ -26,7 +26,7 @@
 
 ## 1. ABSTRACT
 
-HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero (branche de développement, décembre 2025), combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
+HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero (série 0.18), combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
 
 Émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. Le code ne contient ni premine ni allocation ; voir §7.
 
@@ -52,7 +52,7 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 HIDERING vise la confidentialité maximale par construction :
 
 - **Anonymat on-chain** : ring signatures 32–64, stealth addresses one-time, RingCT
-- **Anonymat réseau** : propagation Dandelion++ (héritée de Monero). Le trafic P2P n'est pas chiffré ; pour masquer votre adresse IP, faites tourner votre nœud via Tor ou I2P.
+- **Anonymat réseau** : propagation Dandelion++ (héritée de Monero). Le trafic P2P n'est pas chiffré.
 - **Confidentialité des montants** : RingCT (engagements de Pedersen) ; padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus)
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
 
@@ -66,7 +66,7 @@ HIDERING adopte le modèle Bitcoin (supply fixe, halving, émission PoW pure) po
 
 ### 3.1 Base
 
-HIDERING est un fork de **Monero (branche de développement, décembre 2025)** (CryptoNote), bénéficiant de :
+HIDERING est un fork de **Monero (série 0.18)** (CryptoNote), bénéficiant de :
 - RingCT (confidentialité des montants)
 - Bulletproofs+ (taille réduite des preuves)
 - RandomX (PoW conçu pour les CPU)
@@ -376,7 +376,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000) ; les ancres 80386 et 90000 arriveront avec la prochaine release. La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000). La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 
@@ -401,7 +401,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Paramètre | Valeur |
 |-----------|--------|
 | Ticker | HRG |
-| Fork base | Monero (branche de développement, décembre 2025) |
+| Fork base | Monero (série 0.18) |
 | Network ID | `HRG\x02HIDERINGMAIN` (v2.0.0) |
 | Magic bytes | `0x48524702` (v2.0.0) |
 | Port P2P | 19740 |
