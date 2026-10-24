@@ -78,7 +78,7 @@
   <div class="wp-meta" style="justify-content:center;">
     <div>VERSION <span>1.4.3</span></div>
     <div>REVISED <span>OCT 2026</span></div>
-    <div>FORK BASE <span>MONERO 0.18 SERIES</span></div>
+    <div>FORK BASE <span>MONERO DEV BRANCH SNAPSHOT, DEC 2025</span></div>
   </div>
   <div style="margin-top:1.75rem;">
     <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.4.md" class="btn btn-outline btn-sm">Source (Markdown)</a>
@@ -108,17 +108,17 @@
   <article class="wp-body">
 
     <h2 id="abstract">1 · Abstract</h2>
-    <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from Monero (0.18 series), combining advanced anonymity with a Bitcoin-style monetary model.</p>
+    <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from a snapshot of Monero's development branch (December 2025), combining advanced anonymity with a Bitcoin-style monetary model.</p>
     <p>100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. The code contains no premine and no allocation; see §7.</p>
     <p><strong>Key innovations:</strong></p>
     <ul>
       <li>Ring signatures of 32 members by default in the HIDERING wallets (CLI, RPC and GUI); consensus allows 32–64 (Monero: fixed 16)</li>
       <li>Network padding inherited from Monero (1024-byte granularity)</li>
-      <li>2500-byte internal <code class="inline">tx_extra</code> padding by the HRG wallet (a wallet rule, not a consensus rule)</li>
+      <li>2500-byte internal <code class="inline">tx_extra</code> padding by the HIDERING wallet CLI and RPC (a wallet rule, not a consensus rule)</li>
       <li>Transaction propagation via Dandelion++ stem/fluff (inherited from Monero)</li>
       <li>Confidential amounts via RingCT (Pedersen commitments)</li>
       <li>One-time stealth addresses (CryptoNote)</li>
-      <li>Post-quantum resistance scheduled for 2027</li>
+      <li>Post-quantum resistance (target: 2027, not yet scheduled)</li>
     </ul>
 
     <h2 id="vision">2 · Vision &amp; Problem</h2>
@@ -128,12 +128,12 @@
     <ul>
       <li><strong>On-chain anonymity:</strong> ring signatures (32 members by default, up to 64), one-time stealth addresses, RingCT. A larger ring includes more decoys per input, but the ring size is public on-chain, so a size that few people use makes a transaction easier to recognise; the default (32) is recommended.</li>
       <li><strong>Network anonymity:</strong> Dandelion++ propagation (inherited from Monero). P2P traffic is not encrypted.</li>
-      <li><strong>Amount confidentiality:</strong> RingCT (Pedersen commitments), plus 2500-byte internal <code class="inline">tx_extra</code> padding by the HRG wallet (a wallet rule, not a consensus rule)</li>
-      <li><strong>Future resistance:</strong> planned post-quantum migration via hard fork (2027)</li>
+      <li><strong>Amount confidentiality:</strong> RingCT (Pedersen commitments), plus 2500-byte internal <code class="inline">tx_extra</code> padding by the HIDERING wallet CLI and RPC (a wallet rule, not a consensus rule)</li>
+      <li><strong>Future resistance:</strong> post-quantum migration via hard fork (target: 2027, not yet scheduled)</li>
     </ul>
 
     <h2 id="architecture">3 · Technical Architecture</h2>
-    <p>HIDERING is a fork of <strong>Monero (0.18 series)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (PoW designed to be CPU-friendly) and Dandelion++ (transaction diffusion).</p>
+    <p>HIDERING is a fork of <strong>a snapshot of Monero's development branch (December 2025)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (PoW designed to be CPU-friendly) and Dandelion++ (transaction diffusion).</p>
     <table class="data-table" style="margin-top:1rem;">
       <thead><tr><th>Component</th><th>Monero</th><th>HIDERING</th></tr></thead>
       <tbody>
@@ -181,7 +181,7 @@
     <p style="margin-top:1.25rem;">100% PoW emission, no tail emission, irrevocable cap. The genesis block contains 157.14 HRG locked under a Nothing-Up-My-Sleeve (NUMS) key — cryptographically unspendable and kept for deployed-chain compatibility. See <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/GENESIS_PROOF.md">GENESIS_PROOF.md</a>.</p>
 
     <h2 id="quantum">6 · Quantum Resistance</h2>
-    <p>Post-quantum cryptography is introduced via a <strong>hard fork planned for 2027</strong>:</p>
+    <p>Post-quantum cryptography is introduced via a <strong>hard fork</strong> (target: 2027, not yet scheduled):</p>
     <ul>
       <li><strong>Signatures:</strong> ML-DSA-65 (FIPS 204, NIST PQC standard)</li>
       <li><strong>Key exchange:</strong> ML-KEM-768 (FIPS 203, NIST PQC standard)</li>
@@ -189,7 +189,7 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal, AI-assisted security reviews (no third-party audit). All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced well in advance. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
+    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal, AI-assisted security reviews (no third-party audit). All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced before activation. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
 
     <h3>6.1 · What activating HFv16 actually takes</h3>
     <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
@@ -227,7 +227,7 @@
     <p><strong>Principle:</strong> 100% emission via RandomX PoW, no private sale, no seed round. Block 0 is a genesis with 157.14 HRG locked under a NUMS key (unspendable). From block 1 onward, every block reward goes to whoever mines it; the project's own nodes mine under the same rules as everyone else.</p>
     <h3>7.1 · v2.0.0 (post-attack)</h3>
     <p>After the 51% attack on the v1.x chain (16 May 2026, h≈3577), v2.0.0 moved to a new Network ID (<code class="inline">HRG\x02HIDERINGMAIN</code>), which separated the new network from the v1.x chain.</p>
-    <p>Earlier revisions of this document announced a mined reserve held by the founding nodes, with its volume and use to be disclosed at launch. That announcement is withdrawn.</p>
+    <p>Before the public opening of v2.0.0, the founder nodes mined on a private network for a short period. When the network opened, that private chain was replaced by the public chain and the privately mined blocks were orphaned: no coins from that phase are part of the live chain. Earlier revisions of this document announced a reserve from that phase, with its volume and use to be disclosed at launch; that announcement is withdrawn.</p>
 
     <h2 id="pool">8 · Pool Mining</h2>
     <p>HIDERING operates a public RandomX mining pool in production to lower the barrier to CPU mining.</p>
@@ -248,7 +248,7 @@
     <table class="data-table">
       <tbody>
         <tr><td>Ticker</td><td class="gold">HRG</td></tr>
-        <tr><td>Fork base</td><td>Monero (0.18 series)</td></tr>
+        <tr><td>Fork base</td><td>a snapshot of Monero's development branch (December 2025)</td></tr>
         <tr><td>Network ID</td><td class="gold">HRG\x02HIDERINGMAIN (v2.0.0)</td></tr>
         <tr><td>Magic bytes</td><td class="gold">0x48524702 (v2.0.0)</td></tr>
         <tr><td>P2P port</td><td>19740</td></tr>
