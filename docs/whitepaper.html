@@ -146,7 +146,7 @@
         <tr><td>Hard fork</td><td>HFv15</td><td>HFv15 from block 1</td></tr>
       </tbody>
     </table>
-    <div class="note"><strong>Transparency note (June 2026 audit).</strong> The "best-effort multi-hop stem" routing bias announced earlier was <strong>removed</strong>: the on-wire hop counter leaked the distance to the transaction's origin (a peer receiving a zero counter could identify the sender), degrading the anonymity Dandelion++ protects. Propagation now relies on stock Dandelion++ inherited from Monero. The 2500-byte internal padding applies to the <code class="inline">tx_extra</code> field; the network-layer padding remains Monero's (1024-byte granularity).</div>
+    <div class="note"><strong>Transparency note (June 2026 internal review).</strong> The "best-effort multi-hop stem" routing bias announced earlier was <strong>removed</strong>: the on-wire hop counter leaked the distance to the transaction's origin (a peer receiving a zero counter could identify the sender), degrading the anonymity Dandelion++ protects. Propagation now relies on stock Dandelion++ inherited from Monero. The 2500-byte internal padding applies to the <code class="inline">tx_extra</code> field; the network-layer padding remains Monero's (1024-byte granularity).</div>
 
     <h2 id="tokenomics">4 · Tokenomics (HRG)</h2>
     <table class="data-table">
@@ -276,7 +276,7 @@
       <li><strong>OTC desk:</strong> <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a></li>
       <li><strong>Seed nodes:</strong> seed1.hidering.org · seed2.hidering.org</li>
     </ul>
-    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Pure PoW.</strong><br>Whitepaper v1.4.3 — revised October 2026 (earlier revisions: post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 security audit). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
+    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Pure PoW.</strong><br>Whitepaper v1.4.3 — revised October 2026 (earlier revisions: post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 internal security review). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
 
   </article>
 </div>
