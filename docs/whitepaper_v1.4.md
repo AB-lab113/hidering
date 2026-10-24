@@ -84,7 +84,7 @@ HIDERING est un fork de **Monero (série 0.18)** (CryptoNote), bénéficiant de 
 | PoW | RandomX | RandomX (identique) |
 | Hard Fork | HFv15 | HFv15 dès bloc 1 |
 
-> **Note transparence (audit juin 2026, mise à jour).** Le biais de routage stem « multi-hops best-effort » initialement annoncé a été **retiré** : le compteur de hops sérialisé sur le wire révélait la distance à l'origine de la transaction (un pair recevant un compteur à 0 identifiait l'émetteur), dégradant l'anonymat que Dandelion++ protège. La propagation repose désormais sur **Dandelion++ stock** hérité de Monero, sans mécanisme multi-hop spécifique à HIDERING. Le padding interne 2500 o porte sur le champ `tx_extra` ; le padding *réseau* reste celui de Monero (granularité 1024 o). Ces formulations ont été requalifiées pour refléter exactement le code.
+> **Note transparence (revue interne juin 2026, mise à jour).** Le biais de routage stem « multi-hops best-effort » initialement annoncé a été **retiré** : le compteur de hops sérialisé sur le wire révélait la distance à l'origine de la transaction (un pair recevant un compteur à 0 identifiait l'émetteur), dégradant l'anonymat que Dandelion++ protège. La propagation repose désormais sur **Dandelion++ stock** hérité de Monero, sans mécanisme multi-hop spécifique à HIDERING. Le padding interne 2500 o porte sur le champ `tx_extra` ; le padding *réseau* reste celui de Monero (granularité 1024 o). Ces formulations ont été requalifiées pour refléter exactement le code.
 
 ---
 
@@ -321,7 +321,7 @@ Des versions antérieures de ce document annonçaient une réserve minée déten
 - MONEY_SUPPLY = 18M HRG (uint64-safe)
 - HALVING_INTERVAL = 210,000 blocs
 - INITIAL_REWARD = 42.86 HRG/bloc
-- Genesis fair (NUMS, unspendable)
+- Genesis vérifiable (NUMS, unspendable)
 
 **PHASE 2 : PRIVACY ENHANCEMENTS ✅**
 - P1 ✅ Ring size 32 par défaut (consensus : 32 à 64)
@@ -450,7 +450,7 @@ La distribution se fait par compétition PoW. La roadmap post-quantique (2027) a
 
 ---
 
-*Whitepaper v1.4.3 — Octobre 2026 (révisions antérieures : 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; audit sécurité juin 2026, corrections privacy, pool mining + checkpoints)*  
+*Whitepaper v1.4.3 — Octobre 2026 (révisions antérieures : 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
 *SHA256 release v2.0.3 (dernière publique) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
