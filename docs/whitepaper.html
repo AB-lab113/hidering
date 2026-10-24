@@ -78,7 +78,7 @@
   <div class="wp-meta" style="justify-content:center;">
     <div>VERSION <span>1.4.3</span></div>
     <div>REVISED <span>OCT 2026</span></div>
-    <div>FORK BASE <span>MONERO DEV BRANCH, DEC 2025</span></div>
+    <div>FORK BASE <span>MONERO 0.18 SERIES</span></div>
   </div>
   <div style="margin-top:1.75rem;">
     <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/docs/whitepaper_v1.4.md" class="btn btn-outline btn-sm">Source (Markdown)</a>
@@ -108,7 +108,7 @@
   <article class="wp-body">
 
     <h2 id="abstract">1 · Abstract</h2>
-    <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from Monero (development branch, December 2025), combining advanced anonymity with a Bitcoin-style monetary model.</p>
+    <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from Monero (0.18 series), combining advanced anonymity with a Bitcoin-style monetary model.</p>
     <p>100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. The code contains no premine and no allocation; see §7.</p>
     <p><strong>Key innovations:</strong></p>
     <ul>
@@ -127,13 +127,13 @@
     <h3>The HIDERING vision</h3>
     <ul>
       <li><strong>On-chain anonymity:</strong> ring signatures 32–64, one-time stealth addresses, RingCT</li>
-      <li><strong>Network anonymity:</strong> Dandelion++ propagation (inherited from Monero). P2P traffic is not encrypted; to hide your IP address, run your node over Tor or I2P.</li>
+      <li><strong>Network anonymity:</strong> Dandelion++ propagation (inherited from Monero). P2P traffic is not encrypted.</li>
       <li><strong>Amount confidentiality:</strong> RingCT (Pedersen commitments), plus 2500-byte internal <code class="inline">tx_extra</code> padding by the HRG wallet (a wallet rule, not a consensus rule)</li>
       <li><strong>Future resistance:</strong> planned post-quantum migration via hard fork (2027)</li>
     </ul>
 
     <h2 id="architecture">3 · Technical Architecture</h2>
-    <p>HIDERING is a fork of <strong>Monero (development branch, December 2025)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (PoW designed to be CPU-friendly) and Dandelion++ (transaction diffusion).</p>
+    <p>HIDERING is a fork of <strong>Monero (0.18 series)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (PoW designed to be CPU-friendly) and Dandelion++ (transaction diffusion).</p>
     <table class="data-table" style="margin-top:1rem;">
       <thead><tr><th>Component</th><th>Monero</th><th>HIDERING</th></tr></thead>
       <tbody>
@@ -189,7 +189,7 @@
       <li><strong>Impact:</strong> only post-fork transactions use the new scheme; historical blockchain data is unaffected</li>
       <li><strong>Compatibility:</strong> a mandatory binary update at fork time</li>
     </ul>
-    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits. All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced well in advance. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
+    <div class="note"><strong>Status (September 2026).</strong> The post-quantum prototype (liboqs integration (0.15.0 in the published binaries, 0.16.0 on the development branch), BQ keygen, key persistence, ML-DSA-65 signatures in <code class="inline">tx_extra</code>, ML-KEM-768 KEM) is implemented and has undergone several internal security audits (no third-party audit). All PQ code remains <strong>inert</strong>. The current code carries a placeholder activation height (2,000,000) that is not the planned date; the real activation height will be set by a future release and announced well in advance. The nominal path is implemented: C-1 binding, validator checks a–e, the wallet2 spend side, the H-5 multi-ciphertext fix, mempool acceptance and wallet activation. The full <code class="inline">B...→BQ...→spend</code> flow is validated end-to-end on regtest (commits <code class="inline">7d53cb940</code>→<code class="inline">b72425afe</code>, branch v2-privacy). Target: <strong>2027, not yet scheduled</strong>.</div>
 
     <h3>6.1 · What activating HFv16 actually takes</h3>
     <p>Earlier revisions of this document claimed that "if a real quantum threat emerges, activation is possible in 24–48h by changing the <code class="inline">HF_HEIGHT_PQ</code> constant". <strong>That claim was false and has been withdrawn.</strong> Changing a constant does take minutes — it is simply not what governs the timeline. HFv16 activation is blocked today, and will remain so for months at minimum.</p>
@@ -242,13 +242,13 @@
       </tbody>
     </table>
     <div class="code-block" style="margin-top:1.25rem;">xmrig -o pool.hidering.org:3333 -u <span class="cmd">&lt;your_B..._address&gt;</span> -p x -a rx/0</div>
-    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW. The public v2.0.3 binaries contain the first six (up to 25000); 80386 and 90000 will ship with the next release.</p>
+    <p style="margin-top:1.25rem;">Solo mining is fully supported via <code class="inline">hideringd</code> + <code class="inline">hidering-wallet-cli</code>. See the <a href="mining.html">Mining guide</a> for both paths. The v2.0.0 chain embeds checkpoint anchors (heights 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) to aid initial synchronisation — consensus security still rests on cumulative RandomX PoW. The public v2.0.3 binaries contain the first six (up to 25000).</p>
 
     <h2 id="specs">9 · Technical Specifications</h2>
     <table class="data-table">
       <tbody>
         <tr><td>Ticker</td><td class="gold">HRG</td></tr>
-        <tr><td>Fork base</td><td>Monero (development branch, December 2025)</td></tr>
+        <tr><td>Fork base</td><td>Monero (0.18 series)</td></tr>
         <tr><td>Network ID</td><td class="gold">HRG\x02HIDERINGMAIN (v2.0.0)</td></tr>
         <tr><td>Magic bytes</td><td class="gold">0x48524702 (v2.0.0)</td></tr>
         <tr><td>P2P port</td><td>19740</td></tr>
