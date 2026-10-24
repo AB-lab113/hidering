@@ -169,6 +169,8 @@
           <h3>Send HRG to another wallet</h3>
           <p>Once your balance is unlocked, transfer HRG to any B-address. Keep the default ring size (32): the HIDERING wallet CLI, wallet-rpc and GUI all use it by default, and a different size makes your transaction easier to single out.</p>
           <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><br><span class="cmd">show_transfers</span>       <span class="dim"># transaction history</span></div>
+          <p style="font-size:0.8rem;color:var(--text-dim);margin-top:1rem;line-height:1.6;"><strong style="color:var(--gold-dim);">Advanced — choosing a larger ring:</strong> in the wallet CLI, the ring size is the number of ring members (any value from 32 to 64) and goes right after <code class="inline">transfer</code>, before the address. A larger ring includes more decoys per input. The ring size is public on-chain, so a size that few people use makes your transaction easier to recognise; we recommend the default (32). The GUI has no ring-size setting.</p>
+          <div class="code-block"><span class="cmd">transfer</span> 48 B5xxx...address 10   <span class="dim"># ring of 48 members</span></div>
         </div>
       </div>
     </div>
