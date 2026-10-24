@@ -1,8 +1,8 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
 **FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
-**Version 1.4.2 (révisée 26 Juin 2026 — implémentation HFv16 complète)**  
-**Juin 2026**
+**Version 1.4.3 (révisée octobre 2026)**  
+**Octobre 2026**
 
 ---
 
@@ -13,7 +13,7 @@
 4. Tokenomics (HRG)
 5. Émission Bitcoin-Style
 6. Résistance Quantique
-7. Distribution Fair Launch
+7. Distribution
 8. Roadmap Complète
 9. Pool Mining
 10. Comparaison Technique
@@ -26,14 +26,14 @@
 
 ## 1. ABSTRACT
 
-HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero v0.18.1, combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
+HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé de Monero (branche de développement, décembre 2025), combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
 
-**FAIR LAUNCH** : émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. v2.0.0 introduit une courte phase de pré-minage en réseau privé (réponse à l'attaque 51% du 16 mai 2026 sur la chaîne v1.x à h≈3577) constituant une réserve minée — voir §7 pour la justification complète et l'usage des fonds.
+Émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. Le code ne contient ni premine ni allocation ; voir §7.
 
 **INNOVATIONS CLÉS** :
-- Ring size dynamique 32–64 (vs Monero 16)
+- Ring size 32 par défaut (consensus : 32 à 64) (vs Monero 16)
 - Padding réseau hérité de Monero (granularité 1024 bytes)
-- TX padding interne fixe 2500 bytes (tx_extra)
+- Padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus)
 - Propagation des transactions via Dandelion++ (stem/fluff, héritée de Monero)
 - Montants confidentiels via RingCT (engagements de Pedersen)
 - Stealth addresses one-time (CryptoNote)
@@ -52,8 +52,8 @@ Les blockchains publiques traditionnelles (Bitcoin, Ethereum) exposent intégral
 HIDERING vise la confidentialité maximale par construction :
 
 - **Anonymat on-chain** : ring signatures 32–64, stealth addresses one-time, RingCT
-- **Anonymat réseau** : propagation Dandelion++ (héritée de Monero), chiffrement bout-en-bout hérité de Monero
-- **Confidentialité des montants** : RingCT (engagements de Pedersen) ; TX padding interne fixe 2500 bytes (tx_extra) pour uniformiser la taille des champs annexes
+- **Anonymat réseau** : propagation Dandelion++ (héritée de Monero). Le trafic P2P n'est pas chiffré ; pour masquer votre adresse IP, faites tourner votre nœud via Tor ou I2P.
+- **Confidentialité des montants** : RingCT (engagements de Pedersen) ; padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus)
 - **Résistance future** : migration post-quantique planifiée via hard fork (2027)
 
 ### 2.3 Modèle économique sain
@@ -66,7 +66,7 @@ HIDERING adopte le modèle Bitcoin (supply fixe, halving, émission PoW pure) po
 
 ### 3.1 Base
 
-HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
+HIDERING est un fork de **Monero (branche de développement, décembre 2025)** (CryptoNote), bénéficiant de :
 - RingCT (confidentialité des montants)
 - Bulletproofs+ (taille réduite des preuves)
 - RandomX (PoW CPU-only, résistant ASIC)
@@ -76,8 +76,8 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 
 | Composant | Monero original | HIDERING |
 |-----------|----------------|----------|
-| Ring size | 16 | 32–64 (dynamique) |
-| TX padding | Variable | TX interne 2500 o (réseau : Monero 1024 o) |
+| Ring size | 16 | 32 par défaut (32–64 autorisé) |
+| TX padding | Variable | `tx_extra` 2500 o, règle du wallet (réseau : Monero 1024 o) |
 | Réseau | Dandelion++ | Dandelion++ (hérité) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
 | Stealth | One-time | One-time (CryptoNote) |
@@ -96,7 +96,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
 |-----------|--------|
 | Ticker | HRG |
 | Supply maximum | **18,000,000 HRG (hard cap irrévocable)** |
-| Supply circulant max | **18,000,000.00 HRG exact** (le NUMS genesis 157.14 HRG est unspendable ET hors comptabilité d'émission — `already_generated_coins` exclut le coinbase genesis, `blockchain.cpp:4427` — donc NON déduit du cap) |
+| Supply circulant max | **18,000,000 HRG** (somme exacte 17,999,999.99999418 HRG : la récompense est arrondie vers le bas à chaque halving) — le NUMS genesis 157.14 HRG est unspendable et hors comptabilité d'émission, donc non déduit du cap |
 | Émission | **100% PoW** (pas de seed round, pas de vente privée) — phase pré-publique v2.0.0 voir §7 |
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~292 jours) |
@@ -125,7 +125,7 @@ HIDERING est un fork de **Monero v0.18.1** (CryptoNote), bénéficiant de :
                = 18,000,000 HRG exactement
 ```
 
-La série géométrique converge vers le cap de **18M HRG**. Émission 100% PoW, zéro inflation, cap irrévocable.
+La série géométrique converge vers le cap de **18M HRG**. Émission 100% PoW, pas d'émission de queue, cap irrévocable.
 
 ### 4.4 Note technique — Choix du cap 18M
 
@@ -146,23 +146,45 @@ Le cap original de 33M HRG provoquait un **overflow uint64** (33 × 10¹⁹ > UI
 
 ### 5.2 Code Halving C++
 
+Le halving est indexé sur les pièces déjà émises (pas directement sur la hauteur). Extrait de `get_block_reward()` (`src/cryptonote_basic/cryptonote_basic_impl.cpp`, commentaires abrégés) :
+
 ```cpp
-bool get_block_reward(uint64_t already_generated_coins, uint64_t &reward) {
-    const uint64_t MONEY_SUPPLY = 18000000000000000000ULL; // 18M HRG (uint64-safe)
-    const uint64_t HALVING_INTERVAL = 210000;
-    const uint64_t INITIAL_REWARD = 42857142857143ULL;     // 42.857142... HRG
+const uint64_t MONEY_SUPPLY_LOCAL = 18000000000000000000ULL; // 18M HRG
+const uint64_t HALVING_INTERVAL_LOCAL = 210000;
+const uint64_t INITIAL_REWARD_LOCAL = 42857142857143ULL;     // 42.857142... HRG
 
-    if (already_generated_coins >= MONEY_SUPPLY) {
-        reward = 0;
-        return true;
-    }
-
-    uint64_t halvings = already_generated_coins / (INITIAL_REWARD * HALVING_INTERVAL);
-    uint64_t base_reward = INITIAL_REWARD >> halvings; // / 2^halvings
-
-    reward = std::min(base_reward, MONEY_SUPPLY - already_generated_coins);
+if (already_generated_coins >= MONEY_SUPPLY_LOCAL) {
+    reward = 0;
     return true;
 }
+
+// Nombre de halvings : on parcourt les ères tant que leurs pièces sont déjà émises
+uint64_t halvings = 0;
+{
+    uint64_t coins_counted = 0;
+    uint64_t period_reward = INITIAL_REWARD_LOCAL;
+    while (period_reward > 0) {
+        uint64_t period_coins = period_reward * HALVING_INTERVAL_LOCAL;
+        if (coins_counted + period_coins > already_generated_coins)
+            break;
+        coins_counted += period_coins;
+        halvings++;
+        period_reward >>= 1;
+    }
+}
+
+uint64_t base_reward = INITIAL_REWARD_LOCAL >> halvings;    // / 2^halvings
+
+// Plafond : ne jamais dépasser le supply max
+if (already_generated_coins + base_reward > MONEY_SUPPLY_LOCAL)
+    base_reward = MONEY_SUPPLY_LOCAL - already_generated_coins;
+
+// Pas de tail emission
+if (base_reward == 0) {
+    reward = 0;
+    return true;
+}
+// (la pénalité de poids de bloc héritée de Monero s'applique ensuite)
 ```
 
 ---
@@ -177,7 +199,7 @@ La cryptographie post-quantique sera introduite via un **hard fork planifié en 
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (septembre 2026).** Le prototype post-quantique (intégration liboqs 0.16.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté et a fait l'objet de plusieurs audits de sécurité internes. Tout le code PQ reste **inerte** jusqu'à l'activation du hard fork (HFv16, `HF_HEIGHT_PQ` = 2 000 000). Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible mainnet : **T2 2027** (inchangée).
+**État (septembre 2026).** Le prototype post-quantique (intégration liboqs (0.15.0 dans les binaires publiés, 0.16.0 sur la branche de développement), keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté sur la branche de développement et a fait l'objet d'une revue interne assistée par IA (pas d'audit tiers). Tout le code PQ reste **inerte**. Le code actuel porte une hauteur d'activation provisoire (2 000 000) qui n'est pas la date prévue ; la vraie hauteur d'activation sera fixée par une future release et annoncée très en avance. Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible : **2027, pas encore planifiée**.
 
 ### 6.1 Délai réel d'activation — ce qu'il faut vraiment pour passer à HFv16
 
@@ -195,7 +217,7 @@ sensibles »*. Elle ne détient aucune validation FIPS 140-3 — seuls les **alg
 pas résolu (audit tiers, implémentation validée, ou posture hybride formalisée), **HFv16 ne
 sera pas activé.**
 
-**Points fonctionnels ouverts.** Les subaddresses BQ n'existent pas encore. *(Deux points
+**Points fonctionnels ouverts.** Les subaddresses BQ sont implémentées dans le cœur du wallet et la CLI (branche de développement), pas encore exposées par wallet-rpc ni la GUI. *(Deux points
 ouverts ont été fermés le 8 septembre 2026 : le **cold-signing** d'une dépense BQ — le fichier
 de transfert transporte le ciphertext ML-KEM-768, jamais le secret partagé, et la machine
 hors-ligne re-dérive celui-ci avec ses propres clés ; et la **consolidation B.../BQ**, via les
@@ -269,38 +291,29 @@ transparence des montants et l'absence de ring sur leurs dépenses.
 
 ---
 
-## 7. DISTRIBUTION FAIR LAUNCH
+## 7. DISTRIBUTION
 
-**Principe** : émission 100% via PoW RandomX, aucune vente privée, aucun seed round. Bloc 0 est un genesis avec 157.14 HRG verrouillés sous clé NUMS (cryptographiquement unspendable, héritage chaîne — voir `GENESIS_PROOF.md`). Bloc 1 onwards : récompense distribuée par compétition PoW pure.
+**Principe** : émission 100% via PoW RandomX, aucune vente privée, aucun seed round. Bloc 0 est un genesis avec 157.14 HRG verrouillés sous clé NUMS (cryptographiquement unspendable, héritage chaîne — voir `GENESIS_PROOF.md`). Depuis le bloc 1, chaque récompense de bloc revient à celui qui le mine ; les nœuds du projet minent sous les mêmes règles que tout le monde.
 
-> **Transparence (révision juin 2026).** La promesse « aucune allocation à l'équipe » du narratif v1.x **n'est plus exacte depuis v2.0.0** : la phase de pré-minage en réseau privé (§7.1) constitue une **réserve minée** détenue par les nœuds fondateurs avant la ré-ouverture publique. Cette réserve n'est pas une vente privée ni un seed round — elle est produite par PoW sous les mêmes règles RandomX — mais elle existe et son usage est détaillé ci-dessous.
+### 7.1 v2.0.0 (post-attaque 16 mai 2026)
 
-### 7.1 Phase pré-publique v2.0.0 (post-attaque 16 mai 2026)
+Après l'attaque 51% sur la chaîne v1.x (16 mai 2026, h≈3577), v2.0.0 est passé à un nouveau Network ID (`HRG\x02HIDERINGMAIN`), ce qui a séparé le nouveau réseau de la chaîne v1.x.
 
-Peu après le lancement v1.x, le réseau HIDERING a subi une attaque 51% (16 mai 2026, chaîne v1.x à h≈3577) : un mineur externe disposant d'une puissance supérieure à l'ensemble du réseau a dominé la chaîne et causé une réorganisation majeure, rendant orphelins tous les blocs minés. La réponse v2.0.0 est duale :
-
-- **Hard fork réseau** : le Network ID passe de `HRG\x01HIDERINGMAIN` à `HRG\x02HIDERINGMAIN` (magic `0x48524701` → `0x48524702`), isolant immédiatement v2.0.0 du mineur malveillant et permettant la consolidation du hashrate sur réseau privé avant ré-ouverture publique.
-- **Phase de pré-minage** : avant l'ouverture publique, les nœuds fondateurs minent en réseau privé pour trois raisons :
-  1. **Durcir le réseau dès le premier jour public** — accumuler suffisamment de hashrate pour rendre une nouvelle attaque 51% économiquement prohibitive dès le launch.
-  2. **Financer le développement** — les tests du wallet GUI et l'implémentation des signatures post-quantiques (ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203), prévues 2027) requièrent des transactions on-chain réelles.
-  3. **Constituer une réserve communautaire** — qui sera soit redistribuée aux mineurs et DEX participants au lancement public, soit partiellement brûlée pour réduire la supply en circulation.
-
-Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement développement**, pas une vente d'insiders : tous les coins sont produits par PoW. Une fois le réseau ouvert publiquement, tous les mineurs concourent sous les mêmes règles RandomX, sans avantage insider sur des coins inaccessibles au public. Le volume exact, la durée et la destination finale de la réserve seront communiqués publiquement au launch.
+Des versions antérieures de ce document annonçaient une réserve minée détenue par les nœuds fondateurs, dont le volume et l'usage devaient être divulgués au lancement. Cette annonce est retirée.
 
 ### 7.2 Engagements
 
 - ✓ Algorithme PoW RandomX (CPU-only, ASIC-resistant)
 - ✓ Aucune vente privée, aucun seed round, aucun ICO
-- ✓ Émission 100% PoW — y compris la réserve minée en phase privée (§7.1)
+- ✓ Émission 100% PoW
 - ✓ Genesis vérifiable on-chain (`GENESIS_PROOF.md`)
-- ✓ Transparence sur la phase pré-publique v2.0.0 : durée, hashrate, volume et destination de la réserve minée (communiqués au launch public)
 
 ---
 
 ## 8. ROADMAP COMPLÈTE
 
 **PHASE 0 : SETUP ✅**
-- Fork Monero v0.18.1
+- Fork de Monero
 - Compilation Ubuntu AMD
 - Dependencies OK
 
@@ -311,8 +324,8 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 - Genesis fair (NUMS, unspendable)
 
 **PHASE 2 : PRIVACY ENHANCEMENTS ✅**
-- P1 ✅ Ring dynamique 32–64
-- P2 ✅ TX padding interne 2500 bytes (tx_extra) ; padding réseau = Monero 1024 o
+- P1 ✅ Ring size 32 par défaut (consensus : 32 à 64)
+- P2 ✅ Padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus) ; padding réseau = Monero 1024 o
 - P3 ⊘ Routage stem multi-hops **retiré** : retour à Dandelion++ stock (le compteur de hops sérialisé fuyait la distance à l'origine ; voir Note transparence §3.2)
 - P4 ✅ Montants confidentiels (RingCT — engagements de Pedersen)
 - P5 ✅ Stealth addresses one-time (CryptoNote)
@@ -334,8 +347,8 @@ Le pré-minage v2.0.0 est un **bouclier défensif et un levier de financement d�
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
 **PHASE 5 : POST-QUANTIQUE (2027)**
-- ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) signatures (prototype audité, code inerte jusqu'à HFv16)
-- ✅ **Finalisé (juin 2026)** — A1 spec, A2 validateur, A3 spend-side, A4 wallet
+- ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) — prototype, revue interne assistée par IA, aucun audit tiers ; code inerte
+- 🔧 Implémenté sur la branche de développement (A1 spec, A2 validateur, A3 spend-side, A4 wallet) — pas encore dans une release
 - ✅ **Tests e2e BQ regtest validés (juin 2026)**
 - Hard fork PQC mainnet (cible T2 2027)
 
@@ -371,7 +384,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 
 | Fonctionnalité | Monero | **HIDERING** |
 |---------------|--------|--------------|
-| Ring size | 16 (fixe) | 32–64 (dynamique) |
+| Ring size | 16 (fixe) | 32 par défaut (32–64 autorisé) |
 | TX padding | Non | TX interne 2500 o (réseau : Monero 1024 o) |
 | Routage réseau | Dandelion++ | Dandelion++ (hérité) |
 | Montants | Masqués (RingCT) | Masqués (RingCT) |
@@ -388,7 +401,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Paramètre | Valeur |
 |-----------|--------|
 | Ticker | HRG |
-| Fork base | Monero v0.18.1 |
+| Fork base | Monero (branche de développement, décembre 2025) |
 | Network ID | `HRG\x02HIDERINGMAIN` (v2.0.0) |
 | Magic bytes | `0x48524702` (v2.0.0) |
 | Port P2P | 19740 |
@@ -398,11 +411,11 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Block time | 120 secondes |
 | PoW | RandomX CPU-only |
 | HFv15 | Dès bloc 1 |
-| Ring size | 32–64 |
+| Ring size | 32 par défaut (32–64 autorisé) |
 | Supply | 18,000,000 HRG |
 | Reward initial | 42.857142857143 HRG/bloc |
 | Halving | 210,000 blocs (~292 jours) |
-| Unlock window | 60 blocs |
+| Unlock | 60 blocs (coins minés) · 10 blocs (sorties reçues) |
 | Émission | 100% PoW (voir §7) |
 | Repo | github.com/AB-lab113/hidering |
 
@@ -431,7 +444,7 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o) par-dessus la propagation Dandelion++ et le RingCT hérités de Monero, HIDERING offre une confidentialité forte par construction.
 
-Le fair launch garantit une distribution par compétition PoW pure. La phase pré-publique v2.0.0 (réponse à l'attaque 51% du 16 mai 2026, §7.1) durcit le réseau et finance le développement avant la ré-ouverture publique ; la réserve qui en résulte est minée, transparente et son usage sera communiqué au launch. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
+La distribution se fait par compétition PoW. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
 **HIDERING — Privacy by design. Fair by launch.** 🚀
 
