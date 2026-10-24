@@ -31,7 +31,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 Émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. Le code ne contient ni premine ni allocation ; voir §7.
 
 **INNOVATIONS CLÉS** :
-- Ring size 32 par défaut (consensus : 32 à 64) (vs Monero 16)
+- Ring size 32 par défaut dans les wallets HIDERING (CLI, RPC et GUI) ; le consensus accepte 32 à 64 (Monero : 16 fixe)
 - Padding réseau hérité de Monero (granularité 1024 bytes)
 - Padding interne de `tx_extra` à 2500 o par le wallet HRG (règle du wallet, pas du consensus)
 - Propagation des transactions via Dandelion++ (stem/fluff, héritée de Monero)
@@ -69,7 +69,7 @@ HIDERING adopte le modèle Bitcoin (supply fixe, halving, émission PoW pure) po
 HIDERING est un fork de **Monero (branche de développement, décembre 2025)** (CryptoNote), bénéficiant de :
 - RingCT (confidentialité des montants)
 - Bulletproofs+ (taille réduite des preuves)
-- RandomX (PoW CPU-only, résistant ASIC)
+- RandomX (PoW conçu pour les CPU)
 - Dandelion++ (diffusion des transactions)
 
 ### 3.2 Modifications principales
@@ -101,7 +101,7 @@ HIDERING est un fork de **Monero (branche de développement, décembre 2025)** (
 | Block time | 120 secondes |
 | Halving interval | 210,000 blocs (~292 jours) |
 | Difficulty adjustment | Chaque bloc (RandomX) |
-| Algorithme PoW | RandomX (CPU-only) |
+| Algorithme PoW | RandomX (optimisé CPU) |
 | Récompense initiale | **42.86 HRG/bloc** |
 | Adresses | Commencent par "B" (préfixe 60) |
 
@@ -142,7 +142,7 @@ Le cap original de 33M HRG provoquait un **overflow uint64** (33 × 10¹⁹ > UI
 | Supply cap | 21M BTC | **18M HRG** |
 | Émission | 100% PoW (fair launch) | **100% PoW (fair launch)** |
 | Mécanisme | Halving tous les ~4 ans | Halving tous les ~292 jours |
-| PoW | SHA-256 (ASIC) | RandomX (CPU-only) |
+| PoW | SHA-256 (ASIC) | RandomX (optimisé CPU) |
 
 ### 5.2 Code Halving C++
 
@@ -303,7 +303,7 @@ Des versions antérieures de ce document annonçaient une réserve minée déten
 
 ### 7.2 Engagements
 
-- ✓ Algorithme PoW RandomX (CPU-only, ASIC-resistant)
+- ✓ Algorithme PoW RandomX (conçu pour les CPU)
 - ✓ Aucune vente privée, aucun seed round, aucun ICO
 - ✓ Émission 100% PoW
 - ✓ Genesis vérifiable on-chain (`GENESIS_PROOF.md`)
@@ -372,7 +372,7 @@ Exemple de commande mineur (xmrig) :
 xmrig -o pool.hidering.org:3333 -u <votre_adresse_B...> -p x -a rx/0
 ```
 
-Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli`. RandomX étant CPU-only et résistant aux ASIC, un simple processeur de bureau permet de participer à l'émission.
+Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli`. RandomX étant conçu pour les CPU, un simple processeur de bureau permet de participer à l'émission.
 
 ### 9.1 Checkpoints d'intégrité
 
@@ -409,7 +409,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Préfixe adresses | 60 → "B" |
 | Décimales | 12 (10¹²) |
 | Block time | 120 secondes |
-| PoW | RandomX CPU-only |
+| PoW | RandomX (optimisé CPU) |
 | HFv15 | Dès bloc 1 |
 | Ring size | 32 par défaut (32–64 autorisé) |
 | Supply | 18,000,000 HRG |
