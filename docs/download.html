@@ -60,6 +60,11 @@
     font-family: 'Fira Mono', monospace; font-size: 0.78rem; color: var(--gold-dim);
     background: var(--dark3); padding: 0.1rem 0.4rem; border-radius: 2px;
   }
+  .release-warning {
+    font-size: 0.85rem; color: var(--text); line-height: 1.7;
+    border: 1px solid var(--gold-dim); border-left-width: 3px;
+    padding: 0.9rem 1.1rem; margin-bottom: 1.5rem; position: relative;
+  }
 </style>
 </head>
 <body>
@@ -130,6 +135,7 @@
 
   <!-- GUI WALLET -->
   <div class="release-card reveal">
+    <p class="release-warning" role="note"><strong style="color:var(--gold);">⚠ Known issue in v2.0.2-gui:</strong> the GUI rounds every amount you send down to the nearest 0.1 HRG, so the recipient may receive slightly less than you typed (an amount under 0.1 HRG is sent as 0). Until a fixed GUI is released, send amounts that are exact multiples of 0.1 HRG, or use hidering-wallet-cli v2.0.3.</p>
     <div class="release-header">
       <div>
         <h2>Wallet GUI Desktop — v2.0.2-gui</h2>
