@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OTC Desk — HIDERING (HRG)</title>
-<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC peer-to-peer through @HideringOTCBot, a Telegram escrow bot operated by HIDERING. No order book; the bot holds both legs until settlement.">
+<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC peer-to-peer through @HideringOTCBot, a Telegram escrow bot operated by HIDERING. No matching engine: buyers pick an open order from /orders; the bot holds both legs until settlement.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -93,12 +93,12 @@
     <div class="flow-step">
       <div class="n">03</div>
       <h3>Bot settles</h3>
-      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller. Each leg is recorded with its transaction ID so that a restart does not resend it.</p>
+      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller. Each leg is tracked — the attempt is recorded before sending, then its transaction ID — so that a restart does not resend it.</p>
     </div>
     <div class="flow-step">
       <div class="n">04</div>
       <h3>Done</h3>
-      <p>Both parties get an on-chain confirmation. Leftover gas is refunded on a best-effort basis, and an unmatched order can be cancelled for a refund of the escrowed HRG.</p>
+      <p>Both parties get an on-chain confirmation. Leftover gas is refunded on a best-effort basis, and an unmatched order can be cancelled for a refund of the escrowed HRG, minus the network fee.</p>
     </div>
   </div>
 
@@ -135,7 +135,7 @@
     </div>
     <div class="feat-cell">
       <h3>Recorded settlement</h3>
-      <p>Each leg is tracked by its on-chain transaction ID, which protects against accidental resends after a restart.</p>
+      <p>Each leg is tracked (attempt recorded before sending, then its transaction ID), which protects against accidental resends after a restart.</p>
     </div>
     <div class="feat-cell">
       <h3>Buyer-pays-gas</h3>
