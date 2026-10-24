@@ -82,7 +82,7 @@
     <div class="panel-label">Requirements</div>
     <ul class="req-list">
       <li><span class="k">OS</span> &nbsp; Linux x86_64 · macOS ARM64 · Windows x64</li>
-      <li><span class="k">RAM</span> &nbsp; ≥ 2 GB free per mining thread (RandomX dataset)</li>
+      <li><span class="k">RAM</span> &nbsp; ≈ 3 GB free in total (the ~2 GB RandomX dataset is shared by all mining threads, plus ~2 MB per thread)</li>
       <li><span class="k">DISK</span> &nbsp; ≥ 8 GB free (daemon pre-allocates ~5 GB LMDB)</li>
       <li><span class="k">PORT</span> &nbsp; 19740 open inbound (optional, for relaying)</li>
     </ul>
@@ -99,14 +99,15 @@
   <div class="tab-panel active" id="tab-pool">
     <div class="panel reveal" style="margin-bottom:2rem;">
       <div class="panel-label">Public Pool</div>
-      <p style="font-size:0.85rem;color:var(--text);line-height:1.7;margin:0 0 1.25rem;">Pooled mining gives steady PPLNS payouts instead of waiting on a solo block. Point any RandomX miner (e.g. <a href="https://github.com/xmrig/xmrig">XMRig</a>) at the HIDERING public pool. You still need a B-address to receive payouts — create one with the wallet CLI (see the Solo tab, steps 1 & 3).</p>
+      <p style="font-size:0.85rem;color:var(--text);line-height:1.7;margin:0 0 1.25rem;">Pooled mining gives steadier payouts than waiting on a solo block: each block's reward is shared in proportion to the work submitted during that round (PROP). Point any RandomX miner (e.g. <a href="https://github.com/xmrig/xmrig">XMRig</a>) at the HIDERING public pool. You still need a B-address to receive payouts — create one with the wallet CLI (see the Solo tab, steps 1 & 3).</p>
       <ul class="pool-list">
         <li><span class="k">STRATUM</span><code>stratum+tcp://pool.hidering.org:3333</code></li>
         <li><span class="k">STATS API</span><a href="https://pool.hidering.org/stats">https://pool.hidering.org/stats</a></li>
         <li><span class="k">ALGO</span><span style="color:var(--text);">RandomX (rx/0)</span></li>
         <li><span class="k">FEE</span><span style="color:var(--text);">1%</span></li>
         <li><span class="k">MIN PAYOUT</span><span style="color:var(--text);">1 HRG</span></li>
-        <li><span class="k">PAYOUTS</span><span style="color:var(--text);">PPLNS</span></li>
+        <li><span class="k">PAYOUTS</span><span style="color:var(--text);">PROP (proportional per round)</span></li>
+        <li><span class="k">PAYOUT CYCLE</span><span style="color:var(--text);">every 30 min · currently max 50 HRG per payment (larger balances are paid over several cycles)</span></li>
       </ul>
       <div style="font-family:'Fira Mono',monospace;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:0.6rem;">One-line command (XMRig)</div>
       <div class="code-block">xmrig -o pool.hidering.org:3333 -u <span class="cmd">YOUR_HRG_ADDRESS</span> -p x -a rx/0</div>
@@ -166,8 +167,8 @@
         <div class="step-num">06</div>
         <div>
           <h3>Send HRG to another wallet</h3>
-          <p>Once your balance is unlocked, transfer HRG to any B-address. Append a ring size (48 or 64) for extra privacy.</p>
-          <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><span class="cmd">transfer</span> B5xxx...address 10 64   <span class="dim"># larger ring</span><br><br><span class="cmd">show_transfers</span>       <span class="dim"># transaction history</span></div>
+          <p>Once your balance is unlocked, transfer HRG to any B-address. Keep the default ring size (32): every standard wallet uses it, and a different size makes your transaction easier to single out.</p>
+          <div class="code-block"><span class="cmd">transfer</span> B5xxx...address 10<br><br><span class="cmd">show_transfers</span>       <span class="dim"># transaction history</span></div>
         </div>
       </div>
     </div>
