@@ -112,7 +112,7 @@
     <p>100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. The code contains no premine and no allocation; see §7.</p>
     <p><strong>Key innovations:</strong></p>
     <ul>
-      <li>Ring signatures (32 members by default, 32–64 allowed) vs Monero's fixed 16</li>
+      <li>Ring signatures of 32 members by default in the HIDERING wallets (CLI, RPC and GUI); consensus allows 32–64 (Monero: fixed 16)</li>
       <li>Network padding inherited from Monero (1024-byte granularity)</li>
       <li>2500-byte internal <code class="inline">tx_extra</code> padding by the HRG wallet (a wallet rule, not a consensus rule)</li>
       <li>Transaction propagation via Dandelion++ stem/fluff (inherited from Monero)</li>
@@ -133,7 +133,7 @@
     </ul>
 
     <h2 id="architecture">3 · Technical Architecture</h2>
-    <p>HIDERING is a fork of <strong>Monero (development branch, December 2025)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (CPU-only, ASIC-resistant PoW) and Dandelion++ (transaction diffusion).</p>
+    <p>HIDERING is a fork of <strong>Monero (development branch, December 2025)</strong> (CryptoNote), inheriting RingCT (confidential amounts), Bulletproofs+ (compact proofs), RandomX (PoW designed to be CPU-friendly) and Dandelion++ (transaction diffusion).</p>
     <table class="data-table" style="margin-top:1rem;">
       <thead><tr><th>Component</th><th>Monero</th><th>HIDERING</th></tr></thead>
       <tbody>
@@ -158,7 +158,7 @@
         <tr><td>Emission</td><td>100% PoW (no seed round, no private sale) — see §7</td></tr>
         <tr><td>Block time</td><td class="gold">120 seconds</td></tr>
         <tr><td>Halving interval</td><td class="gold">210,000 blocks (~292 days)</td></tr>
-        <tr><td>PoW algorithm</td><td>RandomX (CPU-only)</td></tr>
+        <tr><td>PoW algorithm</td><td>RandomX (CPU-optimised)</td></tr>
         <tr><td>Initial reward</td><td class="gold">42.86 HRG / block</td></tr>
         <tr><td>Addresses</td><td>Begin with "B" (prefix 60)</td></tr>
       </tbody>
