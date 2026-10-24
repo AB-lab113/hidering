@@ -1,6 +1,6 @@
 # HIDERING (HRG) — WHITE PAPER OFFICIEL
 **Enhanced Privacy Cryptocurrency avec Bitcoin-Style Emission**  
-**FAIR LAUNCH · 100% PoW MINING · RandomX CPU**  
+**100% PoW MINING · RandomX CPU**  
 **Version 1.4.3 (révisée octobre 2026)**  
 **Octobre 2026**
 
@@ -140,7 +140,7 @@ Le cap original de 33M HRG provoquait un **overflow uint64** (33 × 10¹⁹ > UI
 | Aspect | Bitcoin | **HIDERING** |
 |--------|---------|--------------|
 | Supply cap | 21M BTC | **18M HRG** |
-| Émission | 100% PoW (fair launch) | **100% PoW (fair launch)** |
+| Émission | 100% PoW | **100% PoW** |
 | Mécanisme | Halving tous les ~4 ans | Halving tous les ~292 jours |
 | PoW | SHA-256 (ASIC) | RandomX (optimisé CPU) |
 
@@ -356,7 +356,7 @@ Des versions antérieures de ce document annonçaient une réserve minée déten
 
 ## 9. POOL MINING
 
-HIDERING opère un pool de minage public RandomX en production pour abaisser la barrière d'entrée au minage CPU et faciliter la participation au fair launch.
+HIDERING opère un pool de minage public RandomX en production pour abaisser la barrière d'entrée au minage CPU et faciliter la participation à l'émission 100% PoW.
 
 | Paramètre | Valeur |
 |-----------|--------|
@@ -446,7 +446,7 @@ HIDERING (HRG) représente une évolution significative de la confidentialité f
 
 La distribution se fait par compétition PoW. La roadmap post-quantique (2027) assure la pérennité du protocole face aux menaces futures.
 
-**HIDERING — Privacy by design. Fair by launch.** 🚀
+**HIDERING — Privacy by design. Pure PoW.** 🚀
 
 ---
 
