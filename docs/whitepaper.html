@@ -126,7 +126,7 @@
     <p>Traditional public blockchains (Bitcoin, Ethereum) fully expose transaction flows. Even Monero — the privacy benchmark — has limits: a fixed ring size of 16, exploitable network metadata, and possible timing attacks.</p>
     <h3>The HIDERING vision</h3>
     <ul>
-      <li><strong>On-chain anonymity:</strong> ring signatures 32–64, one-time stealth addresses, RingCT</li>
+      <li><strong>On-chain anonymity:</strong> ring signatures (32 members by default, up to 64), one-time stealth addresses, RingCT. A larger ring includes more decoys per input, but the ring size is public on-chain, so a size that few people use makes a transaction easier to recognise; the default (32) is recommended.</li>
       <li><strong>Network anonymity:</strong> Dandelion++ propagation (inherited from Monero). P2P traffic is not encrypted.</li>
       <li><strong>Amount confidentiality:</strong> RingCT (Pedersen commitments), plus 2500-byte internal <code class="inline">tx_extra</code> padding by the HRG wallet (a wallet rule, not a consensus rule)</li>
       <li><strong>Future resistance:</strong> planned post-quantum migration via hard fork (2027)</li>
