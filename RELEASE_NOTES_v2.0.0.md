@@ -83,6 +83,8 @@ Interop-bound references (Trezor protobuf message names, Ledger app references, 
 
 Following the 51% attack on v1.x, the v2.0.0 mainnet starts as a **private network phase**: founding nodes mine on the new chain before public peering is enabled, so that honest hash rate has time to build up. Total volume mined during this phase and the exact public-opening date will be disclosed at launch. The "zero premine" claim that was attached to v1.0.x is no longer accurate for v2.0.0; please refer to the whitepaper and project docs for the current framing.
 
+**Update (October 2026).** This plan was superseded when the network opened to the public: the private chain was replaced by the public chain and the blocks mined privately were orphaned, so no coins from that phase are part of the live chain. The announcement above that the volume mined would be disclosed at launch is withdrawn, and the remark on "zero premine" is superseded by whitepaper §7.1.
+
 ## What's in this release
 
 Linux x86_64 binaries (built from branch `v2-privacy`, this tag):
