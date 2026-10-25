@@ -93,7 +93,7 @@
     <div class="flow-step">
       <div class="n">03</div>
       <h3>Bot settles</h3>
-      <p>Once both legs are confirmed, the bot releases HRG to the buyer and the stablecoin to the seller. Each leg is tracked — the attempt is recorded before sending, then its transaction ID — so that a restart does not resend it.</p>
+      <p>Once both legs are confirmed, the bot releases HRG to the buyer (minus the network fee) and the stablecoin to the seller. Each leg is tracked — the attempt is recorded before sending, then its transaction ID — and is designed so that a restart does not resend it.</p>
     </div>
     <div class="flow-step">
       <div class="n">04</div>
@@ -135,7 +135,7 @@
     </div>
     <div class="feat-cell">
       <h3>Recorded settlement</h3>
-      <p>Each leg is tracked (attempt recorded before sending, then its transaction ID), which protects against accidental resends after a restart.</p>
+      <p>Each leg is tracked (attempt recorded before sending, then its transaction ID), which is designed to protect against accidental resends after a restart.</p>
     </div>
     <div class="feat-cell">
       <h3>Buyer-pays-gas</h3>
