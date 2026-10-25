@@ -37,7 +37,7 @@ HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité ma
 - Propagation des transactions via Dandelion++ (stem/fluff, héritée de Monero)
 - Montants confidentiels via RingCT (engagements de Pedersen)
 - Stealth addresses one-time (CryptoNote)
-- Résistance quantique (cible : 2027, pas encore planifié)
+- Résistance quantique (cible : 2027, pas encore planifiée)
 
 ---
 
@@ -54,7 +54,7 @@ HIDERING vise la confidentialité maximale par construction :
 - **Anonymat on-chain** : ring signatures (32 membres par défaut, jusqu'à 64), stealth addresses one-time, RingCT. Un anneau plus grand contient plus de leurres par entrée, mais la taille d'anneau est publique on-chain : une taille peu utilisée rend la transaction plus facile à reconnaître ; la taille par défaut (32) est recommandée.
 - **Anonymat réseau** : propagation Dandelion++ (héritée de Monero). Le trafic P2P n'est pas chiffré.
 - **Confidentialité des montants** : RingCT (engagements de Pedersen) ; padding interne de `tx_extra` à 2500 o par le wallet CLI et le RPC HIDERING (règle du wallet, pas du consensus)
-- **Résistance future** : migration post-quantique via hard fork (cible : 2027, pas encore planifié)
+- **Résistance future** : migration post-quantique via hard fork (cible : 2027, pas encore planifiée)
 
 ### 2.3 Modèle économique sain
 
@@ -191,7 +191,7 @@ if (base_reward == 0) {
 
 ## 6. RÉSISTANCE QUANTIQUE
 
-La cryptographie post-quantique sera introduite via un **hard fork** (cible : 2027, pas encore planifié) :
+La cryptographie post-quantique sera introduite via un **hard fork** (cible : 2027, pas encore planifiée) :
 
 - **Signatures** : ML-DSA-65 (FIPS 204, NIST PQC standard)
 - **Échange de clés** : ML-KEM-768 (FIPS 203, NIST PQC standard)
@@ -199,7 +199,7 @@ La cryptographie post-quantique sera introduite via un **hard fork** (cible : 20
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (septembre 2026).** Le prototype post-quantique (intégration liboqs (0.15.0 dans les binaires publiés, 0.16.0 sur la branche de développement), keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté sur la branche de développement et a fait l'objet d'une revue interne assistée par IA (pas d'audit tiers). Tout le code PQ reste **inerte**. Le code actuel porte une hauteur d'activation provisoire (2 000 000) qui n'est pas la date prévue ; la vraie hauteur d'activation sera fixée par une future release et annoncée avant l'activation. Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible : **2027, pas encore planifié**.
+**État (septembre 2026).** Le prototype post-quantique (intégration liboqs (0.15.0 dans les binaires publiés, 0.16.0 sur la branche de développement), keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté sur la branche de développement et a fait l'objet d'une revue interne assistée par IA (pas d'audit tiers). Tout le code PQ reste **inerte**. Le code actuel porte une hauteur d'activation provisoire (2 000 000) qui n'est pas la date prévue ; la vraie hauteur d'activation sera fixée par une future release et annoncée avant l'activation. Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible : **2027, pas encore planifiée**.
 
 ### 6.1 Délai réel d'activation — ce qu'il faut vraiment pour passer à HFv16
 
@@ -225,7 +225,7 @@ transactions hybrides décrites au §6.3.)*
 
 **Le coût réel, c'est la coordination.** Un hard fork n'est pas un déploiement logiciel : il
 faut publier des binaires pour toutes les plateformes, laisser mineurs, pools, services et
-détenteurs de wallets mettre à jour, et annoncer la hauteur d'activation **très en avance**
+détenteurs de wallets mettre à jour, et annoncer la hauteur d'activation **à l'avance**
 pour que le réseau converge. Un nœud non mis à jour se retrouve sur une chaîne morte. C'est un
 processus de **plusieurs semaines**, irréductible, quelle que soit l'urgence.
 
@@ -346,11 +346,11 @@ Avant l'ouverture publique de la v2.0.0, les nœuds fondateurs ont miné quelque
 - ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333` — voir §9)
 - ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
 
-**PHASE 5 : POST-QUANTIQUE (cible : 2027, pas encore planifié)**
+**PHASE 5 : POST-QUANTIQUE (cible : 2027, pas encore planifiée)**
 - ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) — prototype, revue interne assistée par IA, aucun audit tiers ; code inerte
 - 🔧 Implémenté sur la branche de développement (A1 spec, A2 validateur, A3 spend-side, A4 wallet) — pas encore dans une release
 - ✅ **Tests e2e BQ regtest validés (juin 2026)**
-- Hard fork PQC mainnet (cible : 2027, pas encore planifié)
+- Hard fork PQC mainnet (cible : 2027, pas encore planifiée)
 
 ---
 
@@ -392,7 +392,7 @@ La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000,
 | Supply | Tail emission | 18M hard cap |
 | Halving | Non | Tous les 210,000 blocs |
 | PoW | RandomX | RandomX (identique) |
-| Post-quantique | Non planifié | Cible : 2027, pas encore planifié (ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203)) |
+| Post-quantique | Non planifié | Cible : 2027, pas encore planifiée (ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203)) |
 
 ---
 
@@ -444,7 +444,7 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o) par-dessus la propagation Dandelion++ et le RingCT hérités de Monero, HIDERING offre une confidentialité forte par construction.
 
-La distribution se fait par compétition PoW ; voir §7.1 pour la phase pré-publique. La roadmap post-quantique (cible : 2027, pas encore planifié) assure la pérennité du protocole face aux menaces futures.
+La distribution se fait par compétition PoW ; voir §7.1 pour la phase pré-publique. La roadmap post-quantique (cible : 2027, pas encore planifiée) assure la pérennité du protocole face aux menaces futures.
 
 **HIDERING — Privacy by design. Pure PoW.** 🚀
 
