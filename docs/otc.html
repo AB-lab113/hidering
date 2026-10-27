@@ -83,7 +83,7 @@
     <div class="flow-step">
       <div class="n">01</div>
       <h3>Post an offer</h3>
-      <p>A seller runs <code class="inline">/sell</code> with the HRG amount, the price per HRG, an Ethereum address to receive the USDT / USDC, and an HRG address for refunds. The bot replies with a deposit address; the order goes live in <code class="inline">/orders</code> once the HRG deposit has confirmed, and expires if no deposit arrives within 24 hours.</p>
+      <p>A seller runs <code class="inline">/sell</code> with the HRG amount, the price per HRG, an Ethereum address to receive the USDT / USDC, and an HRG address for refunds. The bot replies with a deposit address; the order goes live in <code class="inline">/orders</code> once the HRG deposit has confirmed, and the order is cancelled if the full HRG deposit has not confirmed within 24 hours.</p>
     </div>
     <div class="flow-step">
       <div class="n">02</div>
@@ -93,12 +93,12 @@
     <div class="flow-step">
       <div class="n">03</div>
       <h3>Bot settles</h3>
-      <p>Once the full stablecoin payment and the gas ETH have arrived at the deposit address, the bot sends the HRG to the buyer (minus the HRG network fee) and forwards the USDT / USDC to the seller's Ethereum address. Each leg is tracked — the attempt is recorded before sending, then its transaction ID — and is designed so that a restart does not resend it.</p>
+      <p>Once the full order total in one stablecoin (USDT or USDC) and enough gas ETH have arrived at the deposit address, the bot sends the HRG to the buyer (minus the HRG network fee) and forwards the USDT / USDC to the seller's Ethereum address. Each leg is tracked — the attempt is recorded before sending, then its transaction ID — and is designed so that a restart does not resend it.</p>
     </div>
     <div class="flow-step">
       <div class="n">04</div>
       <h3>Done</h3>
-      <p>Both parties get a Telegram message with the transaction IDs. If the buyer gave an ETH address in <code class="inline">/buy</code>, leftover gas ETH is sent back to it on a best-effort basis. A seller can cancel an order until a buyer commits to it; HRG already in escrow is refunded, minus the network fee.</p>
+      <p>The buyer gets a Telegram message with the HRG transaction ID, and the seller one with the USDT / USDC transaction ID; <code class="inline">/status</code> shows both. If the buyer gave an ETH address in <code class="inline">/buy</code>, leftover gas ETH is sent back to it on a best-effort basis. A seller can cancel an order while it is listed in <code class="inline">/orders</code>; the escrowed HRG is then refunded automatically, minus the network fee.</p>
     </div>
   </div>
 
@@ -121,7 +121,7 @@
     </div>
     <div class="cmd-card">
       <h3>/buy</h3>
-      <p>Reserve an open order and give the HRG address where you will receive the coins. The bot returns an Ethereum address for the USDT / USDC payment plus gas ETH; unpaid reservations are released after the time shown by the bot. Optionally add an ETH address so leftover gas can be sent back to you, on a best-effort basis.</p>
+      <p>Reserve an open order and give the HRG address where you will receive the coins. The bot returns an Ethereum address for the USDT / USDC payment plus gas ETH, and tells you how long you have to pay. If nothing has been paid in that time, the reservation is released; an incomplete payment is not released but goes to review by the operator. Optionally add an ETH address so leftover gas can be sent back to you, on a best-effort basis.</p>
     </div>
     <div class="cmd-card">
       <h3>/status</h3>
@@ -133,7 +133,7 @@
     </div>
     <div class="cmd-card">
       <h3>/cancel</h3>
-      <p>Cancel an order you created, as long as no buyer has committed to it. HRG already in escrow is refunded automatically, minus the network fee — to the address you give with <code class="inline">/cancel</code>, or otherwise to the refund address from <code class="inline">/sell</code>.</p>
+      <p>Cancel an order you created while it is listed in <code class="inline">/orders</code>. The escrowed HRG is then refunded automatically, minus the network fee — to the address you give with <code class="inline">/cancel</code>, or otherwise to the refund address from <code class="inline">/sell</code>.</p>
     </div>
   </div>
 
@@ -155,11 +155,11 @@
     </div>
     <div class="feat-cell">
       <h3>Refund on cancel</h3>
-      <p>Until a buyer commits, the seller can cancel; HRG already in escrow is returned, minus the network fee, to the seller's refund address.</p>
+      <p>While an order is listed in <code class="inline">/orders</code>, the seller can cancel it; the escrowed HRG is then returned, minus the network fee, to the refund address the seller gives with <code class="inline">/sell</code> or <code class="inline">/cancel</code>.</p>
     </div>
     <div class="feat-cell">
       <h3>Stablecoin pairs</h3>
-      <p>Trade against USDT or USDC on Ethereum. Pricing is set per order by the seller; a buyer takes an order at its listed total, and the bot settles only once that total has arrived.</p>
+      <p>Trade against USDT or USDC on Ethereum. Pricing is set per order by the seller; a buyer takes an order at its listed total, and the bot settles only once that total has arrived in one of the two stablecoins.</p>
     </div>
     <div class="feat-cell">
       <h3>No listing needed</h3>
@@ -170,7 +170,7 @@
   <!-- WARNING -->
   <div class="warn reveal">
     <h3>Trade safely</h3>
-    <p>The OTC desk is a peer-to-peer tool — always read the bot's <code class="inline">/start</code> output and check the order with <code class="inline">/status</code> before sending funds. Double-check addresses and amounts; on-chain transfers are irreversible. Only the official bot at <a href="https://t.me/HideringOTCBot">t.me/HideringOTCBot</a> is operated by HIDERING — beware of impersonators. HRG is an experimental asset; never trade more than you can afford to lose.</p>
+    <p>The OTC desk is a peer-to-peer tool — always read the bot's <code class="inline">/start</code> output and check the order with <code class="inline">/status</code> before sending funds. Double-check addresses and amounts; on-chain transfers are irreversible. Only cancel an order once it is listed in <code class="inline">/orders</code>; if you have sent HRG and the order is not listed yet, wait for it to appear before cancelling. Only the official bot at <a href="https://t.me/HideringOTCBot">t.me/HideringOTCBot</a> is operated by HIDERING — beware of impersonators. HRG is an experimental asset; never trade more than you can afford to lose.</p>
   </div>
 
   <div style="text-align:center;margin-top:3.5rem;" class="reveal">
