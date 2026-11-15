@@ -2,12 +2,18 @@
 <!--
   ETH SWITCH — one word on the <body> tag below:
     data-eth="soon"  native ETH shown as "coming soon, closed test" (no ETH command shown)
-    data-eth="live"  native ETH shown as open, with /selleth and the ETH /buy flow
-  The page CSS (.eth-soon / .eth-live) shows only the text of the current state; no JS needed.
-  Any value other than "live" (or a missing attribute) shows the "soon" text.
-  When switching to "live", also update by hand (they cannot follow this switch):
-    - the <meta name="description"> and the <h1> of this page (USDT / USDC only);
-    - docs/index.html, OTC Desk card ("Swap HRG ⇄ USDT / USDC ...").
+    data-eth="beta"  full ETH description (/selleth, ETH /buy flow) + note: limited to
+                     allow-listed users while the desk is being tested
+    data-eth="live"  full ETH description, open to everyone, no beta note
+  The page CSS shows only the text of the current state; no JS needed:
+    .eth-soon  soon only      .eth-live  beta and live
+    .eth-beta  beta only      .eth-golive  live only
+  Any other value (or a missing attribute) shows the "soon" text.
+  These cannot follow the switch and are updated by hand:
+    - the <meta name="description"> and the <h1> of this page (USDT / USDC only
+      up to "beta");
+    - docs/index.html, OTC Desk card ("Swap HRG ⇄ USDT / USDC ...": "soon" text has no
+      ETH, "beta" text says "and native ETH (limited access)").
   Values marked <!- - CONFIG - -> in the "live" text come from the bot's environment:
   check them against the running bot (/start, refusal texts) before switching.
 -->
@@ -62,8 +68,10 @@
   .warn p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; }
 
   /* ETH switch: see the comment at the top of this file */
-  body:not([data-eth="live"]) .eth-live { display: none !important; }
-  body[data-eth="live"] .eth-soon { display: none !important; }
+  body:not([data-eth="beta"]):not([data-eth="live"]) .eth-live { display: none !important; }
+  body[data-eth="beta"] .eth-soon, body[data-eth="live"] .eth-soon { display: none !important; }
+  body:not([data-eth="beta"]) .eth-beta { display: none !important; }
+  body:not([data-eth="live"]) .eth-golive { display: none !important; }
   .eth-note { font-size: 0.86rem; color: var(--text-dim); line-height: 1.7; margin-top: 1.25rem; max-width: 760px; margin-left: auto; margin-right: auto; }
   .eth-list { list-style: disc; padding-left: 1.2rem; }
   .eth-live .cmd-card h3 { overflow-wrap: anywhere; }
@@ -76,7 +84,7 @@
   }
 </style>
 </head>
-<body data-eth="soon">
+<body data-eth="beta">
 
 <!-- NAV -->
 <nav>
@@ -99,7 +107,8 @@
   <h1 class="section-title">Swap HRG ⇄ USDT / USDC</h1>
   <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot, operated by HIDERING, holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No matching engine and no exchange listing required: buyers pick an open order from <code class="inline">/orders</code>.</p>
   <p class="eth-note eth-soon"><strong style="color:var(--gold);">Native ETH — coming soon.</strong> Orders paid in native ETH are in a closed test with a few allow-listed users. They are not open to the public, and no opening date has been set.</p>
-  <p class="eth-note eth-live"><strong style="color:var(--gold);">Native ETH is also available</strong> on Ethereum mainnet, with <code class="inline">/selleth</code>. See <a href="#eth">ETH orders</a> below.</p>
+  <p class="eth-note eth-beta"><strong style="color:var(--gold);">Native ETH — limited access.</strong> Native ETH orders work today but are limited to allow-listed users while the desk is being tested. Other users get "ETH orders are not available right now." See <a href="#eth">ETH orders</a> below.</p>
+  <p class="eth-note eth-golive"><strong style="color:var(--gold);">Native ETH is also available</strong> on Ethereum mainnet, with <code class="inline">/selleth</code>. See <a href="#eth">ETH orders</a> below.</p>
   <div class="otc-hero-cta">
     <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Open @HideringOTCBot</a>
   </div>
@@ -213,6 +222,7 @@
 
   <div class="eth-live">
     <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">ETH orders</h2>
+    <p class="section-sub reveal eth-beta" style="margin-bottom:1rem;"><strong style="color:var(--gold);">Limited access.</strong> Native ETH orders work today but are limited to allow-listed users while the desk is being tested. Other users get "ETH orders are not available right now."</p>
     <p class="section-sub reveal" style="margin-bottom:1.5rem;">A seller can ask to be paid in native ETH on Ethereum mainnet instead of USDT / USDC. Run <code class="inline">/start</code> in the bot for the exact, up-to-date arguments and limits.</p>
     <div class="warn reveal" style="margin-top:0;margin-bottom:1.5rem;">
       <h3>Custodial escrow</h3>
