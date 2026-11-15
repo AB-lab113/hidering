@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!--
+  ETH SWITCH — one word on the <body> tag below:
+    data-eth="soon"  native ETH shown as "coming soon, closed test" (no ETH command shown)
+    data-eth="live"  native ETH shown as open, with /selleth and the ETH /buy flow
+  The page CSS (.eth-soon / .eth-live) shows only the text of the current state; no JS needed.
+  Any value other than "live" (or a missing attribute) shows the "soon" text.
+  When switching to "live", also update by hand (they cannot follow this switch):
+    - the <meta name="description"> and the <h1> of this page (USDT / USDC only);
+    - docs/index.html, OTC Desk card ("Swap HRG ⇄ USDT / USDC ...").
+  Values marked <!- - CONFIG - -> in the "live" text come from the bot's environment:
+  check them against the running bot (/start, refusal texts) before switching.
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -40,6 +52,14 @@
   .warn h3 { font-family: 'Cinzel', serif; font-size: 1rem; color: var(--gold); margin-bottom: 0.6rem; }
   .warn p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; }
 
+  /* ETH switch: see the comment at the top of this file */
+  body:not([data-eth="live"]) .eth-live { display: none !important; }
+  body[data-eth="live"] .eth-soon { display: none !important; }
+  .eth-note { font-size: 0.86rem; color: var(--text-dim); line-height: 1.7; margin-top: 1.25rem; max-width: 760px; margin-left: auto; margin-right: auto; }
+  .eth-list { list-style: disc; padding-left: 1.2rem; }
+  .eth-live .cmd-card h3 { overflow-wrap: anywhere; }
+  .eth-list li { font-size: 0.84rem; color: var(--text-dim); line-height: 1.7; margin-bottom: 0.35rem; }
+
   @media (max-width: 768px) {
     .flow { grid-template-columns: 1fr 1fr; }
     .cmd-grid { grid-template-columns: 1fr; }
@@ -47,7 +67,7 @@
   }
 </style>
 </head>
-<body>
+<body data-eth="soon">
 
 <!-- NAV -->
 <nav>
@@ -69,6 +89,8 @@
   <div class="section-label">OTC Desk</div>
   <h1 class="section-title">Swap HRG ⇄ USDT / USDC</h1>
   <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot, operated by HIDERING, holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No matching engine and no exchange listing required: buyers pick an open order from <code class="inline">/orders</code>.</p>
+  <p class="eth-note eth-soon"><strong style="color:var(--gold);">Native ETH — coming soon.</strong> Orders paid in native ETH are in a closed test with a few allow-listed users. They are not open to the public, and no opening date has been set.</p>
+  <p class="eth-note eth-live"><strong style="color:var(--gold);">Native ETH is also available</strong> on Ethereum mainnet, with <code class="inline">/selleth</code>. See <a href="#eth">ETH orders</a> below.</p>
   <div class="otc-hero-cta">
     <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Open @HideringOTCBot</a>
   </div>
@@ -165,6 +187,50 @@
       <h3>No listing needed</h3>
       <p>Move HRG in and out without waiting for an exchange listing. Peer-to-peer, directly inside Telegram.</p>
     </div>
+  </div>
+
+  <!-- ETH (switch: data-eth on <body>) -->
+  <div id="eth" class="section-label reveal" style="margin-top:5rem;">ETH</div>
+
+  <div class="eth-soon">
+    <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">Native ETH — closed test</h2>
+    <div class="feat-row reveal" style="grid-template-columns:1fr;">
+      <div class="feat-cell">
+        <h3>Not open to the public yet</h3>
+        <p>Selling HRG for native ETH on Ethereum mainnet is being tested with a few allow-listed users. For everyone else, the bot answers that ETH orders are not available right now. No opening date has been set. Today, the desk is open to the public for USDT and USDC only.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="eth-live">
+    <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">ETH orders</h2>
+    <p class="section-sub reveal" style="margin-bottom:1.5rem;">A seller can ask to be paid in native ETH on Ethereum mainnet instead of USDT / USDC. Run <code class="inline">/start</code> in the bot for the exact, up-to-date arguments and limits.</p>
+    <div class="warn reveal" style="margin-top:0;margin-bottom:1.5rem;">
+      <h3>Custodial escrow</h3>
+      <p>Until the trade completes, the HRG and the ETH are held in wallets controlled by the HIDERING OTC team. Normal trades settle automatically; anything unusual is settled by hand by an operator. You are trusting the team with these funds during the trade.</p>
+    </div>
+    <div class="cmd-grid reveal">
+      <div class="cmd-card">
+        <h3>/selleth &lt;HRG_amount&gt; &lt;total_ETH&gt; &lt;your_ETH_address&gt; &lt;your_HRG_refund_address&gt;</h3>
+        <ul class="eth-list">
+          <li>From 10<!-- CONFIG --> to 1000<!-- CONFIG --> HRG per order.</li>
+          <li>Total in ETH for the whole order, from 0.02<!-- CONFIG --> to 0.1<!-- CONFIG --> ETH, with at most 6 decimals.</li>
+          <li>Your ETH address must be a regular wallet address, not a contract.</li>
+          <li>Deposit exactly the HRG amount to the escrow address the bot gives you. The order appears in <code class="inline">/orders</code> after 60<!-- CONFIG --> HRG confirmations: from about 2 hours to several hours, as the HRG block rhythm is irregular. It expires if the HRG has not been deposited within 24 hours.</li>
+          <li>Network fees are deducted from the ETH sent to you. They can be about twice the usual market fee (the bot reserves 21,000 gas at the current maximum fee per gas) and are capped at 5<!-- CONFIG --> % of the total: above that, settlement waits.</li>
+        </ul>
+      </div>
+      <div class="cmd-card">
+        <h3>/buy &lt;order_id&gt; &lt;your_HRG_address&gt;</h3>
+        <ul class="eth-list">
+          <li>The bot gives you an Ethereum deposit address for this order and the exact total to pay.</li>
+          <li>Send only native ETH on Ethereum mainnet, exactly the total. No separate gas: network fees are deducted from this amount. Any excess goes to the seller.</li>
+          <li>Pay within 2<!-- CONFIG --> hours, or the reservation is released. If the payment is incomplete when the time is up, an operator reviews the order and settles it manually.</li>
+          <li>The bot waits until the block of your payment is finalized on Ethereum (about 13 to 19 minutes after inclusion), sends the HRG to you (minus the HRG network fee), then forwards the ETH to the seller, network fees deducted.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="section-sub reveal" style="margin-top:1.5rem;">No price, rate or settlement time is guaranteed. Nothing on this page is financial advice.</p>
   </div>
 
   <!-- WARNING -->
