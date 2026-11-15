@@ -22,7 +22,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OTC Desk — HIDERING (HRG)</title>
-<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC peer-to-peer through @HideringOTCBot, a Telegram escrow bot operated by HIDERING. No matching engine: buyers pick an open order from /orders; the bot holds both legs until settlement.">
+<meta name="description" content="Swap HIDERING (HRG) for USDT / USDC or native ETH peer-to-peer through @HideringOTCBot, a Telegram escrow bot operated by HIDERING. No matching engine: buyers pick an open order from /orders; the bot holds both legs until settlement.">
 <link rel="icon" href="/favicon.ico?v=2" sizes="any">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
@@ -84,7 +84,7 @@
   }
 </style>
 </head>
-<body data-eth="beta">
+<body data-eth="live">
 
 <!-- NAV -->
 <nav>
@@ -104,10 +104,9 @@
 <div class="page-head">
   <div class="hero-glow"></div>
   <div class="section-label">OTC Desk</div>
-  <h1 class="section-title">Swap HRG ⇄ USDT / USDC</h1>
+  <h1 class="section-title">Swap HRG ⇄ USDT / USDC / ETH</h1>
   <p class="section-sub">Trade HIDERING peer-to-peer through <strong style="color:var(--gold);">@HideringOTCBot</strong> — an escrow-backed Telegram bot. The bot, operated by HIDERING, holds the HRG in escrow while the buyer pays in stablecoin, then settles both legs. No matching engine and no exchange listing required: buyers pick an open order from <code class="inline">/orders</code>.</p>
   <p class="eth-note eth-soon"><strong style="color:var(--gold);">Native ETH — coming soon.</strong> Orders paid in native ETH are in a closed test with a few allow-listed users. They are not open to the public, and no opening date has been set.</p>
-  <p class="eth-note eth-beta"><strong style="color:var(--gold);">Native ETH — limited access.</strong> Native ETH orders work today but are limited to allow-listed users while the desk is being tested. Other users get "ETH orders are not available right now." See <a href="#eth">ETH orders</a> below.</p>
   <p class="eth-note eth-golive"><strong style="color:var(--gold);">Native ETH is also available</strong> on Ethereum mainnet, with <code class="inline">/selleth</code>. See <a href="#eth">ETH orders</a> below.</p>
   <div class="otc-hero-cta">
     <a href="https://t.me/HideringOTCBot" class="btn btn-primary">Open @HideringOTCBot</a>
@@ -222,7 +221,6 @@
 
   <div class="eth-live">
     <h2 class="section-title reveal" style="font-size:clamp(1.5rem,3vw,2rem);">ETH orders</h2>
-    <p class="section-sub reveal eth-beta" style="margin-bottom:1rem;"><strong style="color:var(--gold);">Limited access.</strong> Native ETH orders work today but are limited to allow-listed users while the desk is being tested. Other users get "ETH orders are not available right now."</p>
     <p class="section-sub reveal" style="margin-bottom:1.5rem;">A seller can ask to be paid in native ETH on Ethereum mainnet instead of USDT / USDC. Run <code class="inline">/start</code> in the bot for the exact, up-to-date arguments and limits.</p>
     <div class="warn reveal" style="margin-top:0;margin-bottom:1.5rem;">
       <h3>Custodial escrow</h3>
