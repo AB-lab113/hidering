@@ -19,12 +19,52 @@ address.
 
 | Lot | Source | Amount | Status |
 | --- | --- | --- | --- |
-| 1 | `B5TLmi…` (chain-verified portion, mined before the block 16000 cut-off) | 753.741467142937 HRG | pending — tx id to be added |
-| 2 | `B6VkZP…` | 13 101 HRG | later, separately |
+| 1 | `B5TLmi…` (chain-verified portion, mined before the block 16000 cut-off) | 753.741467142937 HRG | **burned** — 2 transactions, below |
+| 2 | `B6VkZP…` | 13 101 HRG | **burned** — 14 transactions, below |
+| **Total** | | **13 854.741467142937 HRG** | **burned** |
 
-Each burn transaction will be listed here with its tx id and tx key once it
-is broadcast. Network fees are paid by the sender and are not part of the
-burned amount.
+Lot 1 transactions:
+
+| Amount | Block | Tx id |
+| --- | --- | --- |
+| 753.74 HRG | 132851 | `995dd0a8fe18886cd512bedc8399a115e79cc994dc1c02e94645f40aaba5f772` |
+| 0.001467142937 HRG | 132853 | `1f919667aba3982f45afc4281e38c8d8cb40828f8cb823623f03c3c8449ab51f` |
+| **753.741467142937 HRG** | | |
+
+Lot 1 was sent in two transactions. The sending wallet was an old build
+(before v2.0.3) that still truncated every destination amount to 0.01 HRG
+(the removed "amount normalisation", audit H5) and refused the full amount.
+753.74 HRG was sent first; the remainder of 0.001467142937 HRG, which the
+two-decimal quantum of older wallet builds cannot express, was sent in a
+separate transaction.
+
+Lot 2 transactions:
+
+| # | Amount | Block | Tx id |
+| --- | --- | --- | --- |
+| 1 | 1000 HRG | 132879 | `9bb80f1e188cb966ba274e94b625bfcebcd061e9393ac0bda3411db20b88edbb` |
+| 2 | 1000 HRG | 132883 | `67266e6c70f7b108c85e625c995ad97599cef112f48389b94fb70d92a977cbd8` |
+| 3 | 1000 HRG | 132884 | `8a4a0033d3b0b98ad5545c1e1194cd7e5a883704b9be5e4b90b4dd53c5c9d4b5` |
+| 4 | 1000 HRG | 132887 | `9ccaa3bcf4e9e7fd2c9bd9e6513a9b009ffb26dc7940ff913046632baa7f74c0` |
+| 5 | 1000 HRG | 132887 | `704cfc0b605db2d79a7b4013366216c2bfcd067b71228ef44f1d6ef246b1151b` |
+| 6 | 1000 HRG | 132887 | `fba11ff74d48aa71400f5d594ebb8c85f5c0039f08a9beaa7ce759d8bee2ba37` |
+| 7 | 1000 HRG | 132887 | `56f867e3860707ec6e0c1e972c327899b38912e2a0254a430772f6fc31732684` |
+| 8 | 1000 HRG | 132888 | `c403b8567d1058d1a5c82bff9854036e7e446abfcb43109efbeb81ff2956138e` |
+| 9 | 1000 HRG | 132888 | `77bd806458df4c7a6549b3cc62586fe6aa9f30223b10f56dd945f6446b81a3e5` |
+| 10 | 1000 HRG | 132888 | `f71e7ad0aa41bb607ee393466e6fecd195fbf23a0a26b496105833321cedd0f6` |
+| 11 | 1000 HRG | 132894 | `fbd8d8d2003a93e1d7e43f552b5e99cbebee8f9b4ca9381968d93a4998944811` |
+| 12 | 1000 HRG | 132895 | `e4dd0c76bbe2bca54e26f1c7e1102947f9b45082ebc47bf43b7a3b298643a342` |
+| 13 | 1000 HRG | 132899 | `ae9e2e88f5da3c43de6cc671650f72bd388d2aebb1515a4ad2a13321aad6c777` |
+| 14 | 101 HRG | 132899 | `a26fef552742373290be67a7a456631e6d54790269ac42a8708309eeb92f9f21` |
+| | **13 101 HRG** | | |
+
+Lot 2 was sent in 14 transactions because the sending wallet refused larger
+single sends (a limit observed around 1000 HRG per transaction). All amounts
+are multiples of 0.01 HRG, so the old-build truncation did not apply: the
+decrypted amounts are exact.
+
+Each burn transaction is listed here with its tx id. Network fees are paid by
+the sender and are not part of the burned amount.
 
 ## Construction
 
@@ -120,7 +160,7 @@ assert hash_to_point(b'HIDERING premine burn - fair launch correction 2026 spend
 Create a view-only wallet from the address and the public view key:
 
 ```bash
-hidering-wallet-cli --generate-from-view-key burn-audit --restore-height <height>
+hidering-wallet-cli --generate-from-view-key burn-audit --restore-height 132850
 # Standard address : B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs
 # Secret view key  : 4d32ad4830f0ffc09902080f484896d2faa38a69ab93cb4ce07c0f763b002a0c
 ```
@@ -132,8 +172,10 @@ amount received by the burn address. Checked on 2026-11-19 with
 `hidering-wallet-rpc` `validate_address` (`valid: true`, `nettype: mainnet`;
 the same address with its last character changed: `valid: false`).
 
-For one specific burn transaction, the sender's published tx key also works:
-`check_tx_key <txid> <txkey> B9p95w…HARs`.
+Every burn transaction listed above can be verified this way, read-only, with
+the public view key alone: once synced from height 132850, the view-only
+wallet lists each of them as an incoming transfer to the burn address, with
+its tx id and amount (`show_transfers in`).
 
 ## Why the funds cannot be spent
 
