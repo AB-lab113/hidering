@@ -1,4 +1,4 @@
-# Pre-mine burn address — verifiable construction
+# Burn address — verifiable construction
 
 This document proves that the HIDERING burn address below is **unspendable**:
 nobody, including the project authors, holds or can classically compute its
@@ -13,20 +13,27 @@ B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFB
 ## Why this address exists
 
 The whitepaper commits HIDERING to a fair launch: emission is 100%
-proof-of-work, and the code contains no premine and no allocation. Coins
-mined by the operator's nodes before the posts of 8 June 2026 on X and
-BitcoinTalk contradict that commitment. Rather than only disclosing them, the
-project **burns** the corresponding amounts by sending them to this address.
+proof-of-work, and the code contains no premine and no allocation. The
+operator's nodes mined before the posts of 8 June 2026 on X and BitcoinTalk,
+which contradicts that commitment. Rather than only disclosing it, the project
+**burns** at least everything received by `B5TLmi…` up to then, by sending an
+equal or greater amount to this address.
 
 The cut-off is **block 17567** (timestamp 2026-06-08 16:31:34 UTC), the last
 block before the posts of 8 June 2026 on X and BitcoinTalk. The burn covers
 the amounts listed below, in 3 lots and 20 transactions, and nothing else.
 
+In total, 17 583.321467142937 HRG were burned in 20 transactions. This is at
+least the 17 485.714285714344 HRG that `B5TLmi…` received in 408 block rewards
+up to block 17567 (2026-06-08 16:31:34 UTC). `B5TLmi…` is both the pool
+address and the address to which the operator's nodes mined directly; its
+block rewards therefore include rewards credited to pool miners.
+
 | Lot | Source | Amount | Status |
 | --- | --- | --- | --- |
-| 1 | `B5TLmi…` (mined up to block 16000, as quantified by the operator; blocks 16001 to 17567: lot 3) | 753.741467142937 HRG | **burned** — 2 transactions, below |
-| 2 | `B6VkZP…` | 13 101 HRG | **burned** — 14 transactions, below |
-| 3 | sent from `B6VkZP…`; corresponds in value to the block rewards mined to `B5TLmi…` in blocks 16001 to 17567 | 3 728.58 HRG | **burned** — 4 transactions, below |
+| 1 | sent from `B5TLmi…` | 753.741467142937 HRG | **burned** — 2 transactions, below |
+| 2 | sent from `B6VkZP…` | 13 101 HRG | **burned** — 14 transactions, below |
+| 3 | sent from `B6VkZP…`; corresponds in value to the 87 block rewards (3 728.571428571441 HRG) received by `B5TLmi…` in blocks 16001 to 17567, rounded up to the next 0.01 HRG | 3 728.58 HRG | **burned** — 4 transactions, below |
 | **Total** | | **17 583.321467142937 HRG** | **burned** — 20 transactions |
 
 Lot 1 transactions:
@@ -81,20 +88,24 @@ Lot 3 transactions (sent from `B6VkZP…`):
 | | **3 728.58 HRG** | | |
 
 Lot 3 is sent from `B6VkZP…`. Its amount corresponds in value to the block rewards
-mined to `B5TLmi…` in blocks 16001 to 17567; it does not move those coinbase
+received by `B5TLmi…` in blocks 16001 to 17567; it does not move those coinbase
 outputs themselves.
 
 - **Verifiable on the chain:** blocks 16001 to 17567 are contiguous (1567
   blocks); the 4 transactions above, their blocks and their amounts (decrypted
   with the public view key); the total received by the burn address,
   17 583.321467142937 HRG.
-- **Declared by the operator:** 87 coinbase outputs of 42.857142857143 HRG
+- **Declared by the operator:** 87 block rewards of 42.857142857143 HRG
   each, identified by the operator in the wallet `B5TLmi…` in these blocks
   (first at block 16019, last at block 17535), i.e. 3 728.571428571441 HRG.
   All 87 amounts are exactly 42.857142857143 HRG, so none of these blocks
   included transaction fees. The sending wallet of each lot is also declared
   by the operator. This attribution cannot be verified with the public view
   key of the burn address alone.
+- **Declared by the operator:** the 408 block rewards (17 485.714285714344 HRG)
+  received by `B5TLmi…` up to block 17567 are declared by the operator;
+  `B5TLmi…` is a private wallet, so this total cannot be verified with the
+  public view key of the burn address.
 
 3 728.571428571441 HRG was rounded up to the next 0.01 HRG (the 0.01 HRG
 quantum of older wallet builds, audit H5), giving 3 728.58 HRG: 0.008571428559

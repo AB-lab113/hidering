@@ -28,7 +28,7 @@
 
 HIDERING (HRG) est un protocole de cryptomonnaie axé sur la confidentialité maximale, dérivé d'un instantané de la branche de développement de Monero (décembre 2025), combinant les innovations d'anonymat avancées avec un modèle économique Bitcoin-style.
 
-Émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. Le code ne contient ni premine ni allocation ; voir §7. Par ailleurs, 17 583,321467142937 HRG, couvrant les HRG minés vers les wallets `B5TLmi…` et `B6VkZP…` jusqu'au bloc 17567, ont été brûlés ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
+Émission 100% via PoW RandomX, supply cap irrévocable **18 millions HRG**. Le code ne contient ni premine ni allocation ; voir §7. Par ailleurs, 17 583,321467142937 HRG ont été brûlés, soit au moins les 17 485,714285714344 HRG reçus en récompenses de bloc jusqu'au bloc 17567 par `B5TLmi…`, l'adresse de la pool et de minage ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
 
 **INNOVATIONS CLÉS** :
 - Ring size 32 par défaut dans les wallets HIDERING (CLI, RPC et GUI) ; le consensus accepte 32 à 64 (Monero : 16 fixe)
@@ -299,15 +299,17 @@ transparence des montants et l'absence de ring sur leurs dépenses.
 
 v2.0.0 utilise un nouveau Network ID (`HRG\x02HIDERINGMAIN`), qui sépare son réseau de la chaîne v1.x ; celle-ci a subi une attaque 51 % (16 mai 2026, h≈3577).
 
-Avant les posts du 8 juin 2026 sur X et BitcoinTalk, les nœuds de l'opérateur ont miné pendant une phase de pré-lancement dont le but annoncé était de durcir le réseau contre les attaques 51 % comme celle qu'a subie la v1.x. La chaîne vivante contient les blocs minés avant ces posts : le bloc 1 est horodaté du 14 mai 2026 à 20:26 UTC, et le bloc 17567 (horodaté le 8 juin 2026 à 16:31:34 UTC) est le dernier bloc avant eux. Des versions antérieures de ce document annonçaient une réserve issue de cette phase, dont le volume et l'usage devaient être divulgués au lancement. À la place, 17 583,321467142937 HRG, couvrant les HRG minés vers les wallets `B5TLmi…` et `B6VkZP…` jusqu'au bloc 17567, ont été brûlés vers l'adresse `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs` ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
+Avant les posts du 8 juin 2026 sur X et BitcoinTalk, les nœuds de l'opérateur ont miné pendant une phase de pré-lancement dont le but annoncé était de durcir le réseau contre les attaques 51 % comme celle qu'a subie la v1.x. La chaîne vivante contient les blocs minés avant ces posts : le bloc 1 est horodaté du 14 mai 2026 à 20:26 UTC, et le bloc 17567 (horodaté le 8 juin 2026 à 16:31:34 UTC) est le dernier bloc avant eux. Des versions antérieures de ce document annonçaient une réserve issue de cette phase, dont le volume et l'usage devaient être divulgués au lancement. À la place, 17 583,321467142937 HRG ont été brûlés vers l'adresse `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs`, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
 
 ### 7.2 Burn
 
-Les coins brûlés sont les coins minés vers les wallets de l'opérateur avant les posts du 8 juin 2026 sur X et BitcoinTalk, tels que l'opérateur les a quantifiés. Ils sont brûlés pour honorer l'engagement de fair launch : l'opérateur ne les garde pas. **17 583,321467142937 HRG**, couvrant les HRG minés vers les wallets `B5TLmi…` et `B6VkZP…` jusqu'au bloc 17567, ont été envoyés à l'adresse de burn `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs`, en 20 transactions (3 lots) :
+Au total, **17 583,321467142937 HRG** ont été brûlés en 20 transactions, envoyées à l'adresse de burn `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs`. C'est au moins les 17 485,714285714344 HRG reçus par `B5TLmi…` en 408 récompenses de bloc jusqu'au bloc 17567 (2026-06-08 16:31:34 UTC). `B5TLmi…` est à la fois l'adresse de la pool et celle vers laquelle les nœuds de l'opérateur minaient en direct ; ses récompenses de bloc incluent donc des récompenses créditées aux mineurs de la pool. Les 20 transactions forment 3 lots :
 
-- Lot 1 — 753,741467142937 HRG minés vers `B5TLmi…` jusqu'au bloc 16000, tels que quantifiés par l'opérateur (2 transactions) ;
-- Lot 2 — 13 101 HRG minés vers `B6VkZP…` (14 transactions) ;
-- Lot 3 — 3 728,58 HRG envoyés depuis `B6VkZP…`, correspondant en valeur aux récompenses de bloc minées vers `B5TLmi…` dans les blocs 16001 à 17567 (4 transactions).
+- Lot 1 — 753,741467142937 HRG envoyés depuis `B5TLmi…` (2 transactions) ;
+- Lot 2 — 13 101 HRG envoyés depuis `B6VkZP…` (14 transactions) ;
+- Lot 3 — 3 728,58 HRG envoyés depuis `B6VkZP…` (4 transactions), correspondant en valeur aux 87 récompenses de bloc (3 728,571428571441 HRG) reçues par `B5TLmi…` dans les blocs 16001 à 17567, arrondi au centième supérieur.
+
+Le burn couvre au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567, dernier bloc avant les posts du 8 juin 2026 sur X et BitcoinTalk (détail ci-dessus). Il honore l'engagement de fair launch : l'opérateur ne conserve pas ces coins.
 
 Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG les récompenses de bloc auxquelles il correspond. L'adresse de burn utilise la même construction « nothing-up-my-sleeve » que la sortie du genesis : sa clé de dépense est une sortie de SHA-256, si bien que personne ne détient ni ne peut calculer classiquement la clé privée. Sa clé de vue est publique : chacun peut vérifier tous les montants reçus. Toutes les transactions, la construction et la procédure de vérification sont dans [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md). Le burn couvre exactement ces montants et n'affirme rien sur d'autres coins.
 
@@ -463,7 +465,7 @@ La distribution se fait par compétition PoW ; voir §7.1 pour la phase de pré-
 
 ---
 
-*Whitepaper v1.5 — Novembre 2026 : phase de pré-lancement réécrite (§7.1) ; burn de 17 583,321467142937 HRG, couvrant les HRG minés vers `B5TLmi…` et `B6VkZP…` jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
+*Whitepaper v1.5 — Novembre 2026 : phase de pré-lancement réécrite (§7.1) ; burn de 17 583,321467142937 HRG, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
 *SHA256 release v2.0.3 (dernière publique) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
