@@ -77,7 +77,7 @@ The genesis-block NUMS output remains `157.14 HRG` locked (legacy from v1.0.0, u
 1. **Ring size 32–64** (dynamic) — up from upstream's fixed 16.
 2. **Transaction padding** to a fixed 2,500 bytes.
 3. **Native 3-hop mixnet**, mandatory.
-4. **Amount normalization** at 0.1 HRG granularity.
+4. **Amount normalization** at 0.01 HRG granularity (corrected: earlier text said 0.1 HRG; feature removed in v2.0.3, audit H5).
 5. **Stealth addresses V2** with time-bounded view keys.
 
 ## Upgrading from v1.0.1

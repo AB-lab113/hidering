@@ -62,7 +62,7 @@ First four bytes of `NETWORK_ID`. Used to disambiguate any tooling that keys off
 | Ring size | 32–64 (dynamic) at HF15+ |
 | Tx padding | 2,500 bytes fixed |
 | Mixnet | 3-hop, mandatory |
-| Amount quantum | 0.1 HRG |
+| Amount quantum | 0.01 HRG (corrected: earlier text said 0.1 HRG; removed in v2.0.3, audit H5) |
 | Address prefix | 60 (addresses start with `B`) |
 | P2P port | 19740 |
 | RPC port | 19741 |

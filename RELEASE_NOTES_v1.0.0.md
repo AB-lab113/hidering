@@ -46,7 +46,7 @@ The Linux binaries are stripped, statically link against ccache-cached system de
 1. **Ring size 32–64** (dynamic) — up from upstream's fixed 16.
 2. **Transaction padding** to a fixed 2,500 bytes — defeats size-based heuristics.
 3. **Native 3-hop mixnet**, mandatory — no plaintext P2P metadata.
-4. **Amount normalization** at 0.1 HRG granularity — reduces fingerprinting.
+4. **Amount normalization** at 0.01 HRG granularity (corrected: earlier text said 0.1 HRG; feature removed in v2.0.3, audit H5) — reduces fingerprinting.
 5. **Stealth addresses V2** with time-bounded view keys.
 
 ## Genesis

@@ -92,8 +92,8 @@
 // HIDERING Mixnet: random delay range before TX submission (milliseconds)
 #define HIDERING_MIXNET_HOP_DELAY_MS                    2000
 
-// HIDERING Amount normalization: round to 0.1 HRG (10^10 atomic units)
-#define HIDERING_AMOUNT_QUANTUM                         ((uint64_t)10000000000) // 0.1 HRG
+// HIDERING Amount normalization: round to 0.01 HRG (10^10 atomic units). Unused since 61bf9dd5d (H5); earlier comments said 0.1 HRG, which was wrong
+#define HIDERING_AMOUNT_QUANTUM                         ((uint64_t)10000000000) // 0.01 HRG
 
 
 #define DIFFICULTY_TARGET_V2                            120  // seconds
