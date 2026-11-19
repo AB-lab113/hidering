@@ -85,6 +85,8 @@ Following the 51% attack on v1.x, the v2.0.0 mainnet starts as a **private netwo
 
 **Update (October 2026).** This plan was superseded when the network opened to the public: the private chain was replaced by the public chain and the blocks mined privately were orphaned, so no coins from that phase are part of the live chain. The announcement above that the volume mined would be disclosed at launch is withdrawn, and the remark on "zero premine" is superseded by whitepaper §7.1.
 
+**Update (November 2026).** The October 2026 statement above that the blocks mined during the pre-launch phase were orphaned is incorrect: the live chain contains the blocks mined before the posts of 8 June 2026 on X and BitcoinTalk. 17,583.321467142937 HRG, covering the HRG mined to the wallets `B5TLmi…` and `B6VkZP…` up to block 17567, were burned in 20 transactions (lot 1: 753.741467142937 HRG mined to `B5TLmi…` up to block 16000, as quantified by the operator; lot 2: 13,101 HRG mined to `B6VkZP…`; lot 3: 3,728.58 HRG sent from `B6VkZP…`, corresponding in value to the block rewards mined to `B5TLmi…` in blocks 16001 to 17567, rounded up to the next 0.01 HRG). See `BURN_PROOF.md` and whitepaper §7.1 and §7.2. The guarantee is classical only; a post-quantum guarantee depends on a future consensus rule, declared as an intention for HFv16.
+
 ## What's in this release
 
 Linux x86_64 binaries (built from branch `v2-privacy`, this tag):

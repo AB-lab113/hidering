@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Whitepaper v1.4.3 — HIDERING (HRG)</title>
-<meta name="description" content="HIDERING (HRG) whitepaper v1.4.3 — enhanced-privacy cryptocurrency with Bitcoin-style emission: 18M hard cap, 100% RandomX PoW, ring signatures (32 members by default, 32–64 allowed), post-quantum roadmap.">
+<title>Whitepaper v1.5 — HIDERING (HRG)</title>
+<meta name="description" content="HIDERING (HRG) whitepaper v1.5 — enhanced-privacy cryptocurrency with Bitcoin-style emission: 18M hard cap, 100% RandomX PoW, ring signatures (32 members by default, 32–64 allowed), post-quantum roadmap.">
 <link rel="icon" href="/favicon.ico?v=2" sizes="any">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=2">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
@@ -85,8 +85,8 @@
   <h1 class="section-title">HIDERING Whitepaper</h1>
   <p class="section-sub">Enhanced-privacy cryptocurrency with Bitcoin-style emission. 100% PoW · RandomX CPU.</p>
   <div class="wp-meta" style="justify-content:center;">
-    <div>VERSION <span>1.4.3</span></div>
-    <div>REVISED <span>OCT 2026</span></div>
+    <div>VERSION <span>1.5</span></div>
+    <div>REVISED <span>NOV 2026</span></div>
     <div>FORK BASE <span>MONERO DEV BRANCH SNAPSHOT, DEC 2025</span></div>
   </div>
   <div style="margin-top:1.75rem;">
@@ -118,7 +118,7 @@
 
     <h2 id="abstract">1 · Abstract</h2>
     <p>HIDERING (HRG) is a maximum-privacy cryptocurrency protocol derived from a snapshot of Monero's development branch (December 2025), combining advanced anonymity with a Bitcoin-style monetary model.</p>
-    <p>100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. The code contains no premine and no allocation; see §7.</p>
+    <p>100% emission via RandomX proof-of-work, with an irrevocable supply cap of <strong>18,000,000 HRG</strong>. The code contains no premine and no allocation; see §7. Separately, 17,583.321467142937 HRG, covering the HRG mined to the wallets <code class="inline">B5TLmi…</code> and <code class="inline">B6VkZP…</code> up to block 17567, have been burned; see §7.2 and <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md">BURN_PROOF.md</a>.</p>
     <p><strong>Key innovations:</strong></p>
     <ul>
       <li>Ring signatures of 32 members by default in the HIDERING wallets (CLI, RPC and GUI); consensus allows 32–64 (Monero: fixed 16)</li>
@@ -234,9 +234,18 @@
 
     <h2 id="fairlaunch">7 · Distribution</h2>
     <p><strong>Principle:</strong> 100% emission via RandomX PoW, no private sale, no seed round. Block 0 is a genesis with 157.14 HRG locked under a NUMS key (unspendable). From block 1 onward, every block reward goes to whoever mines it; the project's own nodes mine under the same rules as everyone else.</p>
-    <h3>7.1 · v2.0.0 (post-attack)</h3>
-    <p>After the 51% attack on the v1.x chain (16 May 2026, h≈3577), v2.0.0 moved to a new Network ID (<code class="inline">HRG\x02HIDERINGMAIN</code>), which separated the new network from the v1.x chain.</p>
-    <p>Before the public opening of v2.0.0, the founder nodes mined on a private network for a short period. When the network opened, that private chain was replaced by the public chain and the privately mined blocks were orphaned: no coins from that phase are part of the live chain. Earlier revisions of this document announced a reserve from that phase, with its volume and use to be disclosed at launch; that announcement is withdrawn.</p>
+    <h3>7.1 · v2.0.0</h3>
+    <p>v2.0.0 uses a new Network ID (<code class="inline">HRG\x02HIDERINGMAIN</code>), which separates its network from the v1.x chain; the v1.x chain suffered a 51% attack (16 May 2026, h≈3577).</p>
+    <p>Before the posts of 8 June 2026 on X and BitcoinTalk, the operator's nodes mined during a pre-launch phase whose announced goal was to harden the network against 51% attacks such as the one suffered by v1.x. The live chain contains the blocks mined before those posts: block 1 is timestamped 14 May 2026, 20:26 UTC, and block 17567 (timestamped 8 June 2026, 16:31:34 UTC) is the last block before them. Earlier revisions of this document announced a reserve from that phase, with its volume and use to be disclosed at launch. Instead, 17,583.321467142937 HRG, covering the HRG mined to the wallets <code class="inline">B5TLmi…</code> and <code class="inline">B6VkZP…</code> up to block 17567, have been burned to the address <code class="inline">B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs</code>; see §7.2 and <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md">BURN_PROOF.md</a>.</p>
+    <h3>7.2 · Burn</h3>
+    <p>The burned coins are the coins mined to the operator's wallets before the posts of 8 June 2026 on X and BitcoinTalk, as quantified by the operator. They are burned to honour the fair-launch commitment: the operator does not keep them. <strong>17,583.321467142937 HRG</strong>, covering the HRG mined to the wallets <code class="inline">B5TLmi…</code> and <code class="inline">B6VkZP…</code> up to block 17567, were sent to the burn address <code class="inline">B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs</code>, in 20 transactions (3 lots):</p>
+    <ul>
+      <li>Lot 1 — 753.741467142937 HRG mined to <code class="inline">B5TLmi…</code> up to block 16000, as quantified by the operator (2 transactions);</li>
+      <li>Lot 2 — 13,101 HRG mined to <code class="inline">B6VkZP…</code> (14 transactions);</li>
+      <li>Lot 3 — 3,728.58 HRG sent from <code class="inline">B6VkZP…</code>, corresponding in value to the block rewards mined to <code class="inline">B5TLmi…</code> in blocks 16001 to 17567 (4 transactions).</li>
+    </ul>
+    <p>Lot 3 is rounded up to the next 0.01 HRG, so it exceeds the block rewards it corresponds to by 0.008571428559 HRG. The burn address uses the same nothing-up-my-sleeve construction as the genesis output: its spend key is a SHA-256 output, so nobody holds or can classically compute the private key. Its view key is public, so anyone can check every amount it receives. Every transaction, the construction and the verification procedure are in <a href="https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md">BURN_PROOF.md</a>. The burn covers exactly these amounts and makes no claim about any other coins.</p>
+    <p><strong>Limit.</strong> The guarantee is classical: a large quantum computer could compute the discrete log of the burn key, as for the genesis output. Coins cannot be moved out of this address later. A post-quantum guarantee would need a consensus rule that makes these outputs (and the genesis output) permanently unusable; adding such a rule at the post-quantum hard fork (HFv16) or later is a declared intention, not yet designed or audited.</p>
 
     <h2 id="pool">8 · Pool Mining</h2>
     <p>HIDERING operates a public RandomX mining pool in production to lower the barrier to CPU mining.</p>
@@ -285,7 +294,7 @@
       <li><strong>OTC desk:</strong> <a href="https://t.me/HideringOTCBot">@HideringOTCBot</a></li>
       <li><strong>Seed nodes:</strong> seed1.hidering.org · seed2.hidering.org</li>
     </ul>
-    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Pure PoW.</strong><br>Whitepaper v1.4.3 — revised October 2026 (earlier revisions: post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 internal security review). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
+    <div class="note" style="margin-top:2rem;"><strong>HIDERING — Privacy by design. Pure PoW.</strong><br>Whitepaper v1.5 — revised November 2026: pre-launch phase restated (§7.1); burn of 17,583.321467142937 HRG, covering the HRG mined to <code class="inline">B5TLmi…</code> and <code class="inline">B6VkZP…</code> up to block 17567 (§7.2). (Earlier revisions: v1.4.3 October 2026, post-quantum activation timeline and the BQ transparency trade-off September 2026, HFv16 implementation June 2026, June 2026 internal security review). HIDERING is open-source software (BSD 3-Clause). The team gives no financial advice; HRG is an experimental asset, and users are responsible for compliance with their local laws.</div>
 
   </article>
 </div>

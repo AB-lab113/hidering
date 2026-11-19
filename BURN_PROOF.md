@@ -12,9 +12,10 @@ B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFB
 
 ## Why this address exists
 
-The whitepaper describes HIDERING as a fair launch with no pre-mine. Coins
+The whitepaper commits HIDERING to a fair launch: emission is 100%
+proof-of-work, and the code contains no premine and no allocation. Coins
 mined by the operator's nodes before the posts of 8 June 2026 on X and
-BitcoinTalk contradict that claim. Rather than only disclosing them, the
+BitcoinTalk contradict that commitment. Rather than only disclosing them, the
 project **burns** the corresponding amounts by sending them to this address.
 
 The cut-off is **block 17567** (timestamp 2026-06-08 16:31:34 UTC), the last
