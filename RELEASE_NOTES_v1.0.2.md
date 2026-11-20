@@ -1,3 +1,7 @@
+> **Historical release — v1.x chain.** This release belongs to the v1.x chain, which was abandoned at the v2.0.0 hard fork after a 51% attack (16 May 2026, height ≈ 3577). v1.x and v2.0.x nodes do not peer with each other: do not use this release on the current network. Current release: https://github.com/AB-lab113/hidering/releases/tag/v2.0.3 (downloads: https://www.hidering.org/download.html).
+>
+> The statements below, including "Fair launch (0 premine)", were written for the v1.x launch and are kept as published. They are not statements about the current v2.0.x network: see whitepaper §7.1 and §7.2 (https://www.hidering.org/whitepaper.html) and `BURN_PROOF.md`. The v2.0.0 release notes record that the "zero premine" claim attached to v1.0.x is no longer accurate for v2.0.0.
+
 # HIDERING v1.0.2 — Clean Daemon Boot
 
 **Ticker:** HRG · **Network:** mainnet · **Fair launch** (0 premine)
@@ -75,10 +79,10 @@ The genesis-block NUMS output remains `157.14 HRG` locked (legacy from v1.0.0, u
 ## Privacy enhancements (unchanged)
 
 1. **Ring size 32–64** (dynamic) — up from upstream's fixed 16.
-2. **Transaction padding** to a fixed 2,500 bytes.
-3. **Native 3-hop mixnet**, mandatory.
+2. **Transaction padding** to a fixed 2,500 bytes. *(Clarification: in the current v2.0.x code the padding applies to the `tx_extra` field only and is applied by the HIDERING wallet when it builds a transaction; it is not enforced by consensus and does not by itself make transaction sizes uniform. See the whitepaper, section 3.)*
+3. **Native 3-hop mixnet**, mandatory. *(Corrected: removed in the June 2026 internal review; propagation uses Dandelion++ as inherited from Monero. See the whitepaper, section 3 (https://www.hidering.org/whitepaper.html).)*
 4. **Amount normalization** at 0.01 HRG granularity (corrected: earlier text said 0.1 HRG; feature removed in v2.0.3, audit H5).
-5. **Stealth addresses V2** with time-bounded view keys.
+5. **Stealth addresses V2** with time-bounded view keys. *(Corrected: no time-bounded view-key mechanism exists in the code.)*
 
 ## Upgrading from v1.0.1
 

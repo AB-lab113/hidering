@@ -11,7 +11,7 @@
 | Type | Hard fork (P2P handshake separates the networks) |
 | Wire-compat | **None.** v1.x peers rejected at handshake |
 | DB-compat | **None.** v1.x LMDB is orphan to v2.0.0 |
-| Consensus rules | Unchanged (same RandomX, ring sizes, mixnet, supply curve) |
+| Consensus rules | Unchanged (same RandomX, ring sizes, mixnet, supply curve) (the mixnet mention is corrected in the table below) |
 | Genesis block | Unchanged (same hash, same NUMS 157.14 HRG locked) |
 | Upgrade path | Stop daemon → wipe `~/.hidering` → install v2.0.0 → re-sync |
 
@@ -60,8 +60,8 @@ First four bytes of `NETWORK_ID`. Used to disambiguate any tooling that keys off
 | Initial reward | **42.857142857143 HRG / block** |
 | Supply hard cap | **18,000,000 HRG** |
 | Ring size | 32–64 (dynamic) at HF15+ |
-| Tx padding | 2,500 bytes fixed |
-| Mixnet | 3-hop, mandatory |
+| Tx padding | 2,500 bytes fixed (clarification: applies to the tx_extra field only, applied by the HIDERING wallet, not enforced by consensus; see whitepaper section 3) |
+| Mixnet | 3-hop, mandatory (corrected: removed in the June 2026 internal review; propagation uses Dandelion++ as inherited from Monero, see whitepaper section 3) |
 | Amount quantum | 0.01 HRG (corrected: earlier text said 0.1 HRG; removed in v2.0.3, audit H5) |
 | Address prefix | 60 (addresses start with `B`) |
 | P2P port | 19740 |
