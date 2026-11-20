@@ -14,13 +14,13 @@ B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFB
 
 The whitepaper commits HIDERING to a fair launch: emission is 100%
 proof-of-work, and the code contains no premine and no allocation. The
-operator's nodes mined before the posts of 8 June 2026 on X and BitcoinTalk,
+operator's nodes mined during an initial phase whose blocks are in the live chain,
 which contradicts that commitment. Rather than only disclosing it, the project
-**burns** at least everything received by `B5TLmi…` up to then, by sending an
+**burns** at least everything received by `B5TLmi…` up to block 17567, by sending an
 equal or greater amount to this address.
 
-The cut-off is **block 17567** (timestamp 2026-06-08 16:31:34 UTC), the last
-block before the posts of 8 June 2026 on X and BitcoinTalk. The burn covers
+The cut-off is **block 17567** (timestamp 2026-06-08 16:31:34 UTC).
+The burn covers
 the amounts listed below, in 3 lots and 20 transactions, and nothing else.
 
 In total, 17 583.321467142937 HRG were burned in 20 transactions. This is at

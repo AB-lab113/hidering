@@ -299,7 +299,7 @@ transparence des montants et l'absence de ring sur leurs dépenses.
 
 v2.0.0 utilise un nouveau Network ID (`HRG\x02HIDERINGMAIN`), qui sépare son réseau de la chaîne v1.x ; celle-ci a subi une attaque 51 % (16 mai 2026, h≈3577).
 
-Avant les posts du 8 juin 2026 sur X et BitcoinTalk, les nœuds de l'opérateur ont miné pendant une phase de pré-lancement dont le but annoncé était de durcir le réseau contre les attaques 51 % comme celle qu'a subie la v1.x. La chaîne vivante contient les blocs minés avant ces posts : le bloc 1 est horodaté du 14 mai 2026 à 20:26 UTC, et le bloc 17567 (horodaté le 8 juin 2026 à 16:31:34 UTC) est le dernier bloc avant eux. Des versions antérieures de ce document annonçaient une réserve issue de cette phase, dont le volume et l'usage devaient être divulgués au lancement. À la place, 17 583,321467142937 HRG ont été brûlés vers l'adresse `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs`, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
+Pendant une phase initiale, les nœuds de l'opérateur ont miné avec pour but annoncé de durcir le réseau contre les attaques 51 % comme celle qu'a subie la v1.x. La chaîne vivante contient les blocs minés pendant cette phase : le bloc 1 est horodaté du 14 mai 2026 à 20:26 UTC. La borne du burn (§7.2) est le bloc 17567, horodaté du 8 juin 2026 à 16:31:34 UTC. Des versions antérieures de ce document annonçaient une réserve issue de cette phase, dont le volume et l'usage devaient être divulgués au lancement. À la place, 17 583,321467142937 HRG ont été brûlés vers l'adresse `B9p95wVgmNkVtfLYdGKZPFhj8V1BvUu4c43udYRW1EgbFjkX4s78cF9aTwc8ka5yW9dZvLRCWqEVVVFBg4bmCM1xBf3HARs`, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 ; voir §7.2 et [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md).
 
 ### 7.2 Burn
 
@@ -309,7 +309,7 @@ Au total, **17 583,321467142937 HRG** ont été brûlés en 20 transactions, env
 - Lot 2 — 13 101 HRG envoyés depuis `B6VkZP…` (14 transactions) ;
 - Lot 3 — 3 728,58 HRG envoyés depuis `B6VkZP…` (4 transactions), correspondant en valeur aux 87 récompenses de bloc (3 728,571428571441 HRG) reçues par `B5TLmi…` dans les blocs 16001 à 17567, arrondi au centième supérieur.
 
-Le burn couvre au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567, dernier bloc avant les posts du 8 juin 2026 sur X et BitcoinTalk (détail ci-dessus). Il honore l'engagement de fair launch : l'opérateur ne conserve pas ces coins.
+Le burn couvre au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567, horodaté du 8 juin 2026 à 16:31:34 UTC (détail ci-dessus). Il honore l'engagement de fair launch : l'opérateur ne conserve pas ces coins.
 
 Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG les récompenses de bloc auxquelles il correspond. L'adresse de burn utilise la même construction « nothing-up-my-sleeve » que la sortie du genesis : sa clé de dépense est une sortie de SHA-256, si bien que personne ne détient ni ne peut calculer classiquement la clé privée. Sa clé de vue est publique : chacun peut vérifier tous les montants reçus. Toutes les transactions, la construction et la procédure de vérification sont dans [BURN_PROOF.md](https://github.com/AB-lab113/hidering/blob/v2-privacy/BURN_PROOF.md). Le burn couvre exactement ces montants et n'affirme rien sur d'autres coins.
 
@@ -459,13 +459,13 @@ HIDERING est un logiciel open-source distribué sous licence identique à Monero
 
 HIDERING (HRG) représente une évolution significative de la confidentialité financière on-chain. En combinant les meilleures innovations de Monero avec un modèle économique Bitcoin-style (supply fixe 18M, halving, émission 100% PoW) et des améliorations privacy substantielles (ring size 32–64, TX padding interne 2500 o) par-dessus la propagation Dandelion++ et le RingCT hérités de Monero, HIDERING offre une confidentialité forte par construction.
 
-La distribution se fait par compétition PoW ; voir §7.1 pour la phase de pré-lancement et §7.2 pour le burn. La roadmap post-quantique (cible : 2027, pas encore planifiée) assure la pérennité du protocole face aux menaces futures.
+La distribution se fait par compétition PoW ; voir §7.1 pour la phase initiale et §7.2 pour le burn. La roadmap post-quantique (cible : 2027, pas encore planifiée) assure la pérennité du protocole face aux menaces futures.
 
 **HIDERING — Privacy by design. Pure PoW.** 🚀
 
 ---
 
-*Whitepaper v1.5 — Novembre 2026 : phase de pré-lancement réécrite (§7.1) ; burn de 17 583,321467142937 HRG, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
+*Whitepaper v1.5 — Novembre 2026 : phase initiale réécrite (§7.1) ; burn de 17 583,321467142937 HRG, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
 *SHA256 release v2.0.3 (dernière publique) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  

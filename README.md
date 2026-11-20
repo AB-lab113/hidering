@@ -77,7 +77,7 @@ hardware can compete. Emission is 100% PoW: no ICO, no private sale, no seed rou
 17,583.321467142937 HRG have been burned to an address unspendable under the classical
 discrete-log assumption ([BURN_PROOF.md](BURN_PROOF.md)): at least everything received up to
 block 17567 by `B5TLmi…`, the pool and mining address. See [§7 of the whitepaper](docs/whitepaper_v1.4.md)
-for the pre-launch mining phase and the burn, stated plainly.
+for the initial mining phase and the burn, stated plainly.
 
 ## Differences from Monero
 
