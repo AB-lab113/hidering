@@ -31,7 +31,7 @@ permissions:
 jobs:
   build-macos:
     name: macOS arm64 build
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       ARCH: arm64
     steps:
