@@ -354,12 +354,12 @@ Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG
 
 **PHASE 4 : MAINNET LAUNCH (En cours)**
 - ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
-- ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (pré-launch, ~h≈3577) retirée au profit du nouveau réseau v2.0.0.
-- ✅ **Release v2.0.3 (19 juin 2026)** — dernière publique, ajoute checkpoint h=25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
+- ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (attaque 51 % à h≈3577) retirée au profit du nouveau réseau v2.0.0.
+- ✅ **Release v2.0.3 (19 juin 2026)** — dernière publique, ajoute les checkpoints h=16000, 20000 et 25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
 - ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256
 - ✅ Wallet GUI Desktop multi-plateformes (v2.0.2-gui : Linux AppImage, macOS ARM64, Windows x64)
 - ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333` — voir §9)
-- ⏳ Launch public (Twitter, Reddit, BitcoinTalk)
+- ✅ Annonces publiques sur BitcoinTalk et sur X
 
 **PHASE 5 : POST-QUANTIQUE (cible : 2027, pas encore planifiée)**
 - ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) — prototype, revue interne assistée par IA, aucun audit tiers ; code inerte
@@ -391,7 +391,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000). La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000, 110000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000). La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 
