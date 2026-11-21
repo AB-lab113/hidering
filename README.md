@@ -152,6 +152,42 @@ Binaries for Linux x64, macOS ARM64 and Windows x64 are published on the
   [hidering-gui](https://github.com/AB-lab113/hidering-gui/releases) repository (Linux
   AppImage, macOS `.app`, Windows portable)
 
+### Running the official binaries
+
+The release binaries are not self-contained on every platform. This is what they need on
+the machine (checked on the binaries built by CI on 21 November 2026 and on the v2.0.3
+assets):
+
+* **Windows x64.** The CI zip contains the MSYS2 runtime DLLs that the wallet CLI loads
+  (ICU, iconv, libstdc++, libgcc, libwinpthread). Unzip everything into one folder and keep
+  the `.dll` files next to the `.exe` files. The executables use the Windows Universal C
+  Runtime, built into Windows 10 and later; older Windows versions have not been tested.
+  **The v2.0.3 zip is different:** its `hidering-wallet-cli.exe` imports `libiconv-2.dll`,
+  `libicuin78.dll` and `libicuuc78.dll`, which that zip does not contain, so it does not
+  start on a machine without MSYS2. Its `hideringd.exe` and `hidering-wallet-rpc.exe` only
+  import Windows system DLLs. Releases built from commit `a5288e64a` or later ship the DLLs.
+* **Linux x64.** Built on Ubuntu 22.04 and dynamically linked. Needs glibc 2.34 or newer and
+  these shared libraries: Boost 1.74 (chrono, filesystem, program_options, regex,
+  serialization, thread), readline 8, libsodium 23, libunbound 8, OpenSSL 3 and, for
+  `hideringd` only, libzmq 5. On Ubuntu 22.04:
+
+    ```bash
+    sudo apt install libboost-chrono1.74.0 libboost-filesystem1.74.0 \
+      libboost-program-options1.74.0 libboost-regex1.74.0 libboost-serialization1.74.0 \
+      libboost-thread1.74.0 libreadline8 libsodium23 libunbound8 libssl3 libzmq5
+    ```
+
+  Distributions that no longer install Boost 1.74 by default (Ubuntu 24.04 installs
+  Boost 1.83) need those libraries added separately, or a build from source. Other
+  distributions have not been checked.
+* **macOS ARM64.** Linked against [Homebrew](https://brew.sh) libraries in `/opt/homebrew`:
+  `boost`, `readline`, `libsodium`, `unbound`, `zeromq` and OpenSSL (`openssl@3` for the
+  v2.0.3 binaries, `openssl@4` for builds made by the current CI). The archive contains no
+  libraries, so these formulae must be installed first. Only Apple silicon binaries are
+  published.
+
+If a binary does not start, compare this list with what is installed, or build from source.
+
 Note that the v1.x chain was abandoned after a 51% attack in May 2026; the current chain
 starts at v2.0.0 and **v1.x binaries cannot connect to it** (the network ID differs).
 
@@ -322,11 +358,11 @@ Two things differ from an ordinary Monero build and will bite you otherwise:
 #### On Linux and macOS
 
 * Install the dependencies
-* Change to the root of the source code directory, change to the most recent release branch, and build:
+* Change to the root of the source code directory and build the default branch (`v2-privacy`,
+  the one CI builds):
 
     ```bash
     cd hidering
-    git checkout release-v0.18
     make
     ```
 
@@ -391,12 +427,11 @@ Tested on a Raspberry Pi 5B with a clean installation of Raspberry Pi OS (64-bit
 
 * If using an external hard disk without an external power supply, ensure it gets enough power to avoid hardware issues when syncing, by adding the line "max_usb_current=1" to /boot/config.txt
 
-* Clone HIDERING and checkout the most recent release version:
+* Clone HIDERING (this gives the default branch, `v2-privacy`, which is the one CI builds):
 
     ```bash
     git clone --recursive https://github.com/AB-lab113/hidering.git
     cd hidering
-    git checkout v0.18.4.1
     ```
 
 * Build:
@@ -438,10 +473,11 @@ application.
 * Install dependencies:
 
     ```bash
-    pacman -S mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake mingw-w64-x86_64-boost mingw-w64-x86_64-openssl mingw-w64-x86_64-zeromq mingw-w64-x86_64-libsodium mingw-w64-x86_64-hidapi mingw-w64-x86_64-unbound
+    pacman -S mingw-w64-ucrt-x86_64-toolchain make mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-boost mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-zeromq mingw-w64-ucrt-x86_64-libsodium mingw-w64-ucrt-x86_64-miniupnpc mingw-w64-ucrt-x86_64-unbound git pkg-config zip
     ```
 
-* Open the MingW shell via `MSYS2 MINGW64` shortcut.
+* Open the UCRT64 shell via the `MSYS2 UCRT64` shortcut. CI builds in this environment; the
+  `MINGW64` one is no longer used because `mingw-w64-x86_64-unbound` is no longer available.
 
 **Cloning**
 
@@ -459,19 +495,35 @@ application.
     cd hidering
     ```
 
-* If you would like a specific [version/tag](https://github.com/AB-lab113/hidering/tags), do a git checkout for that version. eg. 'v2.0.3'. If you don't care about the version and just want binaries from master, skip this step:
+* If you would like a specific [version/tag](https://github.com/AB-lab113/hidering/tags), do a git checkout for that version. eg. 'v2.0.3'. If you don't care about the version and just want binaries from the default branch (`v2-privacy`), skip this step:
 
     ```bash
-    git checkout v0.18.4.1
+    git checkout v2.0.3
     ```
 
-* To build HIDERING, run:
+  Tags up to v2.0.3 predate the OpenSSL 4 compatibility fix (commit `450d1aafd`) and do not
+  compile against the OpenSSL 4 shipped by current MSYS2. Skip this step to build the default branch.
+
+* To build HIDERING, run these commands (they are the ones CI uses, see
+  `.github/workflows/build-windows.yml`):
 
     ```bash
-    make release-static -j $(nproc)
+    cmake -S external/liboqs -B external/liboqs/build -G "MSYS Makefiles" \
+      -DBUILD_SHARED_LIBS=OFF -DOQS_USE_OPENSSL=ON -DOQS_BUILD_ONLY_LIB=ON \
+      -DCMAKE_BUILD_TYPE=Release
+    cmake --build external/liboqs/build -j"$(nproc)"
+    WIN_SYS_LIBS="-lws2_32 -lcrypt32 -lbcrypt -lgdi32 -liphlpapi"
+    cmake -S . -B build -G "MSYS Makefiles" \
+      -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+      -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON \
+      -DCMAKE_C_STANDARD_LIBRARIES="${WIN_SYS_LIBS}" \
+      -DCMAKE_CXX_STANDARD_LIBRARIES="${WIN_SYS_LIBS}"
+    make -C build -j"$(nproc)" daemon simplewallet wallet_rpc_server
     ```
 
-   The resulting executables can be found in `build/release/bin`
+   The resulting executables can be found in `build/bin`. They run outside MSYS2 only if the
+   DLLs they import sit next to them (the wallet CLI needs ICU and iconv): the `package` step
+   of the workflow copies every DLL that `ldd` resolves under `/ucrt64/bin`.
 
 
 * **Optional**: to build Windows binaries suitable for debugging, run:
