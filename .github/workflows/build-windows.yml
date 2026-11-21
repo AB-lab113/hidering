@@ -15,8 +15,11 @@ name: build-windows
 #
 # NOTE on STATIC: the spec asked for -DSTATIC=ON, but linking the mandatory
 # libunbound statically pulls in unresolved nettle/gmp/hogweed symbols that
-# Monero's CMake does not add to the link line. We link dynamically; the
-# resulting hideringd.exe needs the ucrt64 runtime DLLs alongside it.
+# Monero's CMake does not add to the link line. We link dynamically, but the
+# daemon and the wallet RPC only import Windows system DLLs; the wallet CLI
+# also imports MSYS2 DLLs (ICU, iconv). The package step bundles every DLL
+# that ldd resolves under /ucrt64/bin and fails the build if an import is
+# neither bundled nor provided by Windows.
 
 on:
   push:
@@ -92,6 +95,40 @@ jobs:
           PKG="hidering-windows-x64"
           mkdir -p "dist/${PKG}"
           cp build/bin/hideringd.exe build/bin/hidering-wallet-cli.exe build/bin/hidering-wallet-rpc.exe "dist/${PKG}/"
+          # Bundle the MSYS2 DLLs the executables load at run time. ldd lists the
+          # whole dependency chain; only files under /ucrt64/bin are copied, so
+          # Windows system DLLs are never bundled.
+          for exe in "dist/${PKG}"/*.exe; do
+            ldd "$exe" | awk '/\/ucrt64\/bin\//{print $3}'
+          done | sort -u > dll-list.txt
+          echo "Bundled MSYS2 DLLs:"
+          cat dll-list.txt
+          while read -r dll; do
+            cp "$dll" "dist/${PKG}/"
+          done < dll-list.txt
+          # Fail if any executable or bundled DLL needs a DLL that is neither
+          # in the package nor provided by Windows. api-ms-win-* are Windows
+          # API-set stubs and always resolve.
+          ls /c/Windows/System32 | tr '[:upper:]' '[:lower:]' | sort -u > system-dlls.txt
+          ls "dist/${PKG}" | tr '[:upper:]' '[:lower:]' | sort -u > packaged-files.txt
+          missing=0
+          for f in "dist/${PKG}"/*.exe "dist/${PKG}"/*.dll; do
+            [ -e "$f" ] || continue
+            echo "== ${f##*/}"
+            objdump -p "$f" | grep "DLL Name" || true
+            for d in $(objdump -p "$f" | awk '/DLL Name:/{print $3}'); do
+              lc=$(echo "$d" | tr '[:upper:]' '[:lower:]')
+              case "$lc" in api-ms-win-*) continue ;; esac
+              grep -qxF -- "$lc" packaged-files.txt && continue
+              grep -qxF -- "$lc" system-dlls.txt && continue
+              echo "MISSING: ${f##*/} needs $d"
+              missing=1
+            done
+          done
+          if [ "$missing" != 0 ]; then
+            echo "Unresolved DLL imports, refusing to package."
+            exit 1
+          fi
           cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
           cd dist
           zip -r "${PKG}.zip" "${PKG}"
