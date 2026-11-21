@@ -11,12 +11,12 @@ name: build-windows
 # NOTE on generator: the spec asked for `-G "MinGW Makefiles"`, but that
 # generator drives mingw32-make and breaks when sh.exe is on PATH (always true
 # inside the MSYS2 shell). We use `-G "MSYS Makefiles"` + GNU make under the
-# mingw64 environment instead.
+# ucrt64 environment instead.
 #
 # NOTE on STATIC: the spec asked for -DSTATIC=ON, but linking the mandatory
 # libunbound statically pulls in unresolved nettle/gmp/hogweed symbols that
 # Monero's CMake does not add to the link line. We link dynamically; the
-# resulting hideringd.exe needs the mingw64 runtime DLLs alongside it.
+# resulting hideringd.exe needs the ucrt64 runtime DLLs alongside it.
 
 on:
   push:
@@ -47,17 +47,18 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-toolchain
             make
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-boost
-            mingw-w64-x86_64-openssl
-            mingw-w64-x86_64-libsodium
-            mingw-w64-x86_64-miniupnpc
-            mingw-w64-x86_64-unbound
-            mingw-w64-x86_64-zeromq
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-libsodium
+            mingw-w64-ucrt-x86_64-miniupnpc
+            mingw-w64-ucrt-x86_64-unbound
+            mingw-w64-ucrt-x86_64-zeromq
             git
             pkg-config
             zip
