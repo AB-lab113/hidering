@@ -144,11 +144,11 @@ TEST(parse_tx_extra, handles_pub_key_and_padding)
   ASSERT_EQ(typeid(cryptonote::tx_extra_padding), tx_extra_fields[1].type());
 }
 
-// HIDERING Phase 5 (audit H2): the greedy 0x00 padding field and the trailing ML-DSA-65
-// signature (0x06) are mutually exclusive as tx_extra fields — both must be the LAST field,
-// and the padding parser rejects any non-zero byte after it. construct_tx_with_tx_key
-// therefore omits the 0x00 padding on the PQ path. These two tests pin that invariant at the
-// parse layer: padding-then-pq_sig must NOT parse; pq_sig-as-terminal must parse cleanly.
+// HIDERING Phase 5 (audit H2): the greedy 0x00 padding field must be the LAST tx_extra
+// field, because its parser rejects any non-zero byte after it. These two tests pin that
+// invariant at the parse layer: padding followed by another field (here the removed
+// account-level pq_sig, tag 0x06) must NOT parse; the same field as terminal must parse
+// cleanly. construct_tx_with_tx_key puts the padding last, at every hf_version.
 namespace
 {
   // tx_extra_pq_sig is a BLOB_SERIALIZER: on the wire it is [0x06][pk||sig].

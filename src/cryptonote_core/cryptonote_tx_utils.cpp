@@ -836,28 +836,22 @@ namespace cryptonote
     for (const auto& b : pq_binds)
       add_pq_bind_to_extra(tx.extra, b.first, b.second);
 
-    // HIDERING privacy padding (audit F-4): normalise every transaction's tx_extra to a
-    // FIXED target of 2500 bytes, per the HIDERING spec (Patch 2: fixed 2500-byte TX
-    // padding), replacing the former hybrid/proportional scheme whose variable size was
-    // itself a metadata fingerprint. If extra already meets/exceeds the target, no padding
-    // is added; the size ceiling is enforced ONCE, after all fields are in place — see below.
+    // HIDERING privacy padding (audit F-4): raise every transaction's tx_extra to at least
+    // 2500 bytes (a floor, not a fixed size: an extra that already meets or exceeds the target
+    // gets no padding). A variable-size tx_extra is itself a metadata fingerprint. This is a
+    // wallet rule, not a consensus rule. The size ceiling is enforced ONCE, after all fields
+    // are in place - see below.
     //
-    // HIDERING Phase 5 (audit H2): the greedy TX_EXTRA_TAG_PADDING (0x00) field can ONLY be
-    // the TERMINAL tx_extra field. Its canonical parser (tx_extra.h tx_extra_padding load)
-    // reads zero bytes until EOF and REJECTS the whole tx_extra on the first non-zero byte
-    // (proven by the unit test parse_tx_extra.handles_invalid_padding_only: [0x00][0x2A]
-    // → parse_tx_extra == false). At/after HFv16 the terminal field MUST be the ML-DSA-65
-    // signature (tag 0x06, audit E-3 — blockchain.cpp requires pq_fields.back() == pq_sig),
-    // so any 0x00 padding emitted here would sit *before* that 0x06 tag and the canonical
-    // parser would greedily consume the 0x06 byte, reject the tx, and halt the chain at the
-    // fork. A greedy 0x00 padding and a trailing 0x06 signature are therefore mutually
-    // exclusive — the two "must be last" fields cannot coexist. We resolve this by OMITTING
-    // the 0x00 padding on the PQ path: under HFv16 tx_extra ends cleanly with the pq_sig and
-    // parses canonically, and the bulky fixed-size PQ fields (ML-DSA pk+sig 5261 B, plus
-    // a 1088-byte ML-KEM-768 ciphertext per BQ output) provide the size obfuscation the padding
-    // otherwise would. The live chain (get_pq_hf_version() → 0, default 0 at every other call
-    // site → hf_version < HF_VERSION_PQ) keeps the 2500-byte padding BYTE-FOR-BYTE as before.
-    if (hf_version < HF_VERSION_PQ)
+    // The padding is applied at EVERY hf_version, including HFv16 and later. The greedy
+    // TX_EXTRA_TAG_PADDING (0x00) field must be the LAST field of tx_extra: its parser (tx_extra.h,
+    // tx_extra_padding load) reads zero bytes until EOF and rejects the first non-zero byte (unit
+    // test parse_tx_extra.handles_invalid_padding_only). Nothing is appended to tx.extra after this
+    // point: the former trailing account-level ML-DSA-65 signature (tag 0x06) was removed by
+    // spec 2e s3.2 and the validator now rejects it (blockchain.cpp), so padding no longer has to
+    // be skipped from HFv16 on. Skipping it would make every transaction built at HFv16, even a
+    // purely classical one with no PQ field at all, stand out from earlier ones by a much smaller
+    // tx_extra. The padded size (2500) is below both caps, MAX_TX_EXTRA_SIZE (3000) and
+    // MAX_TX_EXTRA_SIZE_PQ (8192).
     {
       const size_t HIDERING_EXTRA_PADDING_TARGET = 2500;
       if (tx.extra.size() < HIDERING_EXTRA_PADDING_TARGET) {
