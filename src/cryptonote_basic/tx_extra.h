@@ -193,11 +193,12 @@ namespace cryptonote
 
   // HIDERING Phase 5 (HFv16) — post-quantum tx_extra fields, registered as proper variant
   // types so parse_tx_extra and sort_tx_extra handle them CANONICALLY (audit E-3). The pq_sig
-  // field is byte-identical to the raw [tag | pk | sig] blob cryptonote_tx_utils.cpp appends
-  // (the validator strips it by its fixed length). The kyber_ct and pq_bind fields lead with
-  // a varint output index and are written through this serialiser. Tags 0x06/0x07/0x08
-  // mirror TX_EXTRA_TAG_PQ_SIG / TX_EXTRA_TAG_KYBER_CT / TX_EXTRA_TAG_PQ_BIND in
-  // cryptonote_config.h. These fields only ever appear once hf_version >= HF_VERSION_PQ.
+  // field (tag 0x06) was removed by spec 2e §2.1: nothing builds it any more and the validator
+  // rejects it, but its type stays registered so that the validator can recognise it. The
+  // kyber_ct and pq_bind fields lead with a varint output index and are written through this
+  // serialiser. Tags 0x06/0x07/0x08 mirror TX_EXTRA_TAG_PQ_SIG / TX_EXTRA_TAG_KYBER_CT /
+  // TX_EXTRA_TAG_PQ_BIND in cryptonote_config.h. The kyber_ct and pq_bind fields only ever
+  // appear once hf_version >= HF_VERSION_PQ.
   struct tx_extra_pq_sig
   {
     crypto::pqc::pq_tx_sig sig; // pk(1952) || sig(3309) = 5261 bytes
@@ -235,8 +236,8 @@ namespace cryptonote
   // will authorise its (transparent) spend: bind_tag = Keccak("HRG_PQ_BIND_v1" || P'_i
   // || dsa_pk_i). Stored at output CREATION, looked up by the validator at SPEND time
   // (see blockchain.cpp check_tx_inputs, check c). Variable-length leading varint, so it
-  // takes the generic [tag|size|data] tx_extra encoding (unlike the fixed-size pq_sig /
-  // kyber_ct blobs). Only present once hf_version >= HF_VERSION_PQ.
+  // takes the generic [tag|size|data] tx_extra encoding (unlike the fixed-size
+  // kyber_ct blob). Only present once hf_version >= HF_VERSION_PQ.
   struct tx_extra_pq_bind
   {
     uint64_t output_index;

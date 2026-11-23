@@ -3325,10 +3325,10 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   if (hf_version >= HF_VERSION_PQ)
   {
 
-    // audit E-5: PQ transactions legitimately exceed the classic 3000-byte extra cap
-    // (ML-DSA pk+sig 5246 B + one ML-KEM-768 ciphertext per BQ output), so enforce the
-    // larger PQ ceiling on the consensus path here (the relay/mempool path enforces it
-    // too — see tx_pool.cpp). Anything beyond it is rejected.
+    // audit E-5: PQ transactions can legitimately exceed the classic 3000-byte extra cap
+    // (one ML-KEM-768 ciphertext field of about 1.1 kB per BQ output, plus its binding
+    // field), so enforce the larger PQ ceiling on the consensus path here (the relay/mempool
+    // path enforces it too — see tx_pool.cpp). Anything beyond it is rejected.
     if (tx.extra.size() > MAX_TX_EXTRA_SIZE_PQ)
     {
       MERROR_VER("Tx " << get_transaction_hash(tx) << " has oversized tx_extra (" << tx.extra.size() << " > " << MAX_TX_EXTRA_SIZE_PQ << ") at/after HFv16");

@@ -79,7 +79,7 @@ target_link_libraries(cncrypto
     ${EXTRA_LIBRARIES})
 
 # Phase 5 PQC: link the imported liboqs (oqs) target so pqc.cpp resolves the
-# Dilithium3 / Kyber768 symbols and picks up the liboqs include dir. The target
+# ML-DSA-65 / ML-KEM-768 symbols and picks up the liboqs include dir. The target
 # is only defined when external/liboqs has been built (see external/CMakeLists.txt);
 # guard so a tree without it still configures.
 if(TARGET oqs)

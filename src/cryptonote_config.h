@@ -213,8 +213,8 @@
 #define HF_VERSION_2021_SCALING                 15
 
 // HIDERING Phase 5 — Post-Quantum additive hard fork (ML-DSA-65 + ML-KEM-768).
-// HFv16 introduces the external ML-DSA-65 signature carried in tx `extra` and
-// the ML-KEM-768-based BQ... addresses. HF_HEIGHT_PQ is a placeholder height: the
+// HFv16 introduces the ML-KEM-768-based BQ... addresses and the per-input ML-DSA-65
+// authorisation of their transparent spends. HF_HEIGHT_PQ is a placeholder height: the
 // fork is registered in the schedule but inactive until mainnet reaches it.
 //
 // SECURITY (audit M-6): a hard fork registered with threshold 0 at a fixed height
@@ -222,21 +222,23 @@
 // If the PQ consensus rules (and the audit findings C-1/E-*) are not finalised and
 // audited before the tip approaches this height, the chain would halt (no valid v16
 // block can be produced). The placeholder is therefore pushed far above any realistic
-// near-term tip. À AJUSTER QUAND LA SPEC PQC SERA FINALISÉE ET AUDITÉE (cible T2 2027).
+// near-term tip. À AJUSTER QUAND LA SPEC PQC SERA FINALISÉE ET AUDITÉE (cible : 2027, pas encore planifiée).
 #define HF_VERSION_PQ                           16
 #define HF_HEIGHT_PQ                            2000000ULL
 
-// Phase 5 (HFv16): tx_extra tag carrying the external ML-DSA-65 signature
-// (pk + sig). Distinct from the classic tx_extra tags in tx_extra.h
-// (0x00..0x04, 0xDE) — 0x06 is unused there. Only emitted/validated once
-// hf_version >= HF_VERSION_PQ; pre-fork transactions never carry it.
+// Phase 5 (HFv16): tx_extra tag that carried the account-level ML-DSA-65 signature
+// (pk + sig). That field was removed by spec 2e §2.1: the wallet no longer builds it and
+// the validator rejects any transaction that carries it at/after HF_VERSION_PQ (see
+// blockchain.cpp). The tag and its field type stay defined because the validator still
+// recognises the field in order to reject it. Distinct from the classic tx_extra tags in
+// tx_extra.h (0x00..0x04, 0xDE) — 0x06 is unused there.
 static const uint8_t TX_EXTRA_TAG_PQ_SIG = 0x06;
 
 // Phase 5 (HFv16): tx_extra tag carrying a ML-KEM-768 KEM ciphertext for a BQ...
 // post-quantum stealth output. Layout (decision 4, design 2b option B3):
 //   [ 0x07 | output_index:varint | sel_tag:8 | ct:1088 ]   (1098 bytes for index < 128)
 // sel_tag is the blinded subaddress selection tag (crypto/pqc.h). One such field is emitted
-// per BQ... destination, before the trailing ML-DSA-65 signature field. Tag 0x07 is unused
+// per BQ... destination. Tag 0x07 is unused
 // by the classic tx_extra tags. Only emitted once hf_version >= HF_VERSION_PQ;
 // pre-fork transactions never carry it.
 static const uint8_t TX_EXTRA_TAG_KYBER_CT = 0x07;

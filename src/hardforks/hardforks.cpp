@@ -44,10 +44,11 @@ const hardfork_t mainnet_hard_forks[] = {
   // height, time) tuples, hence the t=…000 / t=…001 spacing.
   { 1,  0, 0, 1713700000 },
   { 15, 1, 0, 1713700001 },
-  // Phase 5 — Post-Quantum additive hard fork (Dilithium3 + Kyber768).
+  // Phase 5 — Post-Quantum additive hard fork (ML-DSA-65 + ML-KEM-768).
   // Registered but INACTIVE: HF_HEIGHT_PQ (2,000,000) is a placeholder far above
-  // the current mainnet tip (~h81000, Sep 2026), so no block requires major_version 16 yet.
-  // The activation height is finalised before the T2 2027 mainnet fork.
+  // the mainnet tip, so no block requires major_version 16 yet.
+  // The activation height is not scheduled yet (target: 2027); a future release fixes it
+  // and it is announced before activation.
   { HF_VERSION_PQ, HF_HEIGHT_PQ, 0, 1713700002 },
 };
 const size_t num_mainnet_hard_forks = sizeof(mainnet_hard_forks) / sizeof(mainnet_hard_forks[0]);

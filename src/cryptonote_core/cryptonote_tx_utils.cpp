@@ -55,8 +55,8 @@ namespace cryptonote
   // HIDERING Phase 5 (HFv16): serialise a BQ... output's ML-KEM-768 ciphertext into tx.extra as
   // [ TX_EXTRA_TAG_KYBER_CT | output_index:varint | sel_tag:8 | ct:1088 ] through the canonical
   // tx_extra_kyber_ct variant, so parse_tx_extra round-trips it. Appended after the classic
-  // extra fields are sorted and BEFORE the trailing ML-DSA-65 signature, so that signature
-  // stays the last field. Only emitted for BQ... outputs once hf_version >= HF_VERSION_PQ.
+  // extra fields are sorted and BEFORE the padding, which must stay the last field. Only
+  // emitted for BQ... outputs once hf_version >= HF_VERSION_PQ.
   bool add_kyber_ct_to_extra(std::vector<uint8_t>& extra, uint64_t output_index,
                              const crypto::pqc::bq_sel_tag& sel_tag, const crypto::pqc::kyber_ciphertext& ct)
   {
@@ -75,7 +75,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   // HIDERING Phase 5 (HFv16, A1): serialise a per-output binding tag into tx.extra using the
   // generic [ TX_EXTRA_TAG_PQ_BIND | size:varint | output_index:varint | bind_tag:32 ]
-  // encoding (variable-length, unlike the fixed-size pq_sig/kyber_ct blobs), via the
+  // encoding (variable-length, unlike the fixed-size kyber_ct blob), via the
   // canonical tx_extra_pq_bind variant so parse_tx_extra round-trips it. Only emitted for
   // BQ... outputs once hf_version >= HF_VERSION_PQ (inactive on the live chain).
   void add_pq_bind_to_extra(std::vector<uint8_t>& extra, uint64_t output_index, const crypto::hash& bind_tag)
@@ -823,16 +823,15 @@ namespace cryptonote
 
     // HIDERING Phase 5 (HFv16, inactive until HF_HEIGHT_PQ): write the ML-KEM-768
     // ciphertexts for BQ... outputs AFTER sorting (sort_tx_extra would drop these
-    // unknown tags) and BEFORE the trailing ML-DSA-65 signature, keeping that
-    // signature the last field. kyber_cts is empty on the live chain, so this is a
-    // no-op there.
+    // unknown tags) and BEFORE the padding, which must stay the last field.
+    // kyber_cts is empty on the live chain, so this is a no-op there.
     for (const auto& kct : kyber_cts)
       if (!add_kyber_ct_to_extra(tx.extra, kct.output_index, kct.sel_tag, kct.ct))
         return false;
 
     // HIDERING Phase 5 (HFv16, A1): write the per-output binding tags (TX_EXTRA_TAG_PQ_BIND)
-    // after the KEM ciphertexts and BEFORE the trailing ML-DSA-65 signature, so that signature
-    // stays the last field. pq_binds is empty on the live chain → no-op there.
+    // after the KEM ciphertexts and BEFORE the padding, which must stay the last field.
+    // pq_binds is empty on the live chain → no-op there.
     for (const auto& b : pq_binds)
       add_pq_bind_to_extra(tx.extra, b.first, b.second);
 
@@ -864,14 +863,13 @@ namespace cryptonote
     // HIDERING Phase 5 (HFv16, A3): sign every transparent post-quantum input. A txin_to_key_pq is
     // authorised by an ML-DSA-65 signature AND (audit CRIT-3) an Ed25519 signature by the spent
     // output's one-time secret, both over the tx prefix hash computed with ALL dsa.sig and
-    // owner_sig fields zeroed (a signature cannot cover itself) and BEFORE the external ML-DSA-65
-    // tx signature is appended to tx.extra — exactly the message the validator reconstructs
-    // (blockchain.cpp: zero every dsa.sig and owner_sig AND drop the trailing pq_sig field, then
-    // hash). This runs before the external pq_sig block below, so when that block hashes the prefix
-    // the inputs already carry their final signatures. pq_input_signing_keys is empty unless this is
-    // a BQ spend → no-op on the live chain. Runs for the hybrid shape too: its PQ inputs need exactly
-    // the same per-input authorisation, and are matched to their material by output key because the
-    // input sort above has moved them.
+    // owner_sig fields zeroed (a signature cannot cover itself) — exactly the message the
+    // validator reconstructs (blockchain.cpp: zero every dsa.sig and owner_sig, then hash).
+    // tx.extra is already complete here (padding included) and nothing is appended to it
+    // afterwards, so the inputs are signed over the final prefix. pq_input_signing_keys is
+    // empty unless this is a BQ spend → no-op on the live chain. Runs for the hybrid shape too:
+    // its PQ inputs need exactly the same per-input authorisation, and are matched to their
+    // material by output key because the input sort above has moved them.
     // Every signature must commit to the prefix as it will be BROADCAST. A RingCT transaction
     // zeroes its ring-input and output amounts just before genRct (below) — after the PQ
     // signatures here are produced. For a hybrid (the only RingCT shape with PQ inputs) those
@@ -904,7 +902,7 @@ namespace cryptonote
 
     if (any_pq)
     {
-      // input sigs all zero, extra has no pq_sig yet
+      // input sigs all zero; tx.extra is already complete
       const crypto::hash pq_in_prefix_hash = broadcast_prefix_hash();
       size_t signed_inputs = 0;
       for (auto& in_v : tx.vin)
@@ -946,11 +944,9 @@ namespace cryptonote
     // position or length inside tx_extra.
 
     // HIDERING (audit E-5 / finding #4): enforce the tx_extra size ceiling ONCE, here,
-    // after EVERY field is in place — padding, ML-KEM-768 ciphertexts, AND the trailing
-    // ML-DSA-65 signature. The old check ran inside the padding branch, before the
-    // 5262-byte signature was appended, so it never accounted for it. Under HFv16 the
-    // larger PQ ceiling applies; the live chain (hf < HF_VERSION_PQ) keeps the classic
-    // MAX_TX_EXTRA_SIZE.
+    // after EVERY field is in place — ML-KEM-768 ciphertexts, binding tags and padding. Under
+    // HFv16 the larger PQ ceiling applies; the live chain (hf < HF_VERSION_PQ) keeps the
+    // classic MAX_TX_EXTRA_SIZE.
     {
       const size_t max_extra = (hf_version >= HF_VERSION_PQ) ? MAX_TX_EXTRA_SIZE_PQ : MAX_TX_EXTRA_SIZE;
       CHECK_AND_ASSERT_MES(tx.extra.size() <= max_extra, false, "TX extra size (" << tx.extra.size() << ") is greater than max allowed (" << max_extra << ")");
