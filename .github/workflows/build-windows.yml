@@ -83,8 +83,10 @@ jobs:
           # does not append. CMAKE_*_STANDARD_LIBRARIES are emitted at the very
           # END of the link line, after libcrypto.a, so ld resolves them.
           WIN_SYS_LIBS="-lws2_32 -lcrypt32 -lbcrypt -lgdi32 -liphlpapi"
+          # ARCH=default: no -march=native. The runner CPU varies (some have
+          # AVX-512); a native build then dies with SIGILL on CPUs without it.
           cmake -S . -B build -G "MSYS Makefiles" \
-            -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+            -DARCH=default -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF -DBoost_NO_BOOST_CMAKE=ON \
             -DCMAKE_C_STANDARD_LIBRARIES="${WIN_SYS_LIBS}" \
             -DCMAKE_CXX_STANDARD_LIBRARIES="${WIN_SYS_LIBS}"

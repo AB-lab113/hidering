@@ -54,7 +54,9 @@ jobs:
       - name: build daemon + wallet
         run: |
           mkdir -p build && cd build
-          cmake .. -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
+          # ARCH=default: no -march=native. The runner CPU varies (some have
+          # AVX-512); a native build then dies with SIGILL on CPUs without it.
+          cmake .. -DARCH=default -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release \
             -DUSE_DEVICE_TREZOR=OFF
           make -j"${JOBS}" daemon simplewallet wallet_rpc_server
 
