@@ -122,7 +122,10 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: HIDERING ${{ github.ref_name }}
-          draft: false
+          # Draft: the release stays unpublished until the maintainer has checked
+          # the assets and runs gh release edit <tag> --draft=false. (The tag
+          # itself is public as soon as it is pushed.)
+          draft: true
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true

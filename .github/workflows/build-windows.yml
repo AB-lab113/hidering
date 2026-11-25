@@ -131,6 +131,44 @@ jobs:
             echo "Unresolved DLL imports, refusing to package."
             exit 1
           fi
+          # Licence texts of the bundled MSYS2 DLLs: one folder per owning MSYS2
+          # package, with its pacman metadata (name, version, URL, licence) and
+          # every LICENSE/COPYING/NOTICE file the package installs. A bundled DLL
+          # that no package owns fails the build.
+          mkdir -p "dist/${PKG}/licenses"
+          : > dll-packages.txt
+          while read -r dll; do
+            pacman -Qqo "$dll" >> dll-packages.txt || {
+              echo "No MSYS2 package owns $dll, refusing to package."
+              exit 1
+            }
+          done < dll-list.txt
+          sort -u -o dll-packages.txt dll-packages.txt
+          echo "Packages owning the bundled DLLs:"
+          cat dll-packages.txt
+          {
+            echo "Licences of the third-party DLLs bundled in this package."
+            echo "One folder per MSYS2 package: PACKAGE-INFO.txt gives its name, version,"
+            echo "upstream URL and licence; the other files are the licence texts it ships."
+          } > "dist/${PKG}/licenses/README.txt"
+          while read -r pkg; do
+            dest="dist/${PKG}/licenses/${pkg}"
+            mkdir -p "$dest"
+            pacman -Qi "$pkg" | grep -E '^(Name|Version|URL|Licenses) ' > "$dest/PACKAGE-INFO.txt"
+            n=0
+            while IFS= read -r f; do
+              [ -f "$f" ] || continue
+              case "${f##*/}" in
+                LICENSE*|LICENCE*|COPYING*|NOTICE*|COPYRIGHT*)
+                  cp "$f" "$dest/$(echo "${f#/ucrt64/}" | tr '/' '_')"
+                  n=$((n+1)) ;;
+              esac
+            done < <(pacman -Qql "$pkg")
+            echo "${pkg}: ${n} licence file(s)"
+            if [ "$n" = 0 ]; then
+              echo "::warning::${pkg} ships no LICENSE/COPYING file; only PACKAGE-INFO.txt is bundled"
+            fi
+          done < dll-packages.txt
           cp README.md GENESIS_PROOF.md LICENSE "dist/${PKG}/" || true
           cd dist
           zip -r "${PKG}.zip" "${PKG}"
@@ -162,7 +200,10 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: HIDERING ${{ github.ref_name }}
-          draft: false
+          # Draft: the release stays unpublished until the maintainer has checked
+          # the assets and runs gh release edit <tag> --draft=false. (The tag
+          # itself is public as soon as it is pushed.)
+          draft: true
           prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
