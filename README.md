@@ -116,7 +116,8 @@ security still rests on cumulative RandomX proof of work.
 ## Post-Quantum Cryptography
 
 HIDERING implements a post-quantum spend path, **inert until the HFv16 hard fork**
-(`HF_HEIGHT_PQ` = 2,000,000, mainnet target Q2 2027). Nothing below affects the live chain.
+(`HF_HEIGHT_PQ` = 2,000,000 is a placeholder; mainnet target 2027, not yet scheduled). Nothing
+below affects the live chain. Since v2.1.0 the code ships, inactive, in the published binaries.
 
 - **Signatures:** ML-DSA-65 (FIPS 204), via [liboqs](https://github.com/open-quantum-safe/liboqs)
 - **Key encapsulation:** ML-KEM-768 (FIPS 203)
@@ -134,9 +135,11 @@ transaction. BQ addresses trade spend privacy for quantum resistance. Use `B...`
 everyday use. See [§6.2 of the whitepaper](docs/whitepaper_v1.4.md).
 
 **Activation is not imminent, and not fast.** liboqs still carries its authors' own warning
-against production use and holds no FIPS 140-3 validation; cold-signing a BQ spend, mixing
-`B...` and `BQ...` funds in one transaction, and BQ subaddresses are all still open. Beyond
-that, a hard fork needs binaries published for every platform and weeks of lead time for
+against production use and holds no FIPS 140-3 validation; BQ subaddresses are not yet
+exposed by wallet-rpc or the GUI wallet, and a view-only wallet cannot detect a BQ output.
+(Cold-signing a BQ spend and mixing `B...` and `BQ...` funds in one transaction were closed
+on 8 September 2026.) Beyond that, a hard fork needs binaries published for every platform
+and weeks of lead time for
 miners, pools and holders to upgrade. Earlier versions of this file claimed activation was
 possible "in 24–48h by changing a constant" — that was false and has been withdrawn.
 See [§6.1 of the whitepaper](docs/whitepaper_v1.4.md) and `docs/audit/`.
@@ -147,7 +150,7 @@ Binaries for Linux x64, macOS ARM64 and Windows x64 are published on the
 [releases page](https://github.com/AB-lab113/hidering/releases), built by CI, each with a
 `.sha256` sidecar. **Verify the checksum before running anything.**
 
-- **Node + wallet CLI:** v2.0.3 — `hideringd`, `hidering-wallet-cli`, `hidering-wallet-rpc`
+- **Node + wallet CLI:** v2.1.0 — `hideringd`, `hidering-wallet-cli`, `hidering-wallet-rpc`
 - **Desktop GUI wallet:** v2.0.2-gui, from the
   [hidering-gui](https://github.com/AB-lab113/hidering-gui/releases) repository (Linux
   AppImage, macOS `.app`, Windows portable)
@@ -155,17 +158,17 @@ Binaries for Linux x64, macOS ARM64 and Windows x64 are published on the
 ### Running the official binaries
 
 The release binaries are not self-contained on every platform. This is what they need on
-the machine (checked on the binaries built by CI on 21 November 2026 and on the v2.0.3
-assets):
+the machine (checked on the v2.1.0 assets):
 
-* **Windows x64.** The CI zip contains the MSYS2 runtime DLLs that the wallet CLI loads
+* **Windows x64.** The zip contains the MSYS2 runtime DLLs that the wallet CLI loads
   (ICU, iconv, libstdc++, libgcc, libwinpthread). Unzip everything into one folder and keep
   the `.dll` files next to the `.exe` files. The executables use the Windows Universal C
   Runtime, built into Windows 10 and later; older Windows versions have not been tested.
+  The licences of these DLLs are in the `licenses/` folder of the zip.
   **The v2.0.3 zip is different:** its `hidering-wallet-cli.exe` imports `libiconv-2.dll`,
   `libicuin78.dll` and `libicuuc78.dll`, which that zip does not contain, so it does not
   start on a machine without MSYS2. Its `hideringd.exe` and `hidering-wallet-rpc.exe` only
-  import Windows system DLLs. Releases built from commit `a5288e64a` or later ship the DLLs.
+  import Windows system DLLs. v2.1.0 is the first release that ships the DLLs.
 * **Linux x64.** Built on Ubuntu 22.04 and dynamically linked. Needs glibc 2.34 or newer and
   these shared libraries: Boost 1.74 (chrono, filesystem, program_options, regex,
   serialization, thread), readline 8, libsodium 23, libunbound 8, OpenSSL 3 and, for
@@ -181,10 +184,10 @@ assets):
   Boost 1.83) need those libraries added separately, or a build from source. Other
   distributions have not been checked.
 * **macOS ARM64.** Linked against [Homebrew](https://brew.sh) libraries in `/opt/homebrew`:
-  `boost`, `readline`, `libsodium`, `unbound`, `zeromq` and OpenSSL (`openssl@3` for the
-  v2.0.3 binaries, `openssl@4` for builds made by the current CI). The archive contains no
-  libraries, so these formulae must be installed first. Only Apple silicon binaries are
-  published.
+  `boost`, `readline`, `libsodium`, `unbound`, `zeromq` and `openssl@4` (the v2.0.3 binaries
+  used `openssl@3`). The v2.1.0 binaries need macOS 15 or newer (v2.0.3: macOS 14). The
+  archive contains no libraries, so these formulae must be installed first. Only Apple
+  silicon binaries are published.
 
 If a binary does not start, compare this list with what is installed, or build from source.
 
@@ -203,7 +206,7 @@ Dates are YYYY-MM-DD. "Minimum" is the version that follows the new consensus ru
 | 0 | chain launch | v1 | v1.0.0 | Genesis block. Its coinbase is locked under a NUMS key and is cryptographically unspendable — see [GENESIS_PROOF.md](GENESIS_PROOF.md). The v1 row exists only so the genesis coinbase validates. |
 | 1 | chain launch | v15 | v1.0.0 | The chain runs at fork version 15 **from block 1**: CLSAG, bulletproofs+, view tags, dynamic ring 32–64. |
 | — | 2026-05-16 | — | v2.0.0 | Not a consensus fork: a **network ID change** (`HRG\x01` → `HRG\x02`) following the 51% attack on the v1.x chain, which was abandoned. v1.x binaries are cut off at the P2P handshake. |
-| 2000000 | not scheduled (target Q2 2027) | v16 | TBD | **Planned, not scheduled.** Post-quantum: ML-DSA-65 signatures, ML-KEM-768 KEM, `BQ...` addresses. The height is a placeholder and the activation date is not fixed — see [Post-Quantum Cryptography](#post-quantum-cryptography). |
+| 2000000 | not scheduled (target 2027) | v16 | TBD | **Planned, not scheduled.** Post-quantum: ML-DSA-65 signatures, ML-KEM-768 KEM, `BQ...` addresses. The height is a placeholder and the activation date is not fixed — see [Post-Quantum Cryptography](#post-quantum-cryptography). |
 
 HIDERING did **not** inherit Monero's upgrade history: the chain launched directly at fork
 version 15, so Monero's v2–v14 heights and dates do not apply here.
@@ -495,14 +498,14 @@ application.
     cd hidering
     ```
 
-* If you would like a specific [version/tag](https://github.com/AB-lab113/hidering/tags), do a git checkout for that version. eg. 'v2.0.3'. If you don't care about the version and just want binaries from the default branch (`v2-privacy`), skip this step:
+* If you would like a specific [version/tag](https://github.com/AB-lab113/hidering/tags), do a git checkout for that version. eg. 'v2.1.0'. If you don't care about the version and just want binaries from the default branch (`v2-privacy`), skip this step:
 
     ```bash
-    git checkout v2.0.3
+    git checkout v2.1.0
     ```
 
   Tags up to v2.0.3 predate the OpenSSL 4 compatibility fix (commit `450d1aafd`) and do not
-  compile against the OpenSSL 4 shipped by current MSYS2. Skip this step to build the default branch.
+  compile against the OpenSSL 4 shipped by current MSYS2; v2.1.0 includes the fix.
 
 * To build HIDERING, run these commands (they are the ones CI uses, see
   `.github/workflows/build-windows.yml`):

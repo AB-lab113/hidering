@@ -199,7 +199,7 @@ La cryptographie post-quantique sera introduite via un **hard fork** (cible : 20
 - **Impact** : les transactions futures (post-fork) utilisent les nouveaux schémas. La blockchain historique n'est pas affectée.
 - **Compatibilité** : mise à jour obligatoire des binaires au moment du fork.
 
-**État (septembre 2026).** Le prototype post-quantique (intégration liboqs (0.15.0 dans les binaires publiés, 0.16.0 sur la branche de développement), keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté sur la branche de développement et a fait l'objet d'une revue interne assistée par IA (pas d'audit tiers). Tout le code PQ reste **inerte**. Le code actuel porte une hauteur d'activation provisoire (2 000 000) qui n'est pas la date prévue ; la vraie hauteur d'activation sera fixée par une future release et annoncée avant l'activation. Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible : **2027, pas encore planifiée**.
+**État (novembre 2026).** Le prototype post-quantique (intégration liboqs 0.16.0, keygen BQ, persistance des clés, signatures ML-DSA-65 (FIPS 204) en `tx_extra`, KEM ML-KEM-768 (FIPS 203)) est implémenté ; il est présent, inactif, dans les binaires publiés depuis la release v2.1.0 (26 novembre 2026). Il a fait l'objet d'une revue interne assistée par IA (pas d'audit tiers). Tout le code PQ reste **inerte**. Le code actuel porte une hauteur d'activation provisoire (2 000 000) qui n'est pas la date prévue ; la vraie hauteur d'activation sera fixée par une future release et annoncée avant l'activation. Le chemin nominal est implémenté : binding C-1, checks validateur a–e, spend-side wallet2, fix H-5 multi-ciphertext, acceptation mempool, activation wallet. Le flow e2e complet B...→BQ...→dépense est validé sur regtest (commits `7d53cb940`→`b72425afe`, branche v2-privacy). Cible : **2027, pas encore planifiée**.
 
 ### 6.1 Délai réel d'activation — ce qu'il faut vraiment pour passer à HFv16
 
@@ -217,7 +217,7 @@ sensibles »*. Elle ne détient aucune validation FIPS 140-3 — seuls les **alg
 pas résolu (audit tiers, implémentation validée, ou posture hybride formalisée), **HFv16 ne
 sera pas activé.**
 
-**Points fonctionnels ouverts.** Les subaddresses BQ sont implémentées dans le cœur du wallet et la CLI (branche de développement), pas encore exposées par wallet-rpc ni la GUI. *(Deux points
+**Points fonctionnels ouverts.** Les subaddresses BQ sont implémentées dans le cœur du wallet et la CLI (CLI publiée depuis la v2.1.0, inactives avant HFv16), pas encore exposées par wallet-rpc ni la GUI. *(Deux points
 ouverts ont été fermés le 8 septembre 2026 : le **cold-signing** d'une dépense BQ — le fichier
 de transfert transporte le ciphertext ML-KEM-768, jamais le secret partagé, et la machine
 hors-ligne re-dérive celui-ci avec ses propres clés ; et la **consolidation B.../BQ**, via les
@@ -355,7 +355,8 @@ Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG
 **PHASE 4 : MAINNET LAUNCH (En cours)**
 - ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
 - ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (attaque 51 % à h≈3577) retirée au profit du nouveau réseau v2.0.0.
-- ✅ **Release v2.0.3 (19 juin 2026)** — dernière publique, ajoute les checkpoints h=16000, 20000 et 25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
+- ✅ **Release v2.1.0 (26 novembre 2026)** — dernière publique, sans hard fork : zip Windows complet (DLL d'exécution et leurs licences), binaires Linux génériques x86-64 (`-DARCH=default`), checkpoints h=80386, 90000 et 110000, liboqs 0.16.0 ; code post-quantique présent mais inactif
+- ✅ **Release v2.0.3 (19 juin 2026)** — ajoute les checkpoints h=16000, 20000 et 25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
 - ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256
 - ✅ Wallet GUI Desktop multi-plateformes (v2.0.2-gui : Linux AppImage, macOS ARM64, Windows x64)
 - ✅ Pool mining RandomX/HRG en production (`pool.hidering.org:3333` — voir §9)
@@ -363,7 +364,7 @@ Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG
 
 **PHASE 5 : POST-QUANTIQUE (cible : 2027, pas encore planifiée)**
 - ML-DSA-65 (FIPS 204) + ML-KEM-768 (FIPS 203) — prototype, revue interne assistée par IA, aucun audit tiers ; code inerte
-- 🔧 Implémenté sur la branche de développement (A1 spec, A2 validateur, A3 spend-side, A4 wallet) — pas encore dans une release
+- 🔧 Implémenté (A1 spec, A2 validateur, A3 spend-side, A4 wallet) ; présent mais inactif dans la release v2.1.0, activation seulement au hard fork HFv16
 - ✅ **Tests e2e BQ regtest validés (juin 2026)**
 - Hard fork PQC mainnet (cible : 2027, pas encore planifiée)
 
@@ -391,7 +392,7 @@ Le minage solo reste pleinement supporté via `hideringd` + `hidering-wallet-cli
 
 ### 9.1 Checkpoints d'intégrité
 
-La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000, 110000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics de la release v2.0.3 n'en contiennent que 6 (jusqu'à h=25000). La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
+La chaîne v2.0.0 embarque des ancres de checkpoint (hauteurs 2939, 5000, 11000, 16000, 20000, 25000, 80386, 90000, 110000) facilitant la synchronisation initiale et l'alignement des nœuds. Les binaires publics les contiennent toutes depuis la release v2.1.0 (la v2.0.3 n'en contenait que 6, jusqu'à h=25000). La sécurité du consensus repose avant tout sur le PoW RandomX cumulé ; ces ancres sont un aide à la convergence, pas un substitut à la preuve de travail.
 
 ---
 
@@ -465,8 +466,12 @@ La distribution se fait par compétition PoW ; voir §7.1 pour la phase initiale
 
 ---
 
-*Whitepaper v1.5 — Novembre 2026 : phase initiale réécrite (§7.1) ; burn de 17 583,321467142937 HRG, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
-*SHA256 release v2.0.3 (dernière publique) :*  
+*Whitepaper v1.5 — Novembre 2026 : release v2.1.0 (§6, §8, §9.1, empreintes ci-dessous) ; phase initiale réécrite (§7.1) ; burn de 17 583,321467142937 HRG, soit au moins tout ce que `B5TLmi…` a reçu jusqu'au bloc 17567 (§7.2) (révisions antérieures : v1.4.3 octobre 2026 ; 26 juin 2026, implémentation HFv16 complète — binding C-1, validateur, spend-side, wallet, e2e regtest validé ; revue de sécurité interne juin 2026, corrections privacy, pool mining + checkpoints)*  
+*SHA256 release v2.1.0 (dernière publique) :*  
+*  Linux x64 : `a7ed3465dde98b22b3a18b3b0ae7c71945536ca7c7f54a3eda6ee3e0ea3087bf`*  
+*  macOS ARM64 : `95c2bd0b635759830c8df995e09d24dff8f83069070d8f7bda0300aea19fa88e`*  
+*  Windows x64 : `5c5a81857de36bc27463d53394ad3a8ed15dc276f7ba8daa2f1d45bf0fadd7b1`*  
+*SHA256 release v2.0.3 (précédente) :*  
 *  Linux x64 : `32d93e00e0413cbf398f324c5daa31a772e0ee76ee67b0a6796c705a60d797a7`*  
 *  macOS ARM64 : `f98124eb6230f2ea26bca09db6468f898b99446f689ceda5d8affb35131dbb54`*  
 *  Windows x64 : `f8dfc4447b69b7fa75083da55be4925a11f35cc5c35888b2d47c8d08c0a9bfb3`*  
