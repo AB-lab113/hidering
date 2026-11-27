@@ -354,7 +354,7 @@ Le lot 3 est arrondi au centième supérieur : il dépasse de 0,008571428559 HRG
 
 **PHASE 4 : MAINNET LAUNCH (En cours)**
 - ✅ Releases v1.0.0 → v1.0.2 Linux (rebrand, fix MONEY_SUPPLY 18M, fix bad_alloc boot daemon)
-- ✅ **Hard fork v2.0.0 (16 mai 2026)** — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (attaque 51 % à h≈3577) retirée au profit du nouveau réseau v2.0.0.
+- ✅ **Hard fork v2.0.0** (attaque de la v1.x le 16 mai 2026 ; release v2.0.0 publiée le 17 mai) — NETWORK_ID bumpé `HRG\x01HIDERINGMAIN` → `HRG\x02HIDERINGMAIN`, magic `0x48524701` → `0x48524702`, version 1.0.2 → 2.0.0. Chaîne v1.x (attaque 51 % à h≈3577) retirée au profit du nouveau réseau v2.0.0.
 - ✅ **Release v2.1.0 (26 novembre 2026)** — dernière publique, sans hard fork : zip Windows complet (DLL d'exécution et leurs licences), binaires Linux génériques x86-64 (`-DARCH=default`), checkpoints h=80386, 90000 et 110000, liboqs 0.16.0 ; code post-quantique présent mais inactif
 - ✅ **Release v2.0.3 (19 juin 2026)** — ajoute les checkpoints h=16000, 20000 et 25000 ; bundles complets (daemon + wallet) Linux x64, macOS ARM64 et Windows x64, publiés automatiquement par CI
 - ✅ Binaires multi-plateformes v2.0.2 (Linux / macOS ARM64 / Windows) — chaque asset accompagné de son sidecar SHA256

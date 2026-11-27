@@ -1,7 +1,7 @@
 # HIDERING (HRG)
 
-An enhanced-privacy, ASIC-resistant cryptocurrency with a Bitcoin-style emission curve
-and a post-quantum migration path.
+An enhanced-privacy, CPU-mineable (RandomX) cryptocurrency with a Bitcoin-style emission
+curve and a post-quantum migration path.
 
 HIDERING is a **fork of [Monero](https://github.com/monero-project/monero)** (CryptoNote
 lineage). The privacy core — ring signatures, stealth addresses, RingCT — is Monero's work,
@@ -66,14 +66,15 @@ control your funds, and nobody can trace your transfers unless you allow them to
 
 **Privacy.** Transactions hide the sender in a ring of decoys, the recipient behind a
 one-time stealth address, and the amount behind a Pedersen commitment (RingCT). HIDERING
-raises the ring size to a dynamic 32–64, above Monero's fixed 16.
+raises the ring size to 32 by default (consensus allows 32–64), above Monero's fixed 16.
 
 **Security.** Every transaction is cryptographically secured by a distributed peer-to-peer
 consensus network. Wallets have a 25-word mnemonic seed, displayed once, which is the only
 thing you need to back up. Wallet files should be encrypted with a strong passphrase.
 
-**Decentralisation.** Proof of work is RandomX — CPU-friendly and ASIC-hostile — so ordinary
-hardware can compete. Emission is 100% PoW: no ICO, no private sale, no seed round.
+**Decentralisation.** Proof of work is RandomX, designed for CPUs so that ordinary hardware
+can compete (ASIC hardware for RandomX does exist). Emission is 100% PoW: no ICO, no private
+sale, no seed round.
 17,583.321467142937 HRG have been burned to an address unspendable under the classical
 discrete-log assumption ([BURN_PROOF.md](BURN_PROOF.md)): at least everything received up to
 block 17567 by `B5TLmi…`, the pool and mining address. See [§7 of the whitepaper](docs/whitepaper_v1.4.md)
@@ -88,7 +89,7 @@ for the initial mining phase and the burn, stated plainly.
 | Initial block reward | — | 42.86 HRG |
 | Halving | none (tail emission) | every 210,000 blocks (~292 days) |
 | Block time | 120 s | 120 s |
-| Ring size | fixed 16 | **dynamic 32–64** |
+| Ring size | fixed 16 | **32 by default (32–64 allowed)** |
 | Address prefix | `4...` | `B...` (and `BQ...` post-quantum, see below) |
 | PoW | RandomX | RandomX (unchanged) |
 | Post-quantum | research | ML-DSA-65 + ML-KEM-768 implemented, inert until HFv16 |
@@ -204,8 +205,8 @@ Dates are YYYY-MM-DD. "Minimum" is the version that follows the new consensus ru
 | Fork height | Date | Fork version | Minimum version | Details |
 | ----------- | ---- | ------------ | --------------- | ------- |
 | 0 | chain launch | v1 | v1.0.0 | Genesis block. Its coinbase is locked under a NUMS key and is cryptographically unspendable — see [GENESIS_PROOF.md](GENESIS_PROOF.md). The v1 row exists only so the genesis coinbase validates. |
-| 1 | chain launch | v15 | v1.0.0 | The chain runs at fork version 15 **from block 1**: CLSAG, bulletproofs+, view tags, dynamic ring 32–64. |
-| — | 2026-05-16 | — | v2.0.0 | Not a consensus fork: a **network ID change** (`HRG\x01` → `HRG\x02`) following the 51% attack on the v1.x chain, which was abandoned. v1.x binaries are cut off at the P2P handshake. |
+| 1 | chain launch | v15 | v1.0.0 | The chain runs at fork version 15 **from block 1**: CLSAG, bulletproofs+, view tags, ring size 32–64 (wallet default 32). |
+| — | 2026-05-17 | — | v2.0.0 | Not a consensus fork: a **network ID change** (`HRG\x01` → `HRG\x02`) following the 51% attack of 16 May 2026 on the v1.x chain, which was abandoned. v1.x binaries are cut off at the P2P handshake. |
 | 2000000 | not scheduled (target 2027) | v16 | TBD | **Planned, not scheduled.** Post-quantum: ML-DSA-65 signatures, ML-KEM-768 KEM, `BQ...` addresses. The height is a placeholder and the activation date is not fixed — see [Post-Quantum Cryptography](#post-quantum-cryptography). |
 
 HIDERING did **not** inherit Monero's upgrade history: the chain launched directly at fork
